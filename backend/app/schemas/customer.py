@@ -1,0 +1,40 @@
+from datetime import date, datetime
+
+from pydantic import BaseModel, ConfigDict, model_validator
+
+
+class IndividualIn(BaseModel):
+    tc_no: str | None = None
+    birth_date: date | None = None
+    gender: str | None = None
+
+
+class OrganizationIn(BaseModel):
+    company_name: str
+    tax_number: str | None = None
+    tax_office: str | None = None
+
+
+class CustomerCreateIn(BaseModel):
+    customer_type: str  # 'individual' | 'organization'
+    individual: IndividualIn | None = None
+    organization: OrganizationIn | None = None
+
+    @model_validator(mode="after")
+    def check_payload(self):
+        if self.customer_type not in ("individual", "organization"):
+            raise ValueError("customer_type 'individual' veya 'organization' olmalı")
+        if self.customer_type == "individual" and self.individual is None:
+            raise ValueError("customer_type 'individual' ise 'individual' alanı zorunlu")
+        if self.customer_type == "organization" and self.organization is None:
+            raise ValueError("customer_type 'organization' ise 'organization' alanı zorunlu")
+        return self
+
+
+class CustomerOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    cust_id: int
+    user_id: int
+    customer_type: str
+    is_active: bool
+    created_at: datetime
