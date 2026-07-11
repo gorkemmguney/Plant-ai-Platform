@@ -32,3 +32,6 @@ class OrderOut(BaseModel):
     order_date: datetime
     gnl_st_id: int
     items: list[OrderItemOut] = []
+
+class OrderStatusUpdateIn(BaseModel):
+    gnl_st_id: int

@@ -9,8 +9,8 @@ from app.models.customer import Cust
 from app.models.order import CustOrd
 from app.models.user import AppUser
 from app.rbac.roles import RoleName
-from app.schemas.order import OrderCreateIn, OrderOut
-from app.services.order_service import create_order
+from app.schemas.order import OrderCreateIn, OrderOut, OrderStatusUpdateIn
+from app.services.order_service import create_order, update_order_status
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
@@ -44,3 +44,13 @@ async def list_my_orders(
         select(CustOrd).options(selectinload(CustOrd.items)).where(CustOrd.cust_id == cust_id)
     )
     return result.scalars().all()
+
+
+@router.patch("/{cust_ord_id}/status", response_model=OrderOut)
+async def update_order_status_endpoint(
+    cust_ord_id: int,
+    payload: OrderStatusUpdateIn,
+    db: AsyncSession = Depends(get_db),
+    _: AppUser = Depends(require_role(RoleName.SELLER, RoleName.ADMIN)),
+):
+    return await update_order_status(db, cust_ord_id, payload.gnl_st_id)

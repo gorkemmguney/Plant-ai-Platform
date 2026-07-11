@@ -1,5 +1,8 @@
 from decimal import Decimal
 
+from app.models.customer import Cust
+from app.services.notification_service import create_notification
+
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -10,6 +13,36 @@ from app.models.order import CustOrd, CustOrdItem
 from app.schemas.order import OrderCreateIn
 
 DEFAULT_ORDER_STATUS_ID = 5
+
+_STATUS_MESSAGES = {
+    5: "Siparişiniz alındı.",
+    6: "Siparişiniz hazırlanıyor.",
+    7: "Siparişiniz kargoya verildi.",
+    8: "Siparişiniz teslim edildi.",
+    9: "Siparişiniz iptal edildi.",
+}
+
+
+async def update_order_status(db: AsyncSession, cust_ord_id: int, gnl_st_id: int) -> CustOrd:
+    result = await db.execute(
+        select(CustOrd).options(selectinload(CustOrd.items)).where(CustOrd.cust_ord_id == cust_ord_id)
+    )
+    order = result.scalar_one_or_none()
+    if order is None:
+        raise HTTPException(status_code=404, detail="Sipariş bulunamadı")
+
+    order.gnl_st_id = gnl_st_id
+    await db.flush()
+
+    cust_result = await db.execute(select(Cust).where(Cust.cust_id == order.cust_id))
+    cust = cust_result.scalar_one_or_none()
+    if cust is not None:
+        message = _STATUS_MESSAGES.get(gnl_st_id, "Sipariş durumunuz güncellendi.")
+        await create_notification(db, cust.user_id, "Sipariş Güncellemesi", message)
+
+    await db.commit()
+    await db.refresh(order)
+    return order
 
 async def create_order(db: AsyncSession, cust_id: int, payload: OrderCreateIn) -> CustOrd:
     if not payload.items:
