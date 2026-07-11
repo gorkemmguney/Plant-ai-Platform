@@ -1,4 +1,3 @@
-
 from functools import lru_cache
 
 import firebase_admin
@@ -12,7 +11,13 @@ from app.core.config import get_settings
 def get_firebase_app() -> firebase_admin.App:
     settings = get_settings()
     cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)
-    return firebase_admin.initialize_app(cred, {"projectId": settings.FIREBASE_PROJECT_ID})
+    return firebase_admin.initialize_app(
+        cred,
+        {
+            "projectId": settings.FIREBASE_PROJECT_ID,
+            "storageBucket": f"{settings.FIREBASE_PROJECT_ID}.firebasestorage.app",
+        },
+    )
 
 
 class InvalidTokenError(Exception):
@@ -20,7 +25,6 @@ class InvalidTokenError(Exception):
 
 
 def verify_id_token(id_token: str) -> dict:
-    
     get_firebase_app()
     try:
         decoded = firebase_auth.verify_id_token(id_token, check_revoked=True)
