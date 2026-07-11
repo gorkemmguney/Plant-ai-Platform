@@ -23,7 +23,7 @@ async def create_customer_profile(db: AsyncSession, user_id: int, payload: Custo
     db.add(cust)
     await db.flush()
 
-    if payload.customer_type == "individual":
+    if payload.customer_type == "IND":
         db.add(
             Ind(
                 cust_id=cust.cust_id,

@@ -22,12 +22,12 @@ class CustomerCreateIn(BaseModel):
 
     @model_validator(mode="after")
     def check_payload(self):
-        if self.customer_type not in ("individual", "organization"):
-            raise ValueError("customer_type 'individual' veya 'organization' olmalı")
-        if self.customer_type == "individual" and self.individual is None:
-            raise ValueError("customer_type 'individual' ise 'individual' alanı zorunlu")
-        if self.customer_type == "organization" and self.organization is None:
-            raise ValueError("customer_type 'organization' ise 'organization' alanı zorunlu")
+        if self.customer_type not in ("IND", "ORG"):
+            raise ValueError("customer_type 'IND' veya 'ORG' olmalı")
+        if self.customer_type == "IND" and self.individual is None:
+            raise ValueError("customer_type 'IND' ise 'individual' alanı zorunlu")
+        if self.customer_type == "ORG" and self.organization is None:
+            raise ValueError("customer_type 'ORG' ise 'organization' alanı zorunlu")
         return self
 
 

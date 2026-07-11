@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import require_role
@@ -39,5 +40,7 @@ async def list_my_orders(
     user: AppUser = Depends(require_role(RoleName.CUSTOMER, RoleName.ADMIN)),
 ):
     cust_id = await _get_cust_id(user, db)
-    result = await db.execute(select(CustOrd).where(CustOrd.cust_id == cust_id))
+    result = await db.execute(
+        select(CustOrd).options(selectinload(CustOrd.items)).where(CustOrd.cust_id == cust_id)
+    )
     return result.scalars().all()

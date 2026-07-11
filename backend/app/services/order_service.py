@@ -2,14 +2,14 @@ from decimal import Decimal
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.catalog import Prod
 from app.models.order import CustOrd, CustOrdItem
 from app.schemas.order import OrderCreateIn
 
-DEFAULT_ORDER_STATUS_ID = 1  
-
+DEFAULT_ORDER_STATUS_ID = 5
 
 async def create_order(db: AsyncSession, cust_id: int, payload: OrderCreateIn) -> CustOrd:
     if not payload.items:
@@ -40,5 +40,8 @@ async def create_order(db: AsyncSession, cust_id: int, payload: OrderCreateIn) -
     )
     db.add(order)
     await db.commit()
-    await db.refresh(order)
-    return order
+
+    result = await db.execute(
+        select(CustOrd).options(selectinload(CustOrd.items)).where(CustOrd.cust_ord_id == order.cust_ord_id)
+    )
+    return result.scalar_one()
