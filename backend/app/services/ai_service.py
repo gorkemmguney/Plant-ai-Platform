@@ -1,0 +1,58 @@
+"""
+Gemini API entegrasyonu.
+
+- analyze_plant_image: Bir bitki fotoğrafından tür, sağlık durumu ve bakım
+  önerisini yapılandırılmış JSON olarak döner -> ai_image_analysis tablosuna yazılır.
+- chat_reply: Kullanıcının bitki bakımıyla ilgili sorusuna, önceki mesaj geçmişini
+  bağlam olarak kullanarak cevap üretir -> ai_message tablosuna yazılır.
+"""
+import json
+
+import google.generativeai as genai
+
+from app.core.config import get_settings
+
+settings = get_settings()
+genai.configure(api_key=settings.GEMINI_API_KEY)
+
+_VISION_PROMPT = """Sen bir bitki uzmanısın. Görseldeki bitkiyi analiz et ve SADECE
+aşağıdaki JSON formatında, başka hiçbir açıklama eklemeden yanıt ver:
+{
+  "species": "bitkinin türü (Türkçe ve bilimsel isim)",
+  "health_status": "healthy | diseased | pest_damage | unknown",
+  "confidence": 0.0-1.0 arası bir sayı,
+  "care_recommendation": "kısa, pratik bakım önerisi (Türkçe)",
+  "issues_detected": ["varsa tespit edilen sorunlar"]
+}"""
+
+_CHAT_SYSTEM_PROMPT = """Sen bir bitki bakım asistanısın. Kullanıcıların bitki
+alım-satım platformunda bitkilerle ilgili sorularını (bakım, sulama, ışık,
+hastalık, saksı/toprak seçimi vb.) kısa, net ve Türkçe olarak yanıtla."""
+
+
+async def analyze_plant_image(image_bytes: bytes, mime_type: str) -> dict:
+    model = genai.GenerativeModel(settings.GEMINI_VISION_MODEL)
+    response = model.generate_content(
+        [_VISION_PROMPT, {"mime_type": mime_type, "data": image_bytes}],
+        generation_config={"response_mime_type": "application/json"},
+    )
+    try:
+        return json.loads(response.text)
+    except (json.JSONDecodeError, AttributeError):
+        return {
+            "species": "unknown",
+            "health_status": "unknown",
+            "confidence": 0.0,
+            "care_recommendation": "Analiz sırasında bir sorun oluştu, lütfen tekrar deneyin.",
+            "issues_detected": [],
+        }
+
+
+async def chat_reply(history: list[dict], new_message: str) -> str:
+    """
+    history: [{"role": "user"|"model", "parts": ["..."]}, ...] formatında önceki mesajlar
+    """
+    model = genai.GenerativeModel(settings.GEMINI_CHAT_MODEL, system_instruction=_CHAT_SYSTEM_PROMPT)
+    chat = model.start_chat(history=history)
+    response = chat.send_message(new_message)
+    return response.text

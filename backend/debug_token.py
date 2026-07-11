@@ -1,0 +1,15 @@
+import firebase_admin
+from firebase_admin import credentials, auth
+
+cred = credentials.Certificate("firebase-service-account.json")
+firebase_admin.initialize_app(cred, {"projectId": "plant-ai-platform"})
+
+TOKEN = "eyJhbGciOiJSUzI1NiIsImtpZCI6IjY1Y2IzZjAyMGNhZjdiMmE5ZTg2ZWFkOTAxZDg5ZjQ4MTJjYmFjYmMiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuLmdvb2dsZS5jb20vcGxhbnQtYWktcGxhdGZvcm0iLCJhdWQiOiJwbGFudC1haS1wbGF0Zm9ybSIsImF1dGhfdGltZSI6MTc4Mzc2NDQ1NCwidXNlcl9pZCI6IlJwUlV1dTNBTHRSVmJGVXFPR1l1cTRKTFZkODMiLCJzdWIiOiJScFJVdXUzQUx0UlZiRlVxT0dZdXE0SkxWZDgzIiwiaWF0IjoxNzgzNzY0NDU0LCJleHAiOjE3ODM3NjgwNTQsImVtYWlsIjoidGVzdEBwbGFudGFpLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjpmYWxzZSwiZmlyZWJhc2UiOnsiaWRlbnRpdGllcyI6eyJlbWFpbCI6WyJ0ZXN0QHBsYW50YWkuY29tIl19LCJzaWduX2luX3Byb3ZpZGVyIjoicGFzc3dvcmQifX0.pwrqZqe4BWvXDaY9RnGKCRVHu6VjlvrmOJkSLf9CgQMk83fWtDZPayLeZ02OHdKYhBGvsv-LgALMtAWYR4g0KGzdkSficpYgJo336qF-nP7Kyi5_Piq0-6CyaaU6cflPr9ik1E8M1e_-gCvdlZqi4Ip_y0NaCTnDuhev8E2dc7GvVx_FCOnBcbkyEvMqc-9NEfix6jfeY4DFLhIfrbJXP3xZLhvExRvMypuDxZTK1eBtA7RtS3ymq3nOAXV3jb_av8XjB55CYIdHqMO8uLShr75EpfGcDat24HNlkRRTOijGDhLHOfnd_WunH4pU-Egig0yRwungVnwE7LYyAXLiiw"
+
+try:
+    decoded = auth.verify_id_token(TOKEN, check_revoked=True)
+    print("✅ Başarılı:", decoded)
+except Exception as e:
+    print("❌ Hata tipi:", type(e).__name__)
+    print("❌ Hata mesajı:", str(e))
+

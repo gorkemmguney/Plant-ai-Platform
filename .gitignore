@@ -1,0 +1,11 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Environment & secrets
+.env
+firebase-service-account.json
+
+# OS
+.DS_Store
