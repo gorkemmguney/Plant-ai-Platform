@@ -40,6 +40,18 @@ Durum: `[ ]` yapılacak · `[~]` devam ediyor · `[x]` tamamlandı
 - [ ] Firebase Cloud Messaging ile push bildirim entegrasyonu
 - [ ] Bitki bakım periyoduna göre proaktif hatırlatma kuralları
 
+## Faz 5 — Mobil Arayüz (Expo)
+- [x] Giriş/kayıt ekranı (`LoginScreen`)
+- [x] Rol bazlı navigasyon iskeleti (Admin/Seller/Customer stack)
+- [ ] Ürün kataloğu ekranı (`/catalog/products`)
+- [ ] Sipariş oluşturma ve sipariş listesi ekranı (`/orders`)
+- [ ] Sipariş durumu takip ekranı (seller/customer görünümleri)
+- [ ] AI sohbet ekranı (`/ai/chat`)
+- [ ] Kamera ile bitki fotoğrafı çekip analiz gönderme (`/ai/analyze-image`)
+- [ ] Analiz sonucu görselleştirme ekranı
+- [ ] Bildirim ekranı (`/notifications`, okundu işaretleme)
+- [ ] Müşteri profili ekranı (`/customers/me`)
+
 ## Kapsam Dışı Tablolar (sonraki adım)
 - [ ] `prod_spec_*`, `user_preference`, `bsn_inter*`, `sch_job` için router/service katmanı
   (modeller hazır; `repository → service → router` deseni izlenerek genişletilecek)
