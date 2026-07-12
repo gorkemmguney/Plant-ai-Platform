@@ -8,7 +8,7 @@ from alembic import context
 
 from app.core.config import get_settings
 from app.db.base import Base
-import app.models  # noqa: F401  -- tüm modelleri Base.metadata'ya kaydetmek için
+import app.models  
 
 config = context.config
 

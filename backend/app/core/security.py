@@ -31,7 +31,6 @@ async def get_current_user(
     user = result.scalar_one_or_none()
 
     if user is None:
-        # İlk giriş: kullanıcıyı otomatik oluştur (register akışı ayrıca gerekmez)
         user = AppUser(
             firebase_uid=firebase_uid,
             email=email,
@@ -63,7 +62,6 @@ async def get_user_roles(user: AppUser, db: AsyncSession) -> list[str]:
 
 
 def require_role(*allowed_roles: str):
-    """Router'larda: Depends(require_role("admin", "seller")) şeklinde kullanılır."""
 
     async def _guard(
         user: AppUser = Depends(get_current_user),

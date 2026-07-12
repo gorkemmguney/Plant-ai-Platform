@@ -1,10 +1,4 @@
-"""
-Gemini API entegrasyonu.
-- analyze_plant_image: Bir bitki fotoğrafından tür, sağlık durumu ve bakım
-  önerisini yapılandırılmış JSON olarak döner -> ai_image_analysis tablosuna yazılır.
-- chat_reply: Kullanıcının bitki bakımıyla ilgili sorusuna, önceki mesaj geçmişini
-  bağlam olarak kullanarak cevap üretir -> ai_message tablosuna yazılır.
-"""
+
 import json
 
 import google.generativeai as genai
@@ -64,7 +58,6 @@ async def analyze_plant_image(image_bytes: bytes, mime_type: str) -> dict:
     except (json.JSONDecodeError, AttributeError):
         return _FALLBACK_ANALYSIS
 
-    # Gemini bazen tek elemanlı bir liste içinde obje döndürebilir; normalize edelim.
     if isinstance(parsed, list):
         parsed = parsed[0] if parsed and isinstance(parsed[0], dict) else _FALLBACK_ANALYSIS
 
@@ -75,9 +68,7 @@ async def analyze_plant_image(image_bytes: bytes, mime_type: str) -> dict:
 
 
 async def chat_reply(history: list[dict], new_message: str) -> str:
-    """
-    history: [{"role": "user"|"model", "parts": ["..."]}, ...] formatında önceki mesajlar
-    """
+    
     model = genai.GenerativeModel(settings.GEMINI_CHAT_MODEL, system_instruction=_CHAT_SYSTEM_PROMPT)
     chat = model.start_chat(history=history)
     response = chat.send_message(new_message)

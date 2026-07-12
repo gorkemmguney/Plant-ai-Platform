@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict
 
 
 class ChatMessageIn(BaseModel):
-    ai_chat_id: int | None = None  # None ise yeni sohbet başlatılır
+    ai_chat_id: int | None = None  
     message: str
 
 
