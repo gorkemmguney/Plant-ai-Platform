@@ -1,11 +1,12 @@
-import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
+import { onAuthStateChanged, User } from 'firebase/auth';
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { firebaseAuth } from '../firebase/firebaseConfig';
 import { apiClient } from '../services/apiClient';
 
 type Role = 'admin' | 'seller' | 'customer';
 
 interface AuthContextValue {
-  firebaseUser: FirebaseAuthTypes.User | null;
+  firebaseUser: User | null;
   roles: Role[];
   loading: boolean;
   refreshProfile: () => Promise<void>;
@@ -19,12 +20,12 @@ const AuthContext = createContext<AuthContextValue>({
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [firebaseUser, setFirebaseUser] = useState<FirebaseAuthTypes.User | null>(null);
+  const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
 
   const refreshProfile = async () => {
-    if (!auth().currentUser) {
+    if (!firebaseAuth.currentUser) {
       setRoles([]);
       return;
     }
@@ -34,7 +35,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    const unsubscribe = auth().onAuthStateChanged(async (user) => {
+    const unsubscribe = onAuthStateChanged(firebaseAuth, async (user) => {
       setFirebaseUser(user);
       if (user) {
         await refreshProfile();
