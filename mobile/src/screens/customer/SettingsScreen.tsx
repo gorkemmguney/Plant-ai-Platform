@@ -1,10 +1,9 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import { signOut } from 'firebase/auth';
 import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useAuth } from '../context/AuthContext';
-import { firebaseAuth } from '../firebase/firebaseConfig';
-import { badgeColors, colors, fonts, gradients, radius, shadow, spacing } from '../theme/theme';
+import { useAuth } from '../../context/AuthContext';
+import { firebaseAuth } from '../../firebase/firebaseConfig';
+import { badgeColors, colors, fonts, radius, shadow, spacing } from '../../theme/theme';
 
 const roleLabels: Record<string, string> = {
   admin: 'Admin',
@@ -12,21 +11,14 @@ const roleLabels: Record<string, string> = {
   customer: 'Müşteri',
 };
 
-export default function HomeScreen() {
+export default function SettingsScreen() {
   const { firebaseUser, roles } = useAuth();
 
   return (
     <View style={styles.screen}>
-      <LinearGradient colors={gradients.header} style={styles.header}>
-        <View style={styles.brandRow}>
-          <View style={styles.logoMark}>
-            <View style={styles.logoDot} />
-          </View>
-          <Text style={styles.brand}>PLANT AI</Text>
-        </View>
-        <Text style={styles.headerTitle}>Ana Sayfa</Text>
-        <Text style={styles.headerSub}>{firebaseUser?.email}</Text>
-      </LinearGradient>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Ayarlar</Text>
+      </View>
 
       <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: spacing.xl }}>
         <View style={styles.card}>
@@ -63,26 +55,8 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    paddingTop: 56,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.lg,
-    borderBottomLeftRadius: radius.lg,
-    borderBottomRightRadius: radius.lg,
-  },
-  brandRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md },
-  logoMark: {
-    width: 22,
-    height: 22,
-    borderRadius: 7,
-    backgroundColor: 'rgba(237,169,114,0.18)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary },
-  brand: { fontFamily: fonts.displaySemi, fontSize: 12, color: colors.white, letterSpacing: 1.2 },
-  headerTitle: { fontFamily: fonts.display, fontSize: 24, color: colors.white, marginBottom: 2 },
-  headerSub: { fontFamily: fonts.sans, fontSize: 12, color: '#c9c9d6' },
+  header: { paddingTop: 56, paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
+  headerTitle: { fontFamily: fonts.display, fontSize: 24, color: colors.ink },
   content: { flex: 1, padding: spacing.lg },
   card: {
     backgroundColor: colors.card,

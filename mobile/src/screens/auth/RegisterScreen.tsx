@@ -1,5 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -19,17 +19,17 @@ import { colors, fonts, radius, spacing } from '../../theme/theme';
 
 const { height } = Dimensions.get('window');
 
-export default function LoginScreen({ navigation }: any) {
+export default function RegisterScreen({ navigation }: any) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = async () => {
+  const handleRegister = async () => {
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(firebaseAuth, email.trim(), password);
+      await createUserWithEmailAndPassword(firebaseAuth, email.trim(), password);
     } catch (err: any) {
-      Alert.alert('Giriş başarısız', err.message);
+      Alert.alert('Kayıt başarısız', err.message);
     } finally {
       setLoading(false);
     }
@@ -56,13 +56,13 @@ export default function LoginScreen({ navigation }: any) {
             <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} activeOpacity={0.7}>
               <Text style={styles.backIcon}>‹</Text>
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Giriş</Text>
+            <Text style={styles.headerTitle}>Signup</Text>
             <View style={styles.backButton} />
           </View>
 
-          <Text style={styles.title}>Hesabına giriş yap</Text>
+          <Text style={styles.title}>Create your account</Text>
 
-          <Text style={styles.label}>Email adresi</Text>
+          <Text style={styles.label}>Email address</Text>
           <TextInput
             style={styles.input}
             placeholder="ornek@email.com"
@@ -76,7 +76,7 @@ export default function LoginScreen({ navigation }: any) {
           <Text style={styles.label}>Şifre</Text>
           <TextInput
             style={styles.input}
-            placeholder="••••••••"
+            placeholder="En az 6 karakter"
             placeholderTextColor={colors.muted2}
             secureTextEntry
             value={password}
@@ -86,8 +86,8 @@ export default function LoginScreen({ navigation }: any) {
           {loading ? (
             <ActivityIndicator color={colors.buttonPrimary} style={{ marginTop: spacing.lg }} />
           ) : (
-            <TouchableOpacity style={styles.primaryButton} onPress={handleLogin} activeOpacity={0.85}>
-              <Text style={styles.primaryButtonText}>Devam Et</Text>
+            <TouchableOpacity style={styles.primaryButton} onPress={handleRegister} activeOpacity={0.85}>
+              <Text style={styles.primaryButtonText}>Continue</Text>
             </TouchableOpacity>
           )}
 
@@ -102,9 +102,9 @@ export default function LoginScreen({ navigation }: any) {
             <Text style={styles.oauthButtonText}>Continue with Microsoft</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.footerLink} onPress={() => navigation.navigate('Register')}>
+          <TouchableOpacity style={styles.footerLink} onPress={() => navigation.navigate('Login')}>
             <Text style={styles.footerLinkText}>
-              Hesabın yok mu? <Text style={styles.footerLinkBold}>Kayıt ol</Text>
+              Zaten hesabın var mı? <Text style={styles.footerLinkBold}>Giriş yap</Text>
             </Text>
           </TouchableOpacity>
         </ScrollView>

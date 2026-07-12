@@ -1,4 +1,5 @@
 import { initializeApp } from 'firebase/app';
+// @ts-ignore: getReactNativePersistence çalışma zamanında mevcut, tip tanımlarında eksik
 import { getAuth, initializeAuth, getReactNativePersistence } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 

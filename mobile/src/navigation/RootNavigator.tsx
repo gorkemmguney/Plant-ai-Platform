@@ -2,8 +2,8 @@ import { NavigationContainer } from '@react-navigation/native';
 import React from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { useAuth } from '../context/AuthContext';
-import LoginScreen from '../screens/auth/LoginScreen';
 import AdminStack from './AdminStack';
+import AuthStack from './AuthStack';
 import CustomerStack from './CustomerStack';
 import SellerStack from './SellerStack';
 
@@ -21,7 +21,7 @@ export default function RootNavigator() {
   if (!firebaseUser) {
     return (
       <NavigationContainer>
-        <LoginScreen />
+        <AuthStack />
       </NavigationContainer>
     );
   }
