@@ -14,20 +14,40 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useAuth } from '../../context/AuthContext';
 import { firebaseAuth } from '../../firebase/firebaseConfig';
+import { apiClient } from '../../services/apiClient';
 import { colors, fonts, radius, spacing } from '../../theme/theme';
 
 const { height } = Dimensions.get('window');
 
+type AccountType = 'customer' | 'seller';
+
 export default function RegisterScreen({ navigation }: any) {
+  const { refreshProfile } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [role, setRole] = useState<AccountType>('customer');
   const [loading, setLoading] = useState(false);
 
   const handleRegister = async () => {
     setLoading(true);
     try {
       await createUserWithEmailAndPassword(firebaseAuth, email.trim(), password);
+      // Seçilen başlangıç rolünü backend'e bildir (müşteri / satıcı)
+      try {
+        await apiClient.post('/auth/select-role', { role_name: role });
+        if (role === 'seller') {
+          Alert.alert(
+            'Satıcı başvurun alındı',
+            'Hesabın oluşturuldu. Satıcı paneline erişebilmen için başvurunun bir admin tarafından onaylanması gerekiyor. Onaya kadar müşteri olarak devam edebilirsin.'
+          );
+        }
+        await refreshProfile();
+      } catch (roleErr: any) {
+        // Backend'e ulaşılamazsa kayıt yine de tamam; rol sonradan atanabilir
+        console.log('[Register] rol seçimi gönderilemedi:', roleErr?.message ?? roleErr);
+      }
     } catch (err: any) {
       Alert.alert('Kayıt başarısız', err.message);
     } finally {
@@ -82,6 +102,28 @@ export default function RegisterScreen({ navigation }: any) {
             value={password}
             onChangeText={setPassword}
           />
+
+          <Text style={styles.label}>Hesap türü</Text>
+          <View style={styles.roleRow}>
+            {(['customer', 'seller'] as AccountType[]).map((r) => {
+              const active = role === r;
+              return (
+                <TouchableOpacity
+                  key={r}
+                  style={[styles.roleOption, active && styles.roleOptionActive]}
+                  onPress={() => setRole(r)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.roleOptionText, active && styles.roleOptionTextActive]}>
+                    {r === 'customer' ? '🪴 Müşteri' : '🛍️ Satıcı'}
+                  </Text>
+                  <Text style={[styles.roleOptionSub, active && styles.roleOptionSubActive]}>
+                    {r === 'customer' ? 'Ürün satın al' : 'Ürün sat (onay gerekir)'}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
 
           {loading ? (
             <ActivityIndicator color={colors.buttonPrimary} style={{ marginTop: spacing.lg }} />
@@ -165,6 +207,21 @@ const styles = StyleSheet.create({
     color: colors.ink,
     backgroundColor: colors.card,
   },
+  roleRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
+  roleOption: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingVertical: 12,
+    alignItems: 'center',
+    backgroundColor: colors.card,
+  },
+  roleOptionActive: { backgroundColor: colors.buttonPrimary, borderColor: colors.buttonPrimary },
+  roleOptionText: { fontFamily: fonts.sansBold, fontSize: 13.5, color: colors.ink },
+  roleOptionTextActive: { color: colors.buttonPrimaryText },
+  roleOptionSub: { fontFamily: fonts.sans, fontSize: 11, color: colors.muted, marginTop: 2 },
+  roleOptionSubActive: { color: 'rgba(255,255,255,0.7)' },
   primaryButton: {
     backgroundColor: colors.buttonPrimary,
     borderRadius: radius.full,

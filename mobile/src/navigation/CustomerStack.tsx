@@ -44,7 +44,7 @@ const icons: Record<keyof CustomerTabParamList, { active: any; inactive: any }> 
 const labels: Record<keyof CustomerTabParamList, string> = {
   Home: 'Ana Sayfa',
   AIChat: 'AI Chat',
-  Marketplace: 'Satış',
+  Marketplace: 'Mağaza',
   Settings: 'Ayarlar',
 };
 

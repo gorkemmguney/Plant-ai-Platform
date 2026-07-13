@@ -3,13 +3,98 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.firebase import set_role_claim
-from app.core.security import require_role
+from app.core.security import get_user_roles, require_role
 from app.db.session import get_db
 from app.models.user import AppUser, Role, UserRole
 from app.rbac.roles import ROLE_HIERARCHY, RoleName
-from app.schemas.user import RoleAssignIn
+from app.schemas.user import RoleAssignIn, UserOut
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+async def _to_user_out(user: AppUser, db: AsyncSession) -> UserOut:
+    return UserOut(
+        user_id=user.user_id,
+        email=user.email,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        is_active=user.is_active,
+        created_at=user.created_at,
+        roles=await get_user_roles(user, db),
+        seller_status=user.seller_status,
+    )
+
+
+@router.get("/users", response_model=list[UserOut])
+async def list_users(
+    db: AsyncSession = Depends(get_db),
+    _: AppUser = Depends(require_role(RoleName.ADMIN)),
+):
+    result = await db.execute(select(AppUser).order_by(AppUser.user_id))
+    users = result.scalars().all()
+    return [await _to_user_out(user, db) for user in users]
+
+
+@router.get("/sellers/pending", response_model=list[UserOut])
+async def list_pending_sellers(
+    db: AsyncSession = Depends(get_db),
+    _: AppUser = Depends(require_role(RoleName.ADMIN)),
+):
+    result = await db.execute(
+        select(AppUser).where(AppUser.seller_status == "pending").order_by(AppUser.user_id)
+    )
+    users = result.scalars().all()
+    return [await _to_user_out(user, db) for user in users]
+
+
+@router.post("/verify-seller/{user_id}", response_model=UserOut)
+async def verify_seller(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: AppUser = Depends(require_role(RoleName.ADMIN)),
+):
+    user_result = await db.execute(select(AppUser).where(AppUser.user_id == user_id))
+    target = user_result.scalar_one_or_none()
+    if target is None:
+        raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı")
+
+    role_result = await db.execute(select(Role).where(Role.role_name == RoleName.SELLER.value))
+    seller_role = role_result.scalar_one_or_none()
+    if seller_role is None:
+        raise HTTPException(status_code=404, detail="Satıcı rolü bulunamadı (seed eksik olabilir)")
+
+    existing_result = await db.execute(
+        select(UserRole).where(UserRole.user_id == user_id, UserRole.role_id == seller_role.role_id)
+    )
+    if existing_result.scalar_one_or_none() is None:
+        db.add(UserRole(user_id=user_id, role_id=seller_role.role_id))
+
+    target.seller_status = "verified"
+    await db.commit()
+    await db.refresh(target)
+
+    roles = await get_user_roles(target, db)
+    if roles:
+        top_role = max(roles, key=lambda r: ROLE_HIERARCHY.get(r, -1))
+        set_role_claim(target.firebase_uid, top_role)
+    return await _to_user_out(target, db)
+
+
+@router.post("/reject-seller/{user_id}", response_model=UserOut)
+async def reject_seller(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: AppUser = Depends(require_role(RoleName.ADMIN)),
+):
+    user_result = await db.execute(select(AppUser).where(AppUser.user_id == user_id))
+    target = user_result.scalar_one_or_none()
+    if target is None:
+        raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı")
+
+    target.seller_status = "rejected"
+    await db.commit()
+    await db.refresh(target)
+    return await _to_user_out(target, db)
 
 
 @router.post("/assign-role")

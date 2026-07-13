@@ -1,6 +1,7 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.firebase import InvalidTokenError, verify_id_token
@@ -38,8 +39,22 @@ async def get_current_user(
             is_active=True,
         )
         db.add(user)
-        await db.commit()
-        await db.refresh(user)
+
+        try:
+            await db.flush()
+        except IntegrityError:
+            # Aynı yeni kullanıcı için eşzamanlı ilk istekler (ör. kayıt anında
+            # /auth/me ve /auth/select-role) çakışabilir; diğeri oluşturmuşsa onu kullan.
+            await db.rollback()
+            result = await db.execute(select(AppUser).where(AppUser.firebase_uid == firebase_uid))
+            user = result.scalar_one()
+        else:
+            default_role = await db.execute(select(Role).where(Role.role_name == settings.DEFAULT_ROLE))
+            role_obj = default_role.scalar_one_or_none()
+            if role_obj:
+                db.add(UserRole(user_id=user.user_id, role_id=role_obj.role_id))
+            await db.commit()
+            await db.refresh(user)
 
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Hesap devre dışı bırakılmış")
