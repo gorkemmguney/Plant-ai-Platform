@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import require_verified_seller
+from app.core.security import require_role
 from app.db.session import get_db
 from app.models.catalog import Prod
 from app.models.user import AppUser
@@ -31,7 +31,7 @@ async def get_product(prod_id: int, db: AsyncSession = Depends(get_db)):
 async def create_product(
     payload: ProductCreateIn,
     db: AsyncSession = Depends(get_db),
-    _: AppUser = Depends(require_verified_seller),
+    _: AppUser = Depends(require_role(RoleName.SELLER, RoleName.ADMIN)),
 ):
     product = Prod(**payload.model_dump())
     db.add(product)
@@ -45,7 +45,7 @@ async def update_product(
     prod_id: int,
     payload: ProductUpdateIn,
     db: AsyncSession = Depends(get_db),
-    _: AppUser = Depends(require_verified_seller),
+    _: AppUser = Depends(require_role(RoleName.SELLER, RoleName.ADMIN)),
 ):
     result = await db.execute(select(Prod).where(Prod.prod_id == prod_id))
     product = result.scalar_one_or_none()
@@ -64,7 +64,7 @@ async def update_product(
 async def delete_product(
     prod_id: int,
     db: AsyncSession = Depends(get_db),
-    _: AppUser = Depends(require_verified_seller),
+    _: AppUser = Depends(require_role(RoleName.SELLER, RoleName.ADMIN)),
 ):
     result = await db.execute(select(Prod).where(Prod.prod_id == prod_id))
     product = result.scalar_one_or_none()
