@@ -3,7 +3,7 @@ import { firebaseAuth } from '../firebase/firebaseConfig';
 
 // Geliştirme sırasında gerçek makinenizin IP adresini kullanın (localhost telefonda çalışmaz).
 // Terminalde `ipconfig getifaddr en0` (Mac) ile yerel IP'nizi öğrenebilirsiniz.
-const BASE_URL = 'http://192.168.1.225:8000';
+const BASE_URL = 'http://172.20.10.3:8000';
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,
