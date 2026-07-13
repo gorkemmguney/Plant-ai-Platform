@@ -3,11 +3,12 @@ from app.models.catalog import GnlChar, GnlCharVal, GnlSt, Prod, ProdCharVal, Pr
 from app.models.customer import Cust, CustAcct, Ind, Org, WrkOrg
 from app.models.misc import BsnInter, BsnInterSpec, Notification, SchJob, UserPreference
 from app.models.order import CustOrd, CustOrdCharVal, CustOrdItem, CustOrdItemCharVal, SaleCnl
+from app.models.seller import SellerProfile
 from app.models.service import Rsrc, RsrcSpec, Srvc, SrvcSpec
 from app.models.user import AppUser, Role, UserRole
 
 __all__ = [
-    "AppUser", "Role", "UserRole",
+    "AppUser", "Role", "UserRole", "SellerProfile",
     "Cust", "CustAcct", "Org", "Ind", "WrkOrg",
     "GnlSt", "Prod", "ProdSpec", "GnlChar", "GnlCharVal", "ProdCharVal", "ProdOfr",
     "Srvc", "SrvcSpec", "Rsrc", "RsrcSpec",

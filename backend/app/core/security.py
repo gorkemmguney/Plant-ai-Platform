@@ -1,16 +1,13 @@
-
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import get_settings
 from app.core.firebase import InvalidTokenError, verify_id_token
 from app.db.session import get_db
 from app.models.user import AppUser, Role, UserRole
 
 bearer_scheme = HTTPBearer(auto_error=True)
-settings = get_settings()
 
 
 async def get_current_user(
@@ -31,6 +28,8 @@ async def get_current_user(
     user = result.scalar_one_or_none()
 
     if user is None:
+        # NOT: burada artık otomatik rol ataması YAPILMIYOR.
+        # Rol seçimi /auth/register endpoint'i üzerinden kullanıcı tarafından yapılacak.
         user = AppUser(
             firebase_uid=firebase_uid,
             email=email,
@@ -39,12 +38,6 @@ async def get_current_user(
             is_active=True,
         )
         db.add(user)
-        await db.flush()
-
-        default_role = await db.execute(select(Role).where(Role.role_name == settings.DEFAULT_ROLE))
-        role_obj = default_role.scalar_one_or_none()
-        if role_obj:
-            db.add(UserRole(user_id=user.user_id, role_id=role_obj.role_id))
         await db.commit()
         await db.refresh(user)
 
@@ -76,3 +69,23 @@ def require_role(*allowed_roles: str):
         return user
 
     return _guard
+
+
+async def require_verified_seller(
+    user: AppUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> AppUser:
+    from app.services.seller_service import get_seller_profile_by_user_id  # local import: circular import'u önler
+
+    roles = await get_user_roles(user, db)
+    if "admin" in roles:
+        return user
+
+    if "seller" not in roles:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu işlem için satıcı rolü gerekli")
+
+    profile = await get_seller_profile_by_user_id(db, user.user_id)
+    if profile is None or not profile.is_verified:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Satıcı hesabınız henüz onaylanmadı")
+
+    return user
