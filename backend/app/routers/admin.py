@@ -39,22 +39,6 @@ async def assign_role(
     set_role_claim(target_user.firebase_uid, payload.role_name)
     return {"detail": "Rol atandı"}
 
-@router.post("/verify-seller/{user_id}")
-async def verify_seller(
-    user_id: int,
-    db: AsyncSession = Depends(get_db),
-    _: AppUser = Depends(require_role(RoleName.ADMIN)),
-):
-    from app.services.seller_service import get_seller_profile_by_user_id
-
-    profile = await get_seller_profile_by_user_id(db, user_id)
-    if profile is None:
-        raise HTTPException(status_code=404, detail="Satıcı profili bulunamadı (kullanıcı seller rolü almamış olabilir)")
-    profile.is_verified = True
-    await db.commit()
-    return {"detail": "Satıcı onaylandı"}
-
-
 
 @router.post("/remove-role")
 async def remove_role(
