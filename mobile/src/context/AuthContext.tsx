@@ -29,9 +29,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setRoles([]);
       return;
     }
-    // Backend'de kullanıcıyı senkronlar ve rolünü döner
-    const { data } = await apiClient.get('/auth/me');
-    setRoles(data.roles ?? []);
+    try {
+      const { data } = await apiClient.get('/auth/me');
+      setRoles(data.roles ?? []);
+    } catch (err: any) {
+      console.log('[AuthContext] /auth/me başarısız:', err?.message ?? err);
+      setRoles([]);
+    }
   };
 
   useEffect(() => {
