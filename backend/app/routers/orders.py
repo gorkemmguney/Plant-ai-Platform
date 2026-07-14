@@ -46,6 +46,17 @@ async def list_my_orders(
     return result.scalars().all()
 
 
+@router.get("/all", response_model=list[OrderOut])
+async def list_all_orders(
+    db: AsyncSession = Depends(get_db),
+    _: AppUser = Depends(require_role(RoleName.SELLER, RoleName.ADMIN)),
+):
+    result = await db.execute(
+        select(CustOrd).options(selectinload(CustOrd.items)).order_by(CustOrd.order_date.desc())
+    )
+    return result.scalars().all()
+
+
 @router.patch("/{cust_ord_id}/status", response_model=OrderOut)
 async def update_order_status_endpoint(
     cust_ord_id: int,

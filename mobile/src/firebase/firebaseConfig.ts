@@ -8,6 +8,8 @@ const firebaseConfig = {
   authDomain: 'plant-ai-platform.firebaseapp.com',
   projectId: 'plant-ai-platform',
   storageBucket: 'plant-ai-platform.firebasestorage.app',
+  messagingSenderId: '917921949992',
+  appId: '1:917921949992:web:0fe4068e74c40f2aba881d',
 };
 
 export const firebaseApp = initializeApp(firebaseConfig);

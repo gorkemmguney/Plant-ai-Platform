@@ -13,8 +13,13 @@ class UserOut(BaseModel):
     is_active: bool
     created_at: datetime
     roles: list[str] = []
+    seller_status: str = "none"  # 'none' | 'pending' | 'verified' | 'rejected'
 
 
 class RoleAssignIn(BaseModel):
     user_id: int
     role_name: str  # 'admin' | 'seller' | 'customer'
+
+
+class RoleSelectIn(BaseModel):
+    role_name: str  # kayıt sırasında yalnızca 'customer' | 'seller'

@@ -31,8 +31,10 @@ Durum: `[ ]` yapılacak · `[~]` devam ediyor · `[x]` tamamlandı
 - [x] Görsel bitki analizi (`POST /ai/analyze-image`, Gemini Vision)
 - [x] Yapay zeka sohbet akışı (`POST /ai/chat`, geçmiş korunarak)
 - [x] Sohbet geri bildirimi (`POST /ai/feedback`)
-- [ ] Sipariş geçmişine göre kişiselleştirilmiş öneri motoru
-- [ ] Analiz sonuçlarının mobil arayüzde görselleştirilmesi
+- [x] AI Ürün Öneri Motoru: Backend entegrasyonu tamamlandı
+- [x] AI Ürün Öneri Motoru: Mobil arayüz entegrasyonu tamamlandı
+- [x] AI Ürün Öneri Motoru: Tip kontrolleri tamamlandı
+- [~] AI Ürün Öneri Motoru: Uçtan uca testler devam ediyor
 
 ## Faz 4 — Bildirim & Proaktif Takip
 - [x] Sipariş durumu değişince otomatik bildirim üretimi
@@ -47,8 +49,8 @@ Durum: `[ ]` yapılacak · `[~]` devam ediyor · `[x]` tamamlandı
 - [ ] Sipariş oluşturma ve sipariş listesi ekranı (`/orders`)
 - [ ] Sipariş durumu takip ekranı (seller/customer görünümleri)
 - [ ] AI sohbet ekranı (`/ai/chat`)
-- [ ] Kamera ile bitki fotoğrafı çekip analiz gönderme (`/ai/analyze-image`)
-- [ ] Analiz sonucu görselleştirme ekranı
+- [x] Kamera ile bitki fotoğrafı çekip analiz gönderme (`/ai/analyze-image`)
+- [x] Analiz sonucu görselleştirme ekranı
 - [ ] Bildirim ekranı (`/notifications`, okundu işaretleme)
 - [ ] Müşteri profili ekranı (`/customers/me`)
 

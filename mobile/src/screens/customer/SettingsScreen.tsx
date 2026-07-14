@@ -11,8 +11,15 @@ const roleLabels: Record<string, string> = {
   customer: 'Müşteri',
 };
 
+const sellerStatusInfo: Record<string, { label: string; badge: keyof typeof badgeColors }> = {
+  pending: { label: 'Onay bekliyor', badge: 'amber' },
+  verified: { label: 'Onaylandı', badge: 'green' },
+  rejected: { label: 'Reddedildi', badge: 'red' },
+};
+
 export default function SettingsScreen() {
-  const { firebaseUser, roles } = useAuth();
+  const { firebaseUser, roles, sellerStatus } = useAuth();
+  const sellerInfo = sellerStatusInfo[sellerStatus];
 
   return (
     <View style={styles.screen}>
@@ -27,7 +34,7 @@ export default function SettingsScreen() {
             <Text style={styles.rowLabel}>Email</Text>
             <Text style={styles.rowValue}>{firebaseUser?.email}</Text>
           </View>
-          <View style={styles.rowLast}>
+          <View style={sellerInfo ? styles.row : styles.rowLast}>
             <Text style={styles.rowLabel}>Roller</Text>
             <View style={styles.badgeRow}>
               {roles.length > 0 ? (
@@ -43,6 +50,17 @@ export default function SettingsScreen() {
               )}
             </View>
           </View>
+
+          {sellerInfo && (
+            <View style={styles.rowLast}>
+              <Text style={styles.rowLabel}>Satıcı başvurusu</Text>
+              <View style={[styles.badge, { backgroundColor: badgeColors[sellerInfo.badge].bg }]}>
+                <Text style={[styles.badgeText, { color: badgeColors[sellerInfo.badge].text }]}>
+                  {sellerInfo.label}
+                </Text>
+              </View>
+            </View>
+          )}
         </View>
 
         <TouchableOpacity style={styles.logoutButton} onPress={() => signOut(firebaseAuth)} activeOpacity={0.85}>

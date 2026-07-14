@@ -18,6 +18,8 @@ class AppUser(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Satıcı onay durumu: 'none' (başvuru yok) | 'pending' (onay bekliyor) | 'verified' | 'rejected'
+    seller_status: Mapped[str] = mapped_column(String(20), server_default="none", nullable=False)
 
     roles: Mapped[list["UserRole"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
