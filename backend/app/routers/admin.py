@@ -1,13 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.firebase import set_role_claim
 from app.core.security import get_user_roles, require_role
 from app.db.session import get_db
 from app.models.user import AppUser, Role, UserRole
+from app.models.ai import AiImageAnalysis
+from app.models.catalog import Prod
+from app.models.misc import Notification
 from app.rbac.roles import ROLE_HIERARCHY, RoleName
 from app.schemas.user import RoleAssignIn, UserOut
+from app.schemas.admin import AdminStatsOut, BroadcastNotificationIn
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -124,22 +128,6 @@ async def assign_role(
     set_role_claim(target_user.firebase_uid, payload.role_name)
     return {"detail": "Rol atandı"}
 
-@router.post("/verify-seller/{user_id}")
-async def verify_seller(
-    user_id: int,
-    db: AsyncSession = Depends(get_db),
-    _: AppUser = Depends(require_role(RoleName.ADMIN)),
-):
-    from app.services.seller_service import get_seller_profile_by_user_id
-
-    profile = await get_seller_profile_by_user_id(db, user_id)
-    if profile is None:
-        raise HTTPException(status_code=404, detail="Satıcı profili bulunamadı (kullanıcı seller rolü almamış olabilir)")
-    profile.is_verified = True
-    await db.commit()
-    return {"detail": "Satıcı onaylandı"}
-
-
 
 @router.post("/remove-role")
 async def remove_role(
@@ -182,3 +170,61 @@ async def remove_role(
         set_role_claim(target_user.firebase_uid, "")
 
     return {"detail": "Rol kaldırıldı", "remaining_roles": remaining_roles}
+
+
+@router.get("/stats", response_model=AdminStatsOut)
+async def get_admin_stats(
+    db: AsyncSession = Depends(get_db),
+    _: AppUser = Depends(require_role(RoleName.ADMIN)),
+):
+    # Total Users
+    users_count = await db.scalar(select(func.count()).select_from(AppUser))
+
+    # Total Sellers (Users who have the seller role)
+    seller_role = await db.scalar(select(Role.role_id).where(Role.role_name == RoleName.SELLER.value))
+    sellers_count = 0
+    if seller_role:
+        sellers_count = await db.scalar(
+            select(func.count()).select_from(UserRole).where(UserRole.role_id == seller_role)
+        )
+
+    # Total Analyses
+    analyses_count = await db.scalar(select(func.count()).select_from(AiImageAnalysis))
+
+    # Total Products
+    products_count = await db.scalar(select(func.count()).select_from(Prod))
+
+    return AdminStatsOut(
+        total_users=users_count or 0,
+        total_sellers=sellers_count or 0,
+        total_analyses=analyses_count or 0,
+        total_products=products_count or 0,
+    )
+
+
+@router.post("/broadcast-notification")
+async def broadcast_notification(
+    payload: BroadcastNotificationIn,
+    db: AsyncSession = Depends(get_db),
+    _: AppUser = Depends(require_role(RoleName.ADMIN)),
+):
+    # Get all users IDs
+    users_result = await db.execute(select(AppUser.user_id))
+    user_ids = [uid for (uid,) in users_result.all()]
+    
+    if not user_ids:
+        raise HTTPException(status_code=404, detail="Sistemde hiç kullanıcı bulunamadı")
+
+    # Insert notification for every user
+    for uid in user_ids:
+        db.add(
+            Notification(
+                user_id=uid,
+                title=payload.title,
+                message=payload.message,
+                is_read=False,
+            )
+        )
+    await db.commit()
+    return {"detail": f"{len(user_ids)} kullanıcıya duyuru başarıyla gönderildi."}
+
