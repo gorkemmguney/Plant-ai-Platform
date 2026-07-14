@@ -1,3 +1,4 @@
+import json
 from fastapi import APIRouter, Depends, File, UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,18 +22,42 @@ async def analyze_image(
 ):
     image_bytes = await file.read()
     image_url = upload_image(image_bytes, file.content_type or "image/jpeg")
+    
     analysis = await analyze_plant_image(image_bytes, file.content_type or "image/jpeg")
 
     record = AiImageAnalysis(
         user_id=user.user_id,
         image_url=image_url,
-        result=str(analysis),
+        result=json.dumps(analysis),
         confidence=analysis.get("confidence"),
     )
     db.add(record)
     await db.commit()
     await db.refresh(record)
-    return record
+
+    recommended = analysis.get("recommended_products", [])
+
+    return {
+        "analysis_id": record.analysis_id,
+        "image_url": record.image_url,
+        "result": record.result,
+        "confidence": record.confidence,
+        "created_at": record.created_at,
+        "recommended_products": recommended,
+    }
+
+
+@router.get("/analyses", response_model=list[ImageAnalysisOut])
+async def list_my_analyses(
+    db: AsyncSession = Depends(get_db),
+    user: AppUser = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(AiImageAnalysis)
+        .where(AiImageAnalysis.user_id == user.user_id)
+        .order_by(AiImageAnalysis.created_at.desc())
+    )
+    return result.scalars().all()
 
 
 @router.post("/chat", response_model=ChatMessageOut)
