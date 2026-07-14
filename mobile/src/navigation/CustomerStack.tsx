@@ -1,11 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React from 'react';
 import { Platform } from 'react-native';
 import AIChatScreen from '../screens/customer/AIChatScreen';
 import HomeScreen from '../screens/customer/HomeScreen';
 import MarketplaceScreen from '../screens/customer/MarketplaceScreen';
 import SettingsScreen from '../screens/customer/SettingsScreen';
+import ImageAnalysisScreen from '../screens/customer/ImageAnalysisScreen';
+import AnalysisResultScreen from '../screens/customer/AnalysisResultScreen';
 import { colors, fonts } from '../theme/theme';
 
 export type CustomerTabParamList = {
@@ -15,7 +18,21 @@ export type CustomerTabParamList = {
   Settings: undefined;
 };
 
+export type CustomerStackParamList = {
+  MainTabs: undefined;
+  ImageAnalysis: undefined;
+  AnalysisResult: {
+    analysisId: number;
+    imageUrl: string;
+    result: string; // JSON string
+    confidence: number | null;
+    createdAt: string;
+    recommendedProducts?: any[];
+  };
+};
+
 const Tab = createBottomTabNavigator<CustomerTabParamList>();
+const Stack = createNativeStackNavigator<CustomerStackParamList>();
 
 const icons: Record<keyof CustomerTabParamList, { active: any; inactive: any }> = {
   Home: { active: 'home', inactive: 'home-outline' },
@@ -31,7 +48,7 @@ const labels: Record<keyof CustomerTabParamList, string> = {
   Settings: 'Ayarlar',
 };
 
-export default function CustomerStack() {
+function CustomerTabNavigator() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -58,5 +75,15 @@ export default function CustomerStack() {
       <Tab.Screen name="Marketplace" component={MarketplaceScreen} options={{ title: labels.Marketplace }} />
       <Tab.Screen name="Settings" component={SettingsScreen} options={{ title: labels.Settings }} />
     </Tab.Navigator>
+  );
+}
+
+export default function CustomerStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="MainTabs" component={CustomerTabNavigator} />
+      <Stack.Screen name="ImageAnalysis" component={ImageAnalysisScreen} />
+      <Stack.Screen name="AnalysisResult" component={AnalysisResultScreen} />
+    </Stack.Navigator>
   );
 }

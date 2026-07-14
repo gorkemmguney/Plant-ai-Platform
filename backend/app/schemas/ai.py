@@ -27,6 +27,7 @@ class ImageAnalysisOut(BaseModel):
     result: str | None = None
     confidence: Decimal | None = None
     created_at: datetime
+    recommended_products: list[str] = []
 
 
 class FeedbackIn(BaseModel):
