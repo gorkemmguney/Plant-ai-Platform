@@ -70,6 +70,23 @@ Durum: `[ ]` yapılacak · `[~]` devam ediyor · `[x]` tamamlandı
 - [x] Ayarlar'da satıcı başvuru durumu rozeti
 - [ ] Uçtan uca doğrulama: kayıt(satıcı)→pending→admin onayı→seller paneli girişi
 
+## Faz 7 — Müşteri Deneyimi (Customer UX)
+### Alışveriş akışı
+- [ ] Sepete ekleme (Satın Al → Sepete Ekle → sepet ekranı → tek siparişte çoklu ürün) — `/orders` çoklu `items` hazır
+- [ ] "Siparişlerim" ekranı (müşteri kendi siparişleri, `GET /orders`)
+### Arama & keşif
+- [ ] Ürün arama (Mağaza'da işlevli arama çubuğu, client-side filtre)
+- [ ] Ana ekrandaki işlevsiz arama çubuğunu Mağaza'ya taşı ve çalışır hale getir
+- [ ] Ana Sayfa'yı gerçek veriye bağla (sahte listeler yerine `/catalog/products`)
+### Satıcılar / mağazalar (Trendyol tarzı)
+- [ ] Alt bara "Mağazalar/Satıcılar" sekmesi — ürünleri satıcıya göre grupla ⚠️ backend gerekir (`prod`'a satıcı bağı)
+- [ ] Aynı ürünü farklı satıcılardan gösterme + fiyat karşılaştırma ⚠️ backend gerekir (ürün eşleştirme)
+### AI
+- [ ] AI chat'te görsel yükleme (foto ekle → `/ai/analyze-image`) ⚠️ Görkem'in analiz işiyle koordine et
+### Profil & bildirim
+- [ ] Ayarlar'da isim/soyisim görüntüle + düzenle ⚠️ düzenleme için profil güncelleme endpoint'i gerekir
+- [ ] Bildirim ekranı (`GET /notifications` + okundu işaretleme)
+
 ## Kapsam Dışı Tablolar (sonraki adım)
 - [ ] `prod_spec_*`, `user_preference`, `bsn_inter*`, `sch_job` için router/service katmanı
   (modeller hazır; `repository → service → router` deseni izlenerek genişletilecek)
