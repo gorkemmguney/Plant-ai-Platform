@@ -4,10 +4,12 @@ import { firebaseAuth } from '../firebase/firebaseConfig';
 import { apiClient } from '../services/apiClient';
 
 type Role = 'admin' | 'seller' | 'customer';
+export type SellerStatus = 'none' | 'pending' | 'verified' | 'rejected';
 
 interface AuthContextValue {
   firebaseUser: User | null;
   roles: Role[];
+  sellerStatus: SellerStatus;
   loading: boolean;
   refreshProfile: () => Promise<void>;
 }
@@ -15,6 +17,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue>({
   firebaseUser: null,
   roles: [],
+  sellerStatus: 'none',
   loading: true,
   refreshProfile: async () => {},
 });
@@ -22,16 +25,24 @@ const AuthContext = createContext<AuthContextValue>({
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [roles, setRoles] = useState<Role[]>([]);
+  const [sellerStatus, setSellerStatus] = useState<SellerStatus>('none');
   const [loading, setLoading] = useState(true);
 
   const refreshProfile = async () => {
     if (!firebaseAuth.currentUser) {
       setRoles([]);
+      setSellerStatus('none');
       return;
     }
-    // Backend'de kullanıcıyı senkronlar ve rolünü döner
-    const { data } = await apiClient.get('/auth/me');
-    setRoles(data.roles ?? []);
+    try {
+      const { data } = await apiClient.get('/auth/me');
+      setRoles(data.roles ?? []);
+      setSellerStatus(data.seller_status ?? 'none');
+    } catch (err: any) {
+      console.log('[AuthContext] /auth/me başarısız:', err?.message ?? err);
+      setRoles([]);
+      setSellerStatus('none');
+    }
   };
 
   useEffect(() => {
@@ -41,6 +52,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await refreshProfile();
       } else {
         setRoles([]);
+        setSellerStatus('none');
       }
       setLoading(false);
     });
@@ -48,7 +60,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   return (
-    <AuthContext.Provider value={{ firebaseUser, roles, loading, refreshProfile }}>
+    <AuthContext.Provider value={{ firebaseUser, roles, sellerStatus, loading, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

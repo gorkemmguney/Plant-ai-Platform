@@ -7,7 +7,7 @@ const BASE_URL = 'http://192.168.8.150:8000';
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,
-  timeout: 15000,
+  timeout: 60000,
 });
 
 // Her istekte güncel Firebase ID token'ını otomatik ekler
