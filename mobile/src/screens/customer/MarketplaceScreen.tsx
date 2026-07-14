@@ -6,6 +6,7 @@ import {
   RefreshControl,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -29,6 +30,12 @@ export default function MarketplaceScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [buyingId, setBuyingId] = useState<number | null>(null);
+  const [query, setQuery] = useState('');
+
+  // Arama: ürün adına göre filtrele
+  const filtered = products.filter((p) =>
+    p.name.toLowerCase().includes(query.trim().toLowerCase())
+  );
 
   const loadProducts = useCallback(async () => {
     try {
@@ -123,6 +130,16 @@ export default function MarketplaceScreen() {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Mağaza</Text>
         <Text style={styles.headerSub}>Bitkileri keşfet ve satın al</Text>
+        <View style={styles.searchBar}>
+          <Text style={styles.searchIcon}>⌕</Text>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Ürün ara"
+            placeholderTextColor={colors.muted2}
+            value={query}
+            onChangeText={setQuery}
+          />
+        </View>
       </View>
 
       {loading ? (
@@ -138,7 +155,7 @@ export default function MarketplaceScreen() {
         </View>
       ) : (
         <FlatList
-          data={products}
+          data={filtered}
           keyExtractor={(item) => String(item.prod_id)}
           contentContainerStyle={styles.list}
           renderItem={renderProduct}
@@ -151,7 +168,13 @@ export default function MarketplaceScreen() {
               }}
             />
           }
-          ListEmptyComponent={<Text style={styles.emptyText}>Henüz ürün yok. Satıcılar ekledikçe burada görünür.</Text>}
+          ListEmptyComponent={
+            <Text style={styles.emptyText}>
+              {query.trim()
+                ? `"${query.trim()}" için sonuç bulunamadı.`
+                : 'Henüz ürün yok. Satıcılar ekledikçe burada görünür.'}
+            </Text>
+          }
         />
       )}
     </View>
@@ -163,6 +186,18 @@ const styles = StyleSheet.create({
   header: { paddingTop: 56, paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
   headerTitle: { fontFamily: fonts.display, fontSize: 24, color: colors.ink },
   headerSub: { fontFamily: fonts.sans, fontSize: 12.5, color: colors.muted, marginTop: 2 },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.md,
+    marginTop: spacing.md,
+  },
+  searchIcon: { fontSize: 16, color: colors.muted2, marginRight: spacing.sm },
+  searchInput: { flex: 1, paddingVertical: 12, fontFamily: fonts.sans, fontSize: 14, color: colors.ink },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.md },
   list: { padding: spacing.lg, gap: spacing.md },
   card: {

@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -65,11 +66,21 @@ export default function HomeScreen({ navigation }: any) {
   return (
     <View style={styles.screen}>
       <LinearGradient colors={gradients.header} style={styles.header}>
-        <View style={styles.brandRow}>
-          <View style={styles.logoMark}>
-            <View style={styles.logoDot} />
+        <View style={styles.topRow}>
+          <View style={styles.brandRow}>
+            <View style={styles.logoMark}>
+              <View style={styles.logoDot} />
+            </View>
+            <Text style={styles.brand}>PLANT AI</Text>
           </View>
-          <Text style={styles.brand}>PLANT AI</Text>
+          <View style={styles.headerIcons}>
+            <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Orders')} activeOpacity={0.7}>
+              <Ionicons name="receipt-outline" size={20} color={colors.white} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Notifications')} activeOpacity={0.7}>
+              <Ionicons name="notifications-outline" size={20} color={colors.white} />
+            </TouchableOpacity>
+          </View>
         </View>
         <Text style={styles.greeting}>Merhaba, {firstName} 👋</Text>
         <Text style={styles.greetingSub}>Bugün bitkilerine göz atalım</Text>
@@ -170,7 +181,22 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: radius.lg,
     borderBottomRightRadius: radius.lg,
   },
-  brandRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.lg },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.lg,
+  },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  headerIcons: { flexDirection: 'row', gap: spacing.sm },
+  iconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   logoMark: {
     width: 22,
     height: 22,
