@@ -25,7 +25,8 @@ Durum: `[ ]` yapılacak · `[~]` devam ediyor · `[x]` tamamlandı
 - [x] Sipariş oluşturma ve kendi siparişlerini listeleme (`/orders`)
 - [x] Sipariş durumu güncelleme (`PATCH /orders/{id}/status`)
 - [x] Müşteri profili uç noktaları (`/customers/me`)
-- [ ] Örnek/tohum (seed) verilerinin hazırlanması
+- [x] Örnek/tohum (seed) verilerinin hazırlanması (`seed_data.sql`: roller, `gnl_st`, `sale_cnl`)
+- [x] Tüm siparişleri listeleme (satıcı/admin) (`GET /orders/all`)
 
 ## Faz 3 — Yapay Zeka (Gemini)
 - [x] Görsel bitki analizi (`POST /ai/analyze-image`, Gemini Vision)
@@ -45,14 +46,48 @@ Durum: `[ ]` yapılacak · `[~]` devam ediyor · `[x]` tamamlandı
 ## Faz 5 — Mobil Arayüz (Expo)
 - [x] Giriş/kayıt ekranı (`LoginScreen`)
 - [x] Rol bazlı navigasyon iskeleti (Admin/Seller/Customer stack)
-- [ ] Ürün kataloğu ekranı (`/catalog/products`)
-- [ ] Sipariş oluşturma ve sipariş listesi ekranı (`/orders`)
-- [ ] Sipariş durumu takip ekranı (seller/customer görünümleri)
+- [x] Ürün mağazası ekranı — müşteri (`MarketplaceScreen`, `/catalog/products` + satın al)
+- [~] Sipariş oluşturma ve sipariş listesi ekranı (`/orders`) — satın alma var, müşteri sipariş listesi eksik
+- [x] Sipariş durumu takip ekranı — satıcı görünümü (`OrdersScreen`, durum güncelleme)
 - [ ] AI sohbet ekranı (`/ai/chat`)
 - [x] Kamera ile bitki fotoğrafı çekip analiz gönderme (`/ai/analyze-image`)
 - [x] Analiz sonucu görselleştirme ekranı
 - [ ] Bildirim ekranı (`/notifications`, okundu işaretleme)
 - [ ] Müşteri profili ekranı (`/customers/me`)
+
+## Faz 6 — Rol Bazlı Paneller & Satıcı Onayı
+### Backend
+- [x] Kullanıcı listeleme (admin) — `GET /admin/users`
+- [x] Kayıtta rol seçimi (müşteri/satıcı) — `POST /auth/select-role`
+- [x] Satıcı onay durumu alanı — `app_user.seller_status` (`none/pending/verified/rejected`, Alembic migration)
+- [x] Bekleyen satıcı başvuruları — `GET /admin/sellers/pending`
+- [x] Satıcı onaylama — `POST /admin/verify-seller/{user_id}` (test edildi ✅ 200)
+- [x] Satıcı reddetme — `POST /admin/reject-seller/{user_id}` (test edildi ✅ 200)
+- [x] Rol kaldırma — `POST /admin/remove-role`
+- [x] Eşzamanlı ilk-istek yarışına karşı `get_current_user` sağlamlaştırması
+### Mobil
+- [x] Admin paneli — Kullanıcılar (rol atama/kaldırma) + Onaylar (verify/reject) sekmeleri
+- [x] Satıcı paneli — Ürünler (ekle/düzenle/sil) + Siparişler (durum) sekmeleri
+- [x] Kayıt ekranında müşteri/satıcı seçimi + "onay bekliyor" bilgisi
+- [x] Ayarlar'da satıcı başvuru durumu rozeti
+- [ ] Uçtan uca doğrulama: kayıt(satıcı)→pending→admin onayı→seller paneli girişi
+
+## Faz 7 — Müşteri Deneyimi (Customer UX)
+### Alışveriş akışı
+- [ ] Sepete ekleme (Satın Al → Sepete Ekle → sepet ekranı → tek siparişte çoklu ürün) — `/orders` çoklu `items` hazır
+- [ ] "Siparişlerim" ekranı (müşteri kendi siparişleri, `GET /orders`)
+### Arama & keşif
+- [ ] Ürün arama (Mağaza'da işlevli arama çubuğu, client-side filtre)
+- [ ] Ana ekrandaki işlevsiz arama çubuğunu Mağaza'ya taşı ve çalışır hale getir
+- [ ] Ana Sayfa'yı gerçek veriye bağla (sahte listeler yerine `/catalog/products`)
+### Satıcılar / mağazalar (Trendyol tarzı)
+- [ ] Alt bara "Mağazalar/Satıcılar" sekmesi — ürünleri satıcıya göre grupla ⚠️ backend gerekir (`prod`'a satıcı bağı)
+- [ ] Aynı ürünü farklı satıcılardan gösterme + fiyat karşılaştırma ⚠️ backend gerekir (ürün eşleştirme)
+### AI
+- [ ] AI chat'te görsel yükleme (foto ekle → `/ai/analyze-image`) ⚠️ Görkem'in analiz işiyle koordine et
+### Profil & bildirim
+- [ ] Ayarlar'da isim/soyisim görüntüle + düzenle ⚠️ düzenleme için profil güncelleme endpoint'i gerekir
+- [ ] Bildirim ekranı (`GET /notifications` + okundu işaretleme)
 
 ## Kapsam Dışı Tablolar (sonraki adım)
 - [ ] `prod_spec_*`, `user_preference`, `bsn_inter*`, `sch_job` için router/service katmanı
@@ -62,7 +97,7 @@ Durum: `[ ]` yapılacak · `[~]` devam ediyor · `[x]` tamamlandı
 - [ ] Birim testleri (backend servis/router)
 - [ ] Entegrasyon testleri (uçtan uca senaryolar)
 - [ ] Mobil UI testleri
-- [ ] API kimlik doğrulama ve rol kontrolü testleri
+- [~] API kimlik doğrulama ve rol kontrolü testleri (verify/reject-seller Swagger'dan manuel doğrulandı; otomatik test eksik)
 
 ## Dokümantasyon
 - [x] API dokümantasyonu (Swagger/OpenAPI — `/docs`)
