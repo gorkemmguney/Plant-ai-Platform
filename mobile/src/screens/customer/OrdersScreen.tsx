@@ -37,6 +37,8 @@ const statusLabels: Record<number, string> = {
 
 export default function OrdersScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [productNames, setProductNames] = useState<Record<number, string>>({});
+  const [expandedId, setExpandedId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,8 +46,17 @@ export default function OrdersScreen() {
   const load = useCallback(async () => {
     try {
       setError(null);
-      const { data } = await apiClient.get<Order[]>('/orders');
-      setOrders(data);
+      // Siparişler + ürün adları (item'larda sadece prod_id var, adı katalogdan alıyoruz)
+      const [ordersRes, productsRes] = await Promise.all([
+        apiClient.get<Order[]>('/orders'),
+        apiClient.get<{ prod_id: number; name: string }[]>('/catalog/products'),
+      ]);
+      setOrders(ordersRes.data);
+      const names: Record<number, string> = {};
+      productsRes.data.forEach((p) => {
+        names[p.prod_id] = p.name;
+      });
+      setProductNames(names);
     } catch (err: any) {
       setError(err?.response?.data?.detail ?? 'Siparişler yüklenemedi. Backend çalışıyor mu?');
     } finally {
@@ -62,8 +73,13 @@ export default function OrdersScreen() {
     const date = new Date(item.order_date);
     const dateText = Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('tr-TR');
     const itemCount = item.items.reduce((sum, i) => sum + i.quantity, 0);
+    const expanded = expandedId === item.cust_ord_id;
     return (
-      <View style={styles.card}>
+      <TouchableOpacity
+        style={styles.card}
+        activeOpacity={0.85}
+        onPress={() => setExpandedId(expanded ? null : item.cust_ord_id)}
+      >
         <View style={styles.cardTop}>
           <Text style={styles.orderId}>Sipariş #{item.cust_ord_id}</Text>
           <Text style={styles.total}>₺{Number(item.total_price).toFixed(2)}</Text>
@@ -73,12 +89,28 @@ export default function OrdersScreen() {
           {dateText ? ' · ' : ''}
           {itemCount} ürün
         </Text>
-        <View style={[styles.badge, { backgroundColor: badgeColors.secondary.bg }]}>
-          <Text style={[styles.badgeText, { color: badgeColors.secondary.text }]}>
-            {statusLabels[item.gnl_st_id] ?? 'Durum bilinmiyor'}
-          </Text>
+        <View style={styles.badgeRow}>
+          <View style={[styles.badge, { backgroundColor: badgeColors.secondary.bg }]}>
+            <Text style={[styles.badgeText, { color: badgeColors.secondary.text }]}>
+              {statusLabels[item.gnl_st_id] ?? 'Durum bilinmiyor'}
+            </Text>
+          </View>
+          <Text style={styles.detailHint}>{expanded ? 'Gizle ▲' : 'Detay ▼'}</Text>
         </View>
-      </View>
+
+        {expanded && (
+          <View style={styles.itemsBox}>
+            {item.items.map((it) => (
+              <View key={it.cust_ord_item_id} style={styles.itemRow}>
+                <Text style={styles.itemName} numberOfLines={1}>
+                  {productNames[it.prod_id] ?? `Ürün #${it.prod_id}`} × {it.quantity}
+                </Text>
+                <Text style={styles.itemPrice}>₺{(Number(it.unit_price) * it.quantity).toFixed(2)}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+      </TouchableOpacity>
     );
   };
 
@@ -141,8 +173,20 @@ const styles = StyleSheet.create({
   orderId: { fontFamily: fonts.sansBold, fontSize: 15, color: colors.ink },
   total: { fontFamily: fonts.display, fontSize: 16, color: colors.primaryDeep },
   meta: { fontFamily: fonts.sans, fontSize: 12, color: colors.muted, marginTop: 3, marginBottom: spacing.md },
+  badgeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   badge: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.full },
   badgeText: { fontFamily: fonts.sansBold, fontSize: 11 },
+  detailHint: { fontFamily: fonts.sansSemi, fontSize: 12, color: colors.muted },
+  itemsBox: {
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderSoft,
+    gap: spacing.sm,
+  },
+  itemRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  itemName: { fontFamily: fonts.sans, fontSize: 13, color: colors.ink, flex: 1, marginRight: spacing.sm },
+  itemPrice: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.muted },
   errorText: { fontFamily: fonts.sans, fontSize: 13.5, color: colors.muted, textAlign: 'center', lineHeight: 20 },
   retryButton: {
     borderWidth: 1,
