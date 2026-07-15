@@ -86,7 +86,7 @@ Durum: `[ ]` yapılacak · `[~]` devam ediyor · `[x]` tamamlandı
 ### AI
 - [ ] AI chat'te görsel yükleme (foto ekle → `/ai/analyze-image`) ⚠️ Görkem'in analiz işiyle koordine et
 ### Profil & bildirim
-- [ ] Ayarlar'da isim/soyisim görüntüle + düzenle ⚠️ düzenleme için profil güncelleme endpoint'i gerekir
+- [x] Ayarlar'da isim/soyisim görüntüle + düzenle (`PATCH /auth/me`, modal ile)
 - [x] Bildirim ekranı (`GET /notifications` + okundu işaretleme, Ana Sayfa'dan erişim)
 
 ## Kapsam Dışı Tablolar (sonraki adım)
