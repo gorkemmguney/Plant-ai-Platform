@@ -63,7 +63,6 @@ const labels: Record<keyof CustomerTabParamList, string> = {
 };
 
 function CustomerTabs() {
-function CustomerTabNavigator() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -97,18 +96,15 @@ function CustomerTabNavigator() {
 export default function CustomerStack() {
   return (
     <CartProvider>
-      <Stack.Navigator>
-        <Stack.Screen name="Tabs" component={CustomerTabs} options={{ headerShown: false }} />
-        <Stack.Screen name="Cart" component={CartScreen} options={{ title: 'Sepetim' }} />
-        <Stack.Screen name="Orders" component={OrdersScreen} options={{ title: 'Siparişlerim' }} />
-        <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Bildirimler' }} />
-        <Stack.Screen name="StoreProducts" component={StoreProductsScreen} options={{ title: 'Mağaza' }} />
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="Tabs" component={CustomerTabs} />
+        <Stack.Screen name="ImageAnalysis" component={ImageAnalysisScreen} />
+        <Stack.Screen name="AnalysisResult" component={AnalysisResultScreen} />
+        <Stack.Screen name="Cart" component={CartScreen} options={{ headerShown: true, title: 'Sepetim' }} />
+        <Stack.Screen name="Orders" component={OrdersScreen} options={{ headerShown: true, title: 'Siparişlerim' }} />
+        <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ headerShown: true, title: 'Bildirimler' }} />
+        <Stack.Screen name="StoreProducts" component={StoreProductsScreen} options={{ headerShown: true, title: 'Mağaza' }} />
       </Stack.Navigator>
     </CartProvider>
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="MainTabs" component={CustomerTabNavigator} />
-      <Stack.Screen name="ImageAnalysis" component={ImageAnalysisScreen} />
-      <Stack.Screen name="AnalysisResult" component={AnalysisResultScreen} />
-    </Stack.Navigator>
   );
 }
