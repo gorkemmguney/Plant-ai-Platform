@@ -13,6 +13,14 @@ class ProductOut(BaseModel):
     price: Decimal
     stock: int
     gnl_st_id: int
+    seller_id: int | None = None
+    seller_name: str | None = None
+
+
+class SellerOut(BaseModel):
+    seller_id: int
+    seller_name: str
+    product_count: int
     prod_spec_id: int
     owner_user_id: int | None = None
 

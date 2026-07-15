@@ -72,6 +72,25 @@ Durum: `[ ]` yapılacak · `[~]` devam ediyor · `[x]` tamamlandı
 - [x] Ayarlar'da satıcı başvuru durumu rozeti
 - [ ] Uçtan uca doğrulama: kayıt(satıcı)→pending→admin onayı→seller paneli girişi
 
+## Faz 7 — Müşteri Deneyimi (Customer UX)
+### Alışveriş akışı
+- [x] Sepete ekleme (Sepete Ekle → sepet ekranı → adet ayarı → tek siparişte çoklu ürün, `CartContext`)
+- [x] "Siparişlerim" ekranı (müşteri kendi siparişleri, `GET /orders`, Ana Sayfa'dan erişim)
+- [x] Siparişe tıklayınca içeriğini görme (ürün/adet/tutar, expand)
+- [x] Müşteri sipariş iptali (`POST /orders/{id}/cancel`; sadece Alındı/Hazırlanıyor, kendi siparişi, stok iadesi) + Siparişlerim'de "İptal Et" butonu
+### Arama & keşif
+- [x] Ürün arama (Mağaza'da işlevli arama çubuğu, client-side filtre)
+- [x] Ana ekrandaki arama çubuğunu Mağaza'ya taşı — dokununca Mağaza'ya (arama ekranına) yönlendiriyor
+- [x] Ana Sayfa'yı gerçek veriye bağla (sahte listeler yerine `/catalog/products`)
+### Satıcılar / mağazalar (Trendyol tarzı)
+- [x] "Satıcılar" sekmesi — `prod.seller_id` + `GET /catalog/sellers`; mağaza listesi → satıcının ürünleri (`StoresScreen`/`StoreProductsScreen`)
+- [x] Fiyat karşılaştırma — aynı isimli ürünlerde "En ucuz" rozeti + üründe satıcı adı gösterimi
+### AI
+- [ ] AI chat'te görsel yükleme (foto ekle → `/ai/analyze-image`) ⚠️ Görkem'in analiz işiyle koordine et
+### Profil & bildirim
+- [x] Ayarlar'da isim/soyisim görüntüle + düzenle (`PATCH /auth/me`, modal ile)
+- [x] Bildirim ekranı (`GET /notifications` + okundu işaretleme, Ana Sayfa'dan erişim)
+
 ## Kapsam Dışı Tablolar (sonraki adım)
 - [ ] `prod_spec_*`, `user_preference`, `bsn_inter*`, `sch_job` için router/service katmanı
   (modeller hazır; `repository → service → router` deseni izlenerek genişletilecek)

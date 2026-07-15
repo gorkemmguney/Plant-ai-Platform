@@ -21,3 +21,8 @@ class RoleAssignIn(BaseModel):
 
 class RoleSelectIn(BaseModel):
     role_name: str  # kayıt sırasında yalnızca 'customer' | 'seller'
+
+
+class ProfileUpdateIn(BaseModel):
+    first_name: str | None = None
+    last_name: str | None = None

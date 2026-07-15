@@ -1,16 +1,42 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import get_user_roles, require_role
 from app.db.session import get_db
 from app.models.catalog import Prod
 from app.models.user import AppUser
 from app.rbac.roles import RoleName
-from app.schemas.catalog import ProductCreateIn, ProductOut, ProductUpdateIn
+from app.schemas.catalog import ProductCreateIn, ProductOut, ProductUpdateIn, SellerOut
 
 router = APIRouter(prefix="/catalog", tags=["catalog"])
 
 
+def _full_name(first: str | None, last: str | None) -> str | None:
+    name = f"{first or ''} {last or ''}".strip()
+    return name or None
+
+
+def _product_out(prod: Prod, first: str | None, last: str | None) -> ProductOut:
+    return ProductOut(
+        prod_id=prod.prod_id,
+        name=prod.name,
+        description=prod.description,
+        price=prod.price,
+        stock=prod.stock,
+        gnl_st_id=prod.gnl_st_id,
+        seller_id=prod.seller_id,
+        seller_name=_full_name(first, last),
+    )
+
+
+async def _seller_name(db: AsyncSession, seller_id: int | None) -> tuple[str | None, str | None]:
+    if seller_id is None:
+        return None, None
+    result = await db.execute(
+        select(AppUser.first_name, AppUser.last_name).where(AppUser.user_id == seller_id)
+    )
+    row = result.first()
+    return (row[0], row[1]) if row else (None, None)
 async def _ensure_owner_or_admin(product: Prod, user: AppUser, db: AsyncSession) -> None:
     roles = await get_user_roles(user, db)
     if RoleName.ADMIN in roles:
@@ -24,8 +50,30 @@ async def _ensure_owner_or_admin(product: Prod, user: AppUser, db: AsyncSession)
 
 @router.get("/products", response_model=list[ProductOut])
 async def list_products(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Prod))
-    return result.scalars().all()
+    result = await db.execute(
+        select(Prod, AppUser.first_name, AppUser.last_name).outerjoin(
+            AppUser, AppUser.user_id == Prod.seller_id
+        )
+    )
+    return [_product_out(prod, first, last) for (prod, first, last) in result.all()]
+
+
+@router.get("/sellers", response_model=list[SellerOut])
+async def list_sellers(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(AppUser.user_id, AppUser.first_name, AppUser.last_name, func.count(Prod.prod_id))
+        .join(Prod, Prod.seller_id == AppUser.user_id)
+        .group_by(AppUser.user_id, AppUser.first_name, AppUser.last_name)
+        .order_by(AppUser.user_id)
+    )
+    return [
+        SellerOut(
+            seller_id=uid,
+            seller_name=_full_name(first, last) or f"Satıcı #{uid}",
+            product_count=count,
+        )
+        for (uid, first, last, count) in result.all()
+    ]
 
 
 @router.get("/products/my-products", response_model=list[ProductOut])
@@ -43,7 +91,8 @@ async def get_product(prod_id: int, db: AsyncSession = Depends(get_db)):
     product = result.scalar_one_or_none()
     if product is None:
         raise HTTPException(status_code=404, detail="Ürün bulunamadı")
-    return product
+    first, last = await _seller_name(db, product.seller_id)
+    return _product_out(product, first, last)
 
 
 @router.post("/products", response_model=ProductOut)
@@ -52,11 +101,11 @@ async def create_product(
     db: AsyncSession = Depends(get_db),
     user: AppUser = Depends(require_role(RoleName.SELLER, RoleName.ADMIN)),
 ):
-    product = Prod(**payload.model_dump(), owner_user_id=user.user_id)
+    product = Prod(**payload.model_dump(), seller_id=user.user_id)
     db.add(product)
     await db.commit()
     await db.refresh(product)
-    return product
+    return _product_out(product, user.first_name, user.last_name)
 
 
 @router.patch("/products/{prod_id}", response_model=ProductOut)
@@ -77,7 +126,8 @@ async def update_product(
         setattr(product, field, value)
     await db.commit()
     await db.refresh(product)
-    return product
+    first, last = await _seller_name(db, product.seller_id)
+    return _product_out(product, first, last)
 
 
 @router.delete("/products/{prod_id}")

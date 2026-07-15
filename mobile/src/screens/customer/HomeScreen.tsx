@@ -1,7 +1,10 @@
+import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
+import { useCart } from '../../context/CartContext';
+import { apiClient } from '../../services/apiClient';
 import { badgeColors, colors, fonts, gradients, radius, shadow, spacing } from '../../theme/theme';
 
 type CareStatus = 'urgent' | 'soon' | 'ok';
@@ -14,12 +17,12 @@ interface CareReminder {
   message: string;
 }
 
-interface Listing {
-  id: string;
+interface Product {
+  prod_id: number;
   name: string;
-  price: string;
-  emoji: string;
-  location: string;
+  description: string | null;
+  price: string | number;
+  stock: number;
 }
 
 const CARE_REMINDERS: CareReminder[] = [
@@ -27,15 +30,6 @@ const CARE_REMINDERS: CareReminder[] = [
   { id: '2', name: 'Sansevieria', emoji: '🪴', status: 'ok', message: '4 gün sonra sulanacak' },
   { id: '3', name: 'Orkide', emoji: '🌸', status: 'soon', message: 'Yarın sulanmalı' },
   { id: '4', name: 'Ficus Lyrata', emoji: '🌱', status: 'ok', message: '6 gün sonra sulanacak' },
-];
-
-const LISTINGS: Listing[] = [
-  { id: '1', name: 'Monstera Albo', price: '₺2.450', emoji: '🌿', location: 'Kadıköy' },
-  { id: '2', name: 'Kaktüs Seti (3\'lü)', price: '₺320', emoji: '🌵', location: 'Beşiktaş' },
-  { id: '3', name: 'Pothos Marble', price: '₺180', emoji: '🍃', location: 'Üsküdar' },
-  { id: '4', name: 'Anthurium', price: '₺650', emoji: '🌺', location: 'Şişli' },
-  { id: '5', name: 'Zamioculcas', price: '₺290', emoji: '🪴', location: 'Bakırköy' },
-  { id: '6', name: 'Orkide Beyaz', price: '₺410', emoji: '🌸', location: 'Maltepe' },
 ];
 
 const statusColors: Record<CareStatus, { bg: string; text: string }> = {
@@ -46,34 +40,70 @@ const statusColors: Record<CareStatus, { bg: string; text: string }> = {
 
 export default function HomeScreen({ navigation }: any) {
   const { firebaseUser } = useAuth();
-  const [query, setQuery] = useState('');
+  const { count } = useCart();
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const { data } = await apiClient.get<Product[]>('/catalog/products');
+        if (active) setProducts(data);
+      } catch {
+        if (active) setProducts([]);
+      } finally {
+        if (active) setLoadingProducts(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const firstName = firebaseUser?.email?.split('@')[0] ?? 'Bitki Sever';
+  const featured = products.slice(0, 6);
 
   return (
     <View style={styles.screen}>
       <LinearGradient colors={gradients.header} style={styles.header}>
-        <View style={styles.brandRow}>
-          <View style={styles.logoMark}>
-            <View style={styles.logoDot} />
+        <View style={styles.topRow}>
+          <View style={styles.brandRow}>
+            <View style={styles.logoMark}>
+              <View style={styles.logoDot} />
+            </View>
+            <Text style={styles.brand}>PLANT AI</Text>
           </View>
-          <Text style={styles.brand}>PLANT AI</Text>
+          <View style={styles.headerIcons}>
+            <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Cart')} activeOpacity={0.7}>
+              <Ionicons name="cart-outline" size={20} color={colors.white} />
+              {count > 0 && (
+                <View style={styles.cartBadge}>
+                  <Text style={styles.cartBadgeText}>{count}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Orders')} activeOpacity={0.7}>
+              <Ionicons name="receipt-outline" size={20} color={colors.white} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Notifications')} activeOpacity={0.7}>
+              <Ionicons name="notifications-outline" size={20} color={colors.white} />
+            </TouchableOpacity>
+          </View>
         </View>
         <Text style={styles.greeting}>Merhaba, {firstName} 👋</Text>
         <Text style={styles.greetingSub}>Bugün bitkilerine göz atalım</Text>
       </LinearGradient>
 
       <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: spacing.xxl }} showsVerticalScrollIndicator={false}>
-        <View style={styles.searchBar}>
+        <TouchableOpacity
+          style={styles.searchBar}
+          onPress={() => navigation.navigate('Marketplace')}
+          activeOpacity={0.7}
+        >
           <Text style={styles.searchIcon}>⌕</Text>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Bitki, tür veya satıcı ara"
-            placeholderTextColor={colors.muted2}
-            value={query}
-            onChangeText={setQuery}
-          />
-        </View>
+          <Text style={styles.searchPlaceholder}>Ürün ara</Text>
+        </TouchableOpacity>
 
         <LinearGradient
           colors={[colors.secondary, colors.secondaryDeep]}
@@ -84,7 +114,11 @@ export default function HomeScreen({ navigation }: any) {
           <View style={{ flex: 1 }}>
             <Text style={styles.bannerEyebrow}>BU HAFTA</Text>
             <Text style={styles.bannerTitle}>Nadir bitkilerde{'\n'}%20'ye varan indirim</Text>
-            <TouchableOpacity style={styles.bannerButton} activeOpacity={0.85}>
+            <TouchableOpacity
+              style={styles.bannerButton}
+              activeOpacity={0.85}
+              onPress={() => navigation.navigate('Marketplace')}
+            >
               <Text style={styles.bannerButtonText}>Keşfet</Text>
             </TouchableOpacity>
           </View>
@@ -135,18 +169,31 @@ export default function HomeScreen({ navigation }: any) {
             <Text style={styles.sectionLink}>Tümü</Text>
           </TouchableOpacity>
         </View>
-        <View style={styles.grid}>
-          {LISTINGS.map((item) => (
-            <TouchableOpacity key={item.id} style={styles.listingCard} activeOpacity={0.85}>
-              <View style={styles.listingImage}>
-                <Text style={styles.listingEmoji}>{item.emoji}</Text>
-              </View>
-              <Text style={styles.listingName} numberOfLines={1}>{item.name}</Text>
-              <Text style={styles.listingPrice}>{item.price}</Text>
-              <Text style={styles.listingLocation}>{item.location}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {loadingProducts ? (
+          <ActivityIndicator color={colors.buttonPrimary} style={{ marginTop: spacing.lg }} />
+        ) : featured.length === 0 ? (
+          <Text style={styles.emptyListings}>Henüz ürün yok. Satıcılar ekledikçe burada görünür.</Text>
+        ) : (
+          <View style={styles.grid}>
+            {featured.map((item) => (
+              <TouchableOpacity
+                key={item.prod_id}
+                style={styles.listingCard}
+                activeOpacity={0.85}
+                onPress={() => navigation.navigate('Marketplace')}
+              >
+                <View style={styles.listingImage}>
+                  <Text style={styles.listingEmoji}>🪴</Text>
+                </View>
+                <Text style={styles.listingName} numberOfLines={1}>{item.name}</Text>
+                <Text style={styles.listingPrice}>₺{Number(item.price).toFixed(2)}</Text>
+                <Text style={styles.listingLocation}>
+                  {item.stock > 0 ? `Stok: ${item.stock}` : 'Stokta yok'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -161,7 +208,35 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: radius.lg,
     borderBottomRightRadius: radius.lg,
   },
-  brandRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.lg },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.lg,
+  },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  headerIcons: { flexDirection: 'row', gap: spacing.sm },
+  iconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cartBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    minWidth: 17,
+    height: 17,
+    borderRadius: 9,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  cartBadgeText: { fontFamily: fonts.sansBold, fontSize: 9.5, color: colors.white },
   logoMark: {
     width: 22,
     height: 22,
@@ -183,11 +258,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     paddingHorizontal: spacing.md,
-    marginTop: -spacing.xl,
+    marginTop: spacing.md,
     ...shadow.sm,
   },
   searchIcon: { fontSize: 16, color: colors.muted2, marginRight: spacing.sm },
-  searchInput: { flex: 1, paddingVertical: 14, fontFamily: fonts.sans, fontSize: 14, color: colors.ink },
+  searchPlaceholder: { flex: 1, paddingVertical: 14, fontFamily: fonts.sans, fontSize: 14, color: colors.muted2 },
   banner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -263,4 +338,12 @@ const styles = StyleSheet.create({
   listingName: { fontFamily: fonts.sansSemi, fontSize: 13, color: colors.ink, marginBottom: 2 },
   listingPrice: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.ink, marginBottom: 2 },
   listingLocation: { fontFamily: fonts.sans, fontSize: 11, color: colors.muted2 },
+  emptyListings: {
+    fontFamily: fonts.sans,
+    fontSize: 13,
+    color: colors.muted,
+    textAlign: 'center',
+    marginTop: spacing.lg,
+    lineHeight: 20,
+  },
 });
