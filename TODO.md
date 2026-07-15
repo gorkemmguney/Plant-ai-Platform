@@ -81,8 +81,8 @@ Durum: `[ ]` yapılacak · `[~]` devam ediyor · `[x]` tamamlandı
 - [x] Ana ekrandaki arama çubuğunu Mağaza'ya taşı — dokununca Mağaza'ya (arama ekranına) yönlendiriyor
 - [x] Ana Sayfa'yı gerçek veriye bağla (sahte listeler yerine `/catalog/products`)
 ### Satıcılar / mağazalar (Trendyol tarzı)
-- [ ] Alt bara "Mağazalar/Satıcılar" sekmesi — ürünleri satıcıya göre grupla ⚠️ backend gerekir (`prod`'a satıcı bağı)
-- [ ] Aynı ürünü farklı satıcılardan gösterme + fiyat karşılaştırma ⚠️ backend gerekir (ürün eşleştirme)
+- [x] "Satıcılar" sekmesi — `prod.seller_id` + `GET /catalog/sellers`; mağaza listesi → satıcının ürünleri (`StoresScreen`/`StoreProductsScreen`)
+- [x] Fiyat karşılaştırma — aynı isimli ürünlerde "En ucuz" rozeti + üründe satıcı adı gösterimi
 ### AI
 - [ ] AI chat'te görsel yükleme (foto ekle → `/ai/analyze-image`) ⚠️ Görkem'in analiz işiyle koordine et
 ### Profil & bildirim

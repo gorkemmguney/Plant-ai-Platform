@@ -1,19 +1,16 @@
-import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
   Modal,
-  RefreshControl,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { useCart } from '../../context/CartContext';
 import { apiClient } from '../../services/apiClient';
-import { badgeColors, colors, fonts, radius, shadow, spacing } from '../../theme/theme';
+import { colors, fonts, radius, shadow, spacing } from '../../theme/theme';
 
 interface Product {
   prod_id: number;
@@ -22,84 +19,47 @@ interface Product {
   price: string | number;
   stock: number;
   seller_id: number | null;
-  seller_name: string | null;
 }
 
-export default function MarketplaceScreen({ navigation }: any) {
-  const { addToCart, count } = useCart();
+export default function StoreProductsScreen({ route }: any) {
+  const { sellerId, sellerName } = route.params ?? {};
+  const { addToCart } = useCart();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [query, setQuery] = useState('');
-  // Adet seçme modalı
   const [selected, setSelected] = useState<Product | null>(null);
   const [qty, setQty] = useState(1);
 
-  const openAddModal = (product: Product) => {
-    setSelected(product);
-    setQty(1);
-  };
+  const load = useCallback(async () => {
+    try {
+      setError(null);
+      const { data } = await apiClient.get<Product[]>('/catalog/products');
+      setProducts(data.filter((p) => p.seller_id === sellerId));
+    } catch (err: any) {
+      setError(err?.response?.data?.detail ?? 'Ürünler yüklenemedi. Backend çalışıyor mu?');
+    } finally {
+      setLoading(false);
+    }
+  }, [sellerId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const confirmAdd = () => {
     if (selected) addToCart(selected, qty);
     setSelected(null);
   };
 
-  // Arama: ürün adına göre filtrele
-  const filtered = products.filter((p) =>
-    p.name.toLowerCase().includes(query.trim().toLowerCase())
-  );
-
-  // Fiyat karşılaştırma: aynı isimdeki ürünün kaç satıcıda olduğu ve en ucuz fiyatı
-  const priceByName: Record<string, { min: number; count: number }> = {};
-  products.forEach((p) => {
-    const key = p.name.trim().toLowerCase();
-    const price = Number(p.price);
-    if (!priceByName[key]) priceByName[key] = { min: price, count: 0 };
-    priceByName[key].count += 1;
-    priceByName[key].min = Math.min(priceByName[key].min, price);
-  });
-
-  const loadProducts = useCallback(async () => {
-    try {
-      setError(null);
-      const { data } = await apiClient.get<Product[]>('/catalog/products');
-      setProducts(data);
-    } catch (err: any) {
-      setError(err?.response?.data?.detail ?? 'Ürünler yüklenemedi. Backend çalışıyor mu?');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadProducts();
-  }, [loadProducts]);
-
   const renderProduct = ({ item }: { item: Product }) => {
     const out = item.stock < 1;
-    const info = priceByName[item.name.trim().toLowerCase()];
-    // Aynı üründen birden fazla satıcı varsa ve bu en ucuzsa "En ucuz" rozeti
-    const cheapest = info && info.count > 1 && Number(item.price) === info.min;
     return (
       <View style={styles.card}>
         <View style={styles.thumb}>
           <Text style={styles.thumbEmoji}>🪴</Text>
         </View>
         <View style={styles.info}>
-          <View style={styles.nameRow}>
-            <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
-            {cheapest && (
-              <View style={styles.cheapBadge}>
-                <Text style={styles.cheapBadgeText}>En ucuz</Text>
-              </View>
-            )}
-          </View>
-          {!!item.seller_name && (
-            <Text style={styles.seller} numberOfLines={1}>Satıcı: {item.seller_name}</Text>
-          )}
+          <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
           <Text style={[styles.stock, out && styles.stockOut]}>
             {out ? 'Stokta yok' : `Stok: ${item.stock}`}
           </Text>
@@ -108,7 +68,10 @@ export default function MarketplaceScreen({ navigation }: any) {
           <Text style={styles.price}>₺{Number(item.price).toFixed(2)}</Text>
           <TouchableOpacity
             style={[styles.buyButton, out && styles.buyButtonDisabled]}
-            onPress={() => openAddModal(item)}
+            onPress={() => {
+              setSelected(item);
+              setQty(1);
+            }}
             disabled={out}
             activeOpacity={0.85}
           >
@@ -122,30 +85,8 @@ export default function MarketplaceScreen({ navigation }: any) {
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.headerTitle}>Mağaza</Text>
-            <Text style={styles.headerSub}>Bitkileri keşfet ve satın al</Text>
-          </View>
-          <TouchableOpacity style={styles.cartBtn} onPress={() => navigation.navigate('Cart')} activeOpacity={0.7}>
-            <Ionicons name="cart-outline" size={24} color={colors.ink} />
-            {count > 0 && (
-              <View style={styles.cartBadge}>
-                <Text style={styles.cartBadgeText}>{count}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
-        <View style={styles.searchBar}>
-          <Text style={styles.searchIcon}>⌕</Text>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Ürün ara"
-            placeholderTextColor={colors.muted2}
-            value={query}
-            onChangeText={setQuery}
-          />
-        </View>
+        <Text style={styles.headerTitle}>{sellerName ?? 'Mağaza'}</Text>
+        <Text style={styles.headerSub}>Bu satıcının ürünleri</Text>
       </View>
 
       {loading ? (
@@ -155,32 +96,14 @@ export default function MarketplaceScreen({ navigation }: any) {
       ) : error ? (
         <View style={styles.center}>
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={loadProducts} activeOpacity={0.85}>
-            <Text style={styles.retryText}>Tekrar dene</Text>
-          </TouchableOpacity>
         </View>
       ) : (
         <FlatList
-          data={filtered}
+          data={products}
           keyExtractor={(item) => String(item.prod_id)}
           contentContainerStyle={styles.list}
           renderItem={renderProduct}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => {
-                setRefreshing(true);
-                loadProducts();
-              }}
-            />
-          }
-          ListEmptyComponent={
-            <Text style={styles.emptyText}>
-              {query.trim()
-                ? `"${query.trim()}" için sonuç bulunamadı.`
-                : 'Henüz ürün yok. Satıcılar ekledikçe burada görünür.'}
-            </Text>
-          }
+          ListEmptyComponent={<Text style={styles.emptyText}>Bu satıcının ürünü yok.</Text>}
         />
       )}
 
@@ -223,37 +146,10 @@ export default function MarketplaceScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  header: { paddingTop: 56, paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
-  headerTop: { flexDirection: 'row', alignItems: 'center' },
-  headerTitle: { fontFamily: fonts.display, fontSize: 24, color: colors.ink },
+  header: { paddingTop: 24, paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
+  headerTitle: { fontFamily: fonts.display, fontSize: 22, color: colors.ink },
   headerSub: { fontFamily: fonts.sans, fontSize: 12.5, color: colors.muted, marginTop: 2 },
-  cartBtn: { padding: spacing.xs },
-  cartBadge: {
-    position: 'absolute',
-    top: -2,
-    right: -4,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-  },
-  cartBadgeText: { fontFamily: fonts.sansBold, fontSize: 10, color: colors.white },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.card,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: spacing.md,
-    marginTop: spacing.md,
-  },
-  searchIcon: { fontSize: 16, color: colors.muted2, marginRight: spacing.sm },
-  searchInput: { flex: 1, paddingVertical: 12, fontFamily: fonts.sans, fontSize: 14, color: colors.ink },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.md },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
   list: { padding: spacing.lg, gap: spacing.md },
   card: {
     flexDirection: 'row',
@@ -276,12 +172,7 @@ const styles = StyleSheet.create({
   },
   thumbEmoji: { fontSize: 28 },
   info: { flex: 1 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  name: { fontFamily: fonts.sansBold, fontSize: 14.5, color: colors.ink, flexShrink: 1 },
-  cheapBadge: { backgroundColor: badgeColors.green.bg, paddingHorizontal: 7, paddingVertical: 2, borderRadius: radius.full },
-  cheapBadgeText: { fontFamily: fonts.sansBold, fontSize: 9.5, color: badgeColors.green.text },
-  seller: { fontFamily: fonts.sans, fontSize: 11.5, color: colors.muted2, marginTop: 2 },
-  description: { fontFamily: fonts.sans, fontSize: 12, color: colors.muted, marginTop: 2 },
+  name: { fontFamily: fonts.sansBold, fontSize: 14.5, color: colors.ink },
   stock: { fontFamily: fonts.sansMedium, fontSize: 11.5, color: colors.muted2, marginTop: 4 },
   stockOut: { color: colors.red },
   buyCol: { alignItems: 'flex-end', gap: spacing.sm },
@@ -297,21 +188,8 @@ const styles = StyleSheet.create({
   buyButtonDisabled: { backgroundColor: colors.border },
   buyButtonText: { fontFamily: fonts.sansBold, fontSize: 12, color: colors.buttonPrimaryText },
   errorText: { fontFamily: fonts.sans, fontSize: 13.5, color: colors.muted, textAlign: 'center', lineHeight: 20 },
-  retryButton: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingVertical: 10,
-    paddingHorizontal: spacing.xl,
-  },
-  retryText: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.ink },
   emptyText: { fontFamily: fonts.sans, fontSize: 13, color: colors.muted, textAlign: 'center', marginTop: spacing.xl },
-  modalWrap: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'center',
-    padding: spacing.xl,
-  },
+  modalWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', padding: spacing.xl },
   modalCard: { backgroundColor: colors.bg, borderRadius: radius.lg, padding: spacing.xl },
   modalTitle: { fontFamily: fonts.display, fontSize: 18, color: colors.ink },
   modalPrice: { fontFamily: fonts.sansBold, fontSize: 15, color: colors.primaryDeep, marginTop: spacing.xs },

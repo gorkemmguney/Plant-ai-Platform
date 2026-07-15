@@ -25,6 +25,8 @@ class Prod(Base):
     price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     stock: Mapped[int] = mapped_column(Integer, default=0)
     gnl_st_id: Mapped[int] = mapped_column(ForeignKey("gnl_st.gnl_st_id"), nullable=False)
+    # Ürünü ekleyen satıcı (app_user). Eski/sahipsiz ürünlerde NULL olabilir.
+    seller_id: Mapped[int | None] = mapped_column(ForeignKey("app_user.user_id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
