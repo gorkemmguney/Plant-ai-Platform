@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   RefreshControl,
   StyleSheet,
@@ -35,6 +36,9 @@ const statusLabels: Record<number, string> = {
   9: 'İptal edildi',
 };
 
+// Sadece erken aşamada iptal edilebilir (Alındı, Hazırlanıyor)
+const CANCELLABLE = [5, 6];
+
 export default function OrdersScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [productNames, setProductNames] = useState<Record<number, string>>({});
@@ -42,6 +46,7 @@ export default function OrdersScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -68,6 +73,27 @@ export default function OrdersScreen() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const handleCancel = (order: Order) => {
+    Alert.alert('Siparişi iptal et', `Sipariş #${order.cust_ord_id} iptal edilsin mi?`, [
+      { text: 'Vazgeç', style: 'cancel' },
+      {
+        text: 'İptal Et',
+        style: 'destructive',
+        onPress: async () => {
+          setCancellingId(order.cust_ord_id);
+          try {
+            await apiClient.post(`/orders/${order.cust_ord_id}/cancel`);
+            await load();
+          } catch (err: any) {
+            Alert.alert('İptal edilemedi', err?.response?.data?.detail ?? 'Sipariş iptal edilemedi.');
+          } finally {
+            setCancellingId(null);
+          }
+        },
+      },
+    ]);
+  };
 
   const renderOrder = ({ item }: { item: Order }) => {
     const date = new Date(item.order_date);
@@ -108,6 +134,21 @@ export default function OrdersScreen() {
                 <Text style={styles.itemPrice}>₺{(Number(it.unit_price) * it.quantity).toFixed(2)}</Text>
               </View>
             ))}
+
+            {CANCELLABLE.includes(item.gnl_st_id) && (
+              <TouchableOpacity
+                style={styles.cancelOrderBtn}
+                onPress={() => handleCancel(item)}
+                disabled={cancellingId === item.cust_ord_id}
+                activeOpacity={0.85}
+              >
+                {cancellingId === item.cust_ord_id ? (
+                  <ActivityIndicator size="small" color={colors.red} />
+                ) : (
+                  <Text style={styles.cancelOrderText}>Siparişi İptal Et</Text>
+                )}
+              </TouchableOpacity>
+            )}
           </View>
         )}
       </TouchableOpacity>
@@ -187,6 +228,15 @@ const styles = StyleSheet.create({
   itemRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   itemName: { fontFamily: fonts.sans, fontSize: 13, color: colors.ink, flex: 1, marginRight: spacing.sm },
   itemPrice: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.muted },
+  cancelOrderBtn: {
+    borderWidth: 1,
+    borderColor: colors.red,
+    borderRadius: radius.sm,
+    paddingVertical: 11,
+    alignItems: 'center',
+    marginTop: spacing.sm,
+  },
+  cancelOrderText: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.red },
   errorText: { fontFamily: fonts.sans, fontSize: 13.5, color: colors.muted, textAlign: 'center', lineHeight: 20 },
   retryButton: {
     borderWidth: 1,

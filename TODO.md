@@ -75,7 +75,7 @@ Durum: `[ ]` yapılacak · `[~]` devam ediyor · `[x]` tamamlandı
 - [x] Sepete ekleme (Sepete Ekle → sepet ekranı → adet ayarı → tek siparişte çoklu ürün, `CartContext`)
 - [x] "Siparişlerim" ekranı (müşteri kendi siparişleri, `GET /orders`, Ana Sayfa'dan erişim)
 - [x] Siparişe tıklayınca içeriğini görme (ürün/adet/tutar, expand)
-- [ ] Müşteri sipariş iptali ⚠️ backend gerekir (`POST /orders/{id}/cancel`; sadece erken aşamada, kendi siparişi) + mobilde "İptal Et" butonu
+- [x] Müşteri sipariş iptali (`POST /orders/{id}/cancel`; sadece Alındı/Hazırlanıyor, kendi siparişi, stok iadesi) + Siparişlerim'de "İptal Et" butonu
 ### Arama & keşif
 - [x] Ürün arama (Mağaza'da işlevli arama çubuğu, client-side filtre)
 - [x] Ana ekrandaki arama çubuğunu Mağaza'ya taşı — dokununca Mağaza'ya (arama ekranına) yönlendiriyor
