@@ -18,7 +18,8 @@ class OrderItemOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     cust_ord_item_id: int
-    prod_id: int
+    prod_id: int | None = None
+    prod_name: str
     quantity: int
     unit_price: Decimal
 

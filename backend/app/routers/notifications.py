@@ -6,11 +6,12 @@ from app.core.security import get_current_user
 from app.db.session import get_db
 from app.models.misc import Notification
 from app.models.user import AppUser
+from app.schemas.notification import NotificationOut
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
 
-@router.get("")
+@router.get("", response_model=list[NotificationOut])
 async def list_notifications(db: AsyncSession = Depends(get_db), user: AppUser = Depends(get_current_user)):
     result = await db.execute(
         select(Notification).where(Notification.user_id == user.user_id).order_by(Notification.created_at.desc())

@@ -10,6 +10,8 @@ interface AuthContextValue {
   firebaseUser: User | null;
   roles: Role[];
   sellerStatus: SellerStatus;
+  firstName: string;
+  lastName: string;
   loading: boolean;
   refreshProfile: () => Promise<void>;
 }
@@ -18,6 +20,8 @@ const AuthContext = createContext<AuthContextValue>({
   firebaseUser: null,
   roles: [],
   sellerStatus: 'none',
+  firstName: '',
+  lastName: '',
   loading: true,
   refreshProfile: async () => {},
 });
@@ -26,22 +30,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [roles, setRoles] = useState<Role[]>([]);
   const [sellerStatus, setSellerStatus] = useState<SellerStatus>('none');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [loading, setLoading] = useState(true);
 
   const refreshProfile = async () => {
     if (!firebaseAuth.currentUser) {
       setRoles([]);
       setSellerStatus('none');
+      setFirstName('');
+      setLastName('');
       return;
     }
     try {
       const { data } = await apiClient.get('/auth/me');
       setRoles(data.roles ?? []);
       setSellerStatus(data.seller_status ?? 'none');
+      setFirstName(data.first_name ?? '');
+      setLastName(data.last_name ?? '');
     } catch (err: any) {
       console.log('[AuthContext] /auth/me başarısız:', err?.message ?? err);
       setRoles([]);
       setSellerStatus('none');
+      setFirstName('');
+      setLastName('');
     }
   };
 
@@ -53,6 +65,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
         setRoles([]);
         setSellerStatus('none');
+        setFirstName('');
+        setLastName('');
       }
       setLoading(false);
     });
@@ -60,7 +74,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   return (
-    <AuthContext.Provider value={{ firebaseUser, roles, sellerStatus, loading, refreshProfile }}>
+    <AuthContext.Provider
+      value={{ firebaseUser, roles, sellerStatus, firstName, lastName, loading, refreshProfile }}
+    >
       {children}
     </AuthContext.Provider>
   );

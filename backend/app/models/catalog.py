@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, Numeric, String, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -26,9 +26,17 @@ class Prod(Base):
     stock: Mapped[int] = mapped_column(Integer, default=0)
     gnl_st_id: Mapped[int] = mapped_column(ForeignKey("gnl_st.gnl_st_id"), nullable=False)
     # Ürünü ekleyen satıcı (app_user). Eski/sahipsiz ürünlerde NULL olabilir.
-    seller_id: Mapped[int | None] = mapped_column(ForeignKey("app_user.user_id"), nullable=True)
+    # Satıcı (app_user) silinirse ürünleri de otomatik silinir (mağaza yoksa ürün de yok).
+    # Sipariş geçmişi bundan etkilenmez: cust_ord_item.prod_name anlık isim kopyası tutuyor.
+    seller_id: Mapped[int | None] = mapped_column(
+        ForeignKey("app_user.user_id", ondelete="CASCADE", name="fk_prod_seller"), nullable=True
+    )
     prod_spec_id: Mapped[int] = mapped_column(ForeignKey("prod_spec.prod_spec_id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Soft delete: satıcı silindiğinde veya ürün kaldırıldığında true'ya çekilir.
+    # Sipariş geçmişindeki referanslar bozulmasın diye fiziksel silme yapılmıyor.
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class ProdSpec(Base):

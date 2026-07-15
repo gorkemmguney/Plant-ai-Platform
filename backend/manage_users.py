@@ -3,6 +3,7 @@ Kullanım:
   python manage_users.py create --email seller2@plantai.com --password 123456 --role seller
   python manage_users.py create --email admin2@plantai.com --password 123456 --role admin --first-name Admin --last-name Iki
   python manage_users.py delete --email seller2@plantai.com
+  python manage_users.py delete --email seller2@plantai.com --hard-delete   # kalıcı silme (dikkatli kullan)
   python manage_users.py list
 """
 import argparse
@@ -96,7 +97,7 @@ async def create_user(email: str, password: str, role: str, first_name: str, las
     print(f"Role       : {role}")
 
 
-async def delete_user(email: str):
+async def delete_user(email: str, hard_delete: bool = False):
     init_firebase()
 
     try:
@@ -107,20 +108,58 @@ async def delete_user(email: str):
 
     conn = await get_conn()
     try:
+        # user_id'yi bul (firebase_uid varsa onunla, yoksa email ile)
         if fb_user:
-            auth.delete_user(fb_user.uid)
-            print(f"✅ Firebase kullanıcısı silindi: {fb_user.uid}")
-
-            result = await conn.execute(
-                "DELETE FROM app_user WHERE firebase_uid = $1", fb_user.uid
+            user_row = await conn.fetchrow(
+                "SELECT user_id FROM app_user WHERE firebase_uid = $1", fb_user.uid
             )
-            print(f"✅ app_user kaydı silindi ({result})")
         else:
-            # firebase'de yoksa email üzerinden DB'de ara
-            result = await conn.execute(
-                "DELETE FROM app_user WHERE email = $1", email
+            user_row = await conn.fetchrow(
+                "SELECT user_id FROM app_user WHERE email = $1", email
             )
-            print(f"✅ app_user kaydı (email ile) silindi ({result})")
+
+        if user_row is None:
+            print(f"ℹ️  app_user tablosunda bu kullanıcı bulunamadı: {email}")
+            return
+
+        user_id = user_row["user_id"]
+
+        if hard_delete:
+            # ESKİ DAVRANIŞ: kalıcı silme. Yalnızca siparişte/veride referansı
+            # olmayan test kullanıcıları için kullan; aksi halde FK hatası alırsın.
+            if fb_user:
+                auth.delete_user(fb_user.uid)
+                print(f"✅ Firebase kullanıcısı kalıcı silindi: {fb_user.uid}")
+            result = await conn.execute(
+                "DELETE FROM app_user WHERE user_id = $1", user_id
+            )
+            print(f"✅ app_user kaydı kalıcı silindi ({result})")
+            return
+
+        # SOFT DELETE (varsayılan davranış)
+        # 1) Bu satıcıya ait ürünleri pasifleştir
+        prod_result = await conn.execute(
+            """
+            UPDATE prod
+            SET is_active = false, deleted_at = now()
+            WHERE seller_id = $1 AND is_active = true
+            """,
+            user_id,
+        )
+        print(f"✅ Satıcının ürünleri pasifleştirildi ({prod_result})")
+
+        # 2) Kullanıcıyı pasifleştir
+        user_result = await conn.execute(
+            "UPDATE app_user SET is_active = false, updated_at = now() WHERE user_id = $1",
+            user_id,
+        )
+        print(f"✅ app_user pasifleştirildi ({user_result})")
+
+        # 3) Firebase'de girişi engelle (hesabı silme, sadece devre dışı bırak)
+        if fb_user:
+            auth.update_user(fb_user.uid, disabled=True)
+            print(f"✅ Firebase girişi devre dışı bırakıldı: {fb_user.uid}")
+
     finally:
         await conn.close()
 
@@ -159,6 +198,10 @@ def main():
 
     p_delete = sub.add_parser("delete")
     p_delete.add_argument("--email", required=True)
+    p_delete.add_argument(
+        "--hard-delete", action="store_true",
+        help="Kalıcı sil (dikkat: sipariş geçmişi olan ürünlerde FK hatası verir)"
+    )
 
     sub.add_parser("list")
 
@@ -167,7 +210,7 @@ def main():
     if args.command == "create":
         asyncio.run(create_user(args.email, args.password, args.role, args.first_name, args.last_name))
     elif args.command == "delete":
-        asyncio.run(delete_user(args.email))
+        asyncio.run(delete_user(args.email, args.hard_delete))
     elif args.command == "list":
         asyncio.run(list_users())
 

@@ -57,7 +57,12 @@ async def list_products(db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(Prod, AppUser.store_name, AppUser.first_name, AppUser.last_name)
         .outerjoin(AppUser, AppUser.user_id == Prod.seller_id)
-        .where(Prod.seller_id.isnot(None), Prod.stock > 0)
+        .where(
+            Prod.seller_id.isnot(None),
+            Prod.stock > 0,
+            Prod.is_active.is_(True),
+            AppUser.is_active.is_(True),
+        )
     )
     return [_product_out(prod, store_name, first, last) for (prod, store_name, first, last) in result.all()]
 
@@ -69,7 +74,11 @@ async def list_sellers(db: AsyncSession = Depends(get_db)):
             AppUser.user_id, AppUser.store_name, AppUser.first_name, AppUser.last_name, func.count(Prod.prod_id),
         )
         .join(Prod, Prod.seller_id == AppUser.user_id)
-        .where(Prod.stock > 0)
+        .where(
+            Prod.stock > 0,
+            Prod.is_active.is_(True),
+            AppUser.is_active.is_(True),
+        )
         .group_by(AppUser.user_id, AppUser.store_name, AppUser.first_name, AppUser.last_name)
         .order_by(AppUser.user_id)
     )
@@ -94,13 +103,16 @@ async def list_my_products(
     db: AsyncSession = Depends(get_db),
     user: AppUser = Depends(require_role(RoleName.SELLER, RoleName.ADMIN)),
 ):
+    # Satıcı kendi ürünlerini (pasif olanlar dahil) görebilsin diye burada is_active filtrelemiyoruz.
     result = await db.execute(select(Prod).where(Prod.seller_id == user.user_id))
     return result.scalars().all()
 
 
 @router.get("/products/{prod_id}", response_model=ProductOut)
 async def get_product(prod_id: int, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Prod).where(Prod.prod_id == prod_id))
+    result = await db.execute(
+        select(Prod).where(Prod.prod_id == prod_id, Prod.is_active.is_(True))
+    )
     product = result.scalar_one_or_none()
     if product is None:
         raise HTTPException(status_code=404, detail="Ürün bulunamadı")
@@ -156,6 +168,9 @@ async def delete_product(
 
     await _ensure_owner_or_admin(product, user, db)
 
-    await db.delete(product)
+    # Soft delete: sipariş geçmişindeki referanslar bozulmasın diye fiziksel silme yapmıyoruz.
+    product.is_active = False
+    from datetime import datetime, timezone
+    product.deleted_at = datetime.now(timezone.utc)
     await db.commit()
-    return {"detail": "Ürün silindi"}
+    return {"detail": "Ürün pasifleştirildi"}

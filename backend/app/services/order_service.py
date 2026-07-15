@@ -68,7 +68,12 @@ async def create_order(db: AsyncSession, cust_id: int, payload: OrderCreateIn) -
 
         seller_key = product.seller_id
         items_by_seller.setdefault(seller_key, []).append(
-            CustOrdItem(prod_id=product.prod_id, quantity=item.quantity, unit_price=product.price)
+            CustOrdItem(
+                prod_id=product.prod_id,
+                prod_name=product.name,
+                quantity=item.quantity,
+                unit_price=product.price,
+            )
         )
         totals_by_seller[seller_key] = totals_by_seller.get(seller_key, Decimal("0")) + line_total
 

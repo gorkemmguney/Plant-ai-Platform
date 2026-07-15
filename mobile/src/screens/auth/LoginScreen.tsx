@@ -42,12 +42,6 @@ export default function LoginScreen({ navigation }: any) {
   return (
     <View style={styles.screen}>
       <LinearGradient colors={[colors.secondary, colors.secondaryDeep]} style={styles.hero}>
-        <View style={styles.logoRow}>
-          <View style={styles.logoMark}>
-            <View style={styles.logoDot} />
-          </View>
-          <Text style={styles.logoText}>plant ai</Text>
-        </View>
       </LinearGradient>
 
       <KeyboardAvoidingView style={styles.sheetWrap} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -99,7 +93,7 @@ export default function LoginScreen({ navigation }: any) {
 
           <TouchableOpacity style={styles.oauthButton} onPress={handleMicrosoftLogin} activeOpacity={0.85}>
             <Text style={styles.oauthIcon}>⊞</Text>
-            <Text style={styles.oauthButtonText}>Continue with Microsoft</Text>
+            <Text style={styles.oauthButtonText}>Microsoft ile devam et</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.footerLink} onPress={() => navigation.navigate('Register')}>

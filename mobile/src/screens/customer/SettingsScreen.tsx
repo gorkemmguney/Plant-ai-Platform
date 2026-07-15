@@ -1,5 +1,5 @@
 import { signOut } from 'firebase/auth';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -29,33 +29,13 @@ const sellerStatusInfo: Record<string, { label: string; badge: keyof typeof badg
 };
 
 export default function SettingsScreen() {
-  const { firebaseUser, roles, sellerStatus } = useAuth();
+  const { firebaseUser, roles, sellerStatus, firstName, lastName, refreshProfile } = useAuth();
   const sellerInfo = sellerStatusInfo[sellerStatus];
 
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formFirst, setFormFirst] = useState('');
   const [formLast, setFormLast] = useState('');
-
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      try {
-        const { data } = await apiClient.get('/auth/me');
-        if (active) {
-          setFirstName(data.first_name ?? '');
-          setLastName(data.last_name ?? '');
-        }
-      } catch {
-        // sessiz geç (isim gösterilemezse email zaten var)
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, []);
 
   const openEdit = () => {
     setFormFirst(firstName);
@@ -70,12 +50,11 @@ export default function SettingsScreen() {
     }
     setSaving(true);
     try {
-      const { data } = await apiClient.patch('/auth/me', {
+      await apiClient.patch('/auth/me', {
         first_name: formFirst.trim(),
         last_name: formLast.trim(),
       });
-      setFirstName(data.first_name ?? '');
-      setLastName(data.last_name ?? '');
+      await refreshProfile();
       setEditing(false);
     } catch (err: any) {
       Alert.alert('Kaydedilemedi', err?.response?.data?.detail ?? 'Profil güncellenemedi.');

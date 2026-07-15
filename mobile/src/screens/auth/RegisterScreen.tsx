@@ -62,12 +62,6 @@ export default function RegisterScreen({ navigation }: any) {
   return (
     <View style={styles.screen}>
       <LinearGradient colors={[colors.secondary, colors.secondaryDeep]} style={styles.hero}>
-        <View style={styles.logoRow}>
-          <View style={styles.logoMark}>
-            <View style={styles.logoDot} />
-          </View>
-          <Text style={styles.logoText}>plant ai</Text>
-        </View>
       </LinearGradient>
 
       <KeyboardAvoidingView style={styles.sheetWrap} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -76,13 +70,13 @@ export default function RegisterScreen({ navigation }: any) {
             <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} activeOpacity={0.7}>
               <Text style={styles.backIcon}>‹</Text>
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Signup</Text>
+            <Text style={styles.headerTitle}>Kayıt Ol</Text>
             <View style={styles.backButton} />
           </View>
 
-          <Text style={styles.title}>Create your account</Text>
+          <Text style={styles.title}>Hesabını oluştur</Text>
 
-          <Text style={styles.label}>Email address</Text>
+          <Text style={styles.label}>E-posta adresi</Text>
           <TextInput
             style={styles.input}
             placeholder="ornek@email.com"
@@ -115,7 +109,7 @@ export default function RegisterScreen({ navigation }: any) {
                   activeOpacity={0.8}
                 >
                   <Text style={[styles.roleOptionText, active && styles.roleOptionTextActive]}>
-                    {r === 'customer' ? '🪴 Müşteri' : '🛍️ Satıcı'}
+                    {r === 'customer' ? 'Müşteri' : 'Satıcı'}
                   </Text>
                   <Text style={[styles.roleOptionSub, active && styles.roleOptionSubActive]}>
                     {r === 'customer' ? 'Ürün satın al' : 'Ürün sat (onay gerekir)'}
@@ -129,19 +123,18 @@ export default function RegisterScreen({ navigation }: any) {
             <ActivityIndicator color={colors.buttonPrimary} style={{ marginTop: spacing.lg }} />
           ) : (
             <TouchableOpacity style={styles.primaryButton} onPress={handleRegister} activeOpacity={0.85}>
-              <Text style={styles.primaryButtonText}>Continue</Text>
+              <Text style={styles.primaryButtonText}>Devam Et</Text>
             </TouchableOpacity>
           )}
 
           <View style={styles.dividerRow}>
             <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or</Text>
+            <Text style={styles.dividerText}>veya</Text>
             <View style={styles.dividerLine} />
           </View>
 
           <TouchableOpacity style={styles.oauthButton} onPress={handleMicrosoftLogin} activeOpacity={0.85}>
-            <Text style={styles.oauthIcon}>⊞</Text>
-            <Text style={styles.oauthButtonText}>Continue with Microsoft</Text>
+            <Text style={styles.oauthButtonText}>Microsoft ile devam et</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.footerLink} onPress={() => navigation.navigate('Login')}>
@@ -244,7 +237,6 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     backgroundColor: colors.card,
   },
-  oauthIcon: { fontSize: 16, color: colors.ink },
   oauthButtonText: { fontFamily: fonts.sansSemi, fontSize: 14, color: colors.ink },
   footerLink: { alignItems: 'center', marginTop: spacing.xl },
   footerLinkText: { fontFamily: fonts.sans, fontSize: 13, color: colors.muted },
