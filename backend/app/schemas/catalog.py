@@ -13,6 +13,16 @@ class ProductOut(BaseModel):
     price: Decimal
     stock: int
     gnl_st_id: int
+    seller_id: int | None = None
+    seller_name: str | None = None
+
+
+class SellerOut(BaseModel):
+    seller_id: int
+    seller_name: str
+    product_count: int
+    prod_spec_id: int
+    owner_user_id: int | None = None
 
 
 class ProductCreateIn(BaseModel):
@@ -21,6 +31,7 @@ class ProductCreateIn(BaseModel):
     price: Decimal
     stock: int = 0
     gnl_st_id: int
+    prod_spec_id: int
 
 
 class ProductUpdateIn(BaseModel):
@@ -29,6 +40,7 @@ class ProductUpdateIn(BaseModel):
     price: Decimal | None = None
     stock: int | None = None
     gnl_st_id: int | None = None
+    prod_spec_id: int | None = None
 
 
 class ProductOfferOut(BaseModel):

@@ -74,20 +74,22 @@ Durum: `[ ]` yapılacak · `[~]` devam ediyor · `[x]` tamamlandı
 
 ## Faz 7 — Müşteri Deneyimi (Customer UX)
 ### Alışveriş akışı
-- [ ] Sepete ekleme (Satın Al → Sepete Ekle → sepet ekranı → tek siparişte çoklu ürün) — `/orders` çoklu `items` hazır
-- [ ] "Siparişlerim" ekranı (müşteri kendi siparişleri, `GET /orders`)
+- [x] Sepete ekleme (Sepete Ekle → sepet ekranı → adet ayarı → tek siparişte çoklu ürün, `CartContext`)
+- [x] "Siparişlerim" ekranı (müşteri kendi siparişleri, `GET /orders`, Ana Sayfa'dan erişim)
+- [x] Siparişe tıklayınca içeriğini görme (ürün/adet/tutar, expand)
+- [x] Müşteri sipariş iptali (`POST /orders/{id}/cancel`; sadece Alındı/Hazırlanıyor, kendi siparişi, stok iadesi) + Siparişlerim'de "İptal Et" butonu
 ### Arama & keşif
-- [ ] Ürün arama (Mağaza'da işlevli arama çubuğu, client-side filtre)
-- [ ] Ana ekrandaki işlevsiz arama çubuğunu Mağaza'ya taşı ve çalışır hale getir
-- [ ] Ana Sayfa'yı gerçek veriye bağla (sahte listeler yerine `/catalog/products`)
+- [x] Ürün arama (Mağaza'da işlevli arama çubuğu, client-side filtre)
+- [x] Ana ekrandaki arama çubuğunu Mağaza'ya taşı — dokununca Mağaza'ya (arama ekranına) yönlendiriyor
+- [x] Ana Sayfa'yı gerçek veriye bağla (sahte listeler yerine `/catalog/products`)
 ### Satıcılar / mağazalar (Trendyol tarzı)
-- [ ] Alt bara "Mağazalar/Satıcılar" sekmesi — ürünleri satıcıya göre grupla ⚠️ backend gerekir (`prod`'a satıcı bağı)
-- [ ] Aynı ürünü farklı satıcılardan gösterme + fiyat karşılaştırma ⚠️ backend gerekir (ürün eşleştirme)
+- [x] "Satıcılar" sekmesi — `prod.seller_id` + `GET /catalog/sellers`; mağaza listesi → satıcının ürünleri (`StoresScreen`/`StoreProductsScreen`)
+- [x] Fiyat karşılaştırma — aynı isimli ürünlerde "En ucuz" rozeti + üründe satıcı adı gösterimi
 ### AI
 - [ ] AI chat'te görsel yükleme (foto ekle → `/ai/analyze-image`) ⚠️ Görkem'in analiz işiyle koordine et
 ### Profil & bildirim
-- [ ] Ayarlar'da isim/soyisim görüntüle + düzenle ⚠️ düzenleme için profil güncelleme endpoint'i gerekir
-- [ ] Bildirim ekranı (`GET /notifications` + okundu işaretleme)
+- [x] Ayarlar'da isim/soyisim görüntüle + düzenle (`PATCH /auth/me`, modal ile)
+- [x] Bildirim ekranı (`GET /notifications` + okundu işaretleme, Ana Sayfa'dan erişim)
 
 ## Kapsam Dışı Tablolar (sonraki adım)
 - [ ] `prod_spec_*`, `user_preference`, `bsn_inter*`, `sch_job` için router/service katmanı

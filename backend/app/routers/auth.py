@@ -6,7 +6,7 @@ from app.core.security import get_current_user, get_user_roles
 from app.db.session import get_db
 from app.models.user import AppUser
 from app.rbac.roles import ROLE_HIERARCHY, RoleName
-from app.schemas.user import RoleSelectIn, UserOut
+from app.schemas.user import ProfileUpdateIn, RoleSelectIn, UserOut
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -29,6 +29,22 @@ def _user_out(user: AppUser, roles: list[str]) -> UserOut:
 
 @router.get("/me", response_model=UserOut)
 async def get_me(user: AppUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    roles = await get_user_roles(user, db)
+    return _user_out(user, roles)
+
+
+@router.patch("/me", response_model=UserOut)
+async def update_me(
+    payload: ProfileUpdateIn,
+    user: AppUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if payload.first_name is not None:
+        user.first_name = payload.first_name.strip() or user.first_name
+    if payload.last_name is not None:
+        user.last_name = payload.last_name.strip()
+    await db.commit()
+    await db.refresh(user)
     roles = await get_user_roles(user, db)
     return _user_out(user, roles)
 
