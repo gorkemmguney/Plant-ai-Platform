@@ -13,6 +13,8 @@ import OrdersScreen from '../screens/customer/OrdersScreen';
 import SettingsScreen from '../screens/customer/SettingsScreen';
 import StoreProductsScreen from '../screens/customer/StoreProductsScreen';
 import StoresScreen from '../screens/customer/StoresScreen';
+import ImageAnalysisScreen from '../screens/customer/ImageAnalysisScreen';
+import AnalysisResultScreen from '../screens/customer/AnalysisResultScreen';
 import { colors, fonts } from '../theme/theme';
 
 export type CustomerTabParamList = {
@@ -29,6 +31,16 @@ export type CustomerStackParamList = {
   Orders: undefined;
   Notifications: undefined;
   StoreProducts: { sellerId: number; sellerName: string };
+  MainTabs: undefined;
+  ImageAnalysis: undefined;
+  AnalysisResult: {
+    analysisId: number;
+    imageUrl: string;
+    result: string; // JSON string
+    confidence: number | null;
+    createdAt: string;
+    recommendedProducts?: any[];
+  };
 };
 
 const Tab = createBottomTabNavigator<CustomerTabParamList>();
@@ -51,6 +63,7 @@ const labels: Record<keyof CustomerTabParamList, string> = {
 };
 
 function CustomerTabs() {
+function CustomerTabNavigator() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -92,5 +105,10 @@ export default function CustomerStack() {
         <Stack.Screen name="StoreProducts" component={StoreProductsScreen} options={{ title: 'Mağaza' }} />
       </Stack.Navigator>
     </CartProvider>
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="MainTabs" component={CustomerTabNavigator} />
+      <Stack.Screen name="ImageAnalysis" component={ImageAnalysisScreen} />
+      <Stack.Screen name="AnalysisResult" component={AnalysisResultScreen} />
+    </Stack.Navigator>
   );
 }

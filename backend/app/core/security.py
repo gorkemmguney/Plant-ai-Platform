@@ -40,6 +40,7 @@ async def get_current_user(
             is_active=True,
         )
         db.add(user)
+        
         try:
             await db.flush()
         except IntegrityError:

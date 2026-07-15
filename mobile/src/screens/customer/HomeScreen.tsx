@@ -125,6 +125,26 @@ export default function HomeScreen({ navigation }: any) {
           <Text style={styles.bannerEmoji}>🌴</Text>
         </LinearGradient>
 
+        <LinearGradient
+          colors={['#2c694a', '#1e4832']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.banner}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.bannerEyebrow, { color: '#eda972' }]}>YAPAY ZEKA</Text>
+            <Text style={styles.bannerTitle}>Bitki Teşhis &{'\n'}Sağlık Analizi</Text>
+            <TouchableOpacity
+              style={styles.bannerButton}
+              activeOpacity={0.85}
+              onPress={() => navigation.navigate('ImageAnalysis')}
+            >
+              <Text style={[styles.bannerButtonText, { color: '#1e4832' }]}>Fotoğraf Analiz Et 📸</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.bannerEmoji}>🩺</Text>
+        </LinearGradient>
+
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Bakım Takibi</Text>
           <Text style={styles.sectionBadgeAI}>AI destekli</Text>
