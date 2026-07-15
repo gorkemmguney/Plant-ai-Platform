@@ -24,6 +24,13 @@ interface Product {
   price: string | number;
   stock: number;
   gnl_st_id: number;
+  prod_spec_id: number;
+}
+
+interface ProductSpec {
+  prod_spec_id: number;
+  name: string;
+  description: string | null;
 }
 
 interface FormState {
@@ -32,12 +39,14 @@ interface FormState {
   price: string;
   stock: string;
   gnl_st_id: string;
+  prod_spec_id: number | null;
 }
 
-const EMPTY_FORM: FormState = { name: '', description: '', price: '', stock: '0', gnl_st_id: '1' };
+const EMPTY_FORM: FormState = { name: '', description: '', price: '', stock: '0', gnl_st_id: '1', prod_spec_id: null };
 
 export default function ProductsScreen() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [specs, setSpecs] = useState<ProductSpec[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,23 +59,34 @@ export default function ProductsScreen() {
   const loadProducts = useCallback(async () => {
     try {
       setError(null);
-      const { data } = await apiClient.get<Product[]>('/catalog/products');
+      // Sadece bu satıcının kendi ürünleri (tüm ürünler değil)
+      const { data } = await apiClient.get<Product[]>('/catalog/products/my-products');
       setProducts(data);
     } catch (err: any) {
-      setError(err?.response?.data?.detail ?? 'Ürünler yüklenemedi. Backend çalışıyor mu?');
+      setError(err?.response?.data?.detail ?? 'Ürünler yüklenemedi.');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, []);
 
+  const loadSpecs = useCallback(async () => {
+    try {
+      const { data } = await apiClient.get<ProductSpec[]>('/catalog/product-specs');
+      setSpecs(data);
+    } catch {
+      // Kategori listesi yüklenemezse form yine de açılabilir, sadece seçenek görünmez
+    }
+  }, []);
+
   useEffect(() => {
     loadProducts();
-  }, [loadProducts]);
+    loadSpecs();
+  }, [loadProducts, loadSpecs]);
 
   const openCreate = () => {
     setEditingId(null);
-    setForm(EMPTY_FORM);
+    setForm({ ...EMPTY_FORM, prod_spec_id: specs[0]?.prod_spec_id ?? null });
     setModalOpen(true);
   };
 
@@ -78,6 +98,7 @@ export default function ProductsScreen() {
       price: String(product.price),
       stock: String(product.stock),
       gnl_st_id: String(product.gnl_st_id),
+      prod_spec_id: product.prod_spec_id,
     });
     setModalOpen(true);
   };
@@ -92,6 +113,10 @@ export default function ProductsScreen() {
       Alert.alert('Geçersiz fiyat', 'Fiyat geçerli bir sayı olmalı.');
       return;
     }
+    if (form.prod_spec_id == null) {
+      Alert.alert('Eksik bilgi', 'Ürün kategorisi seçilmeli.');
+      return;
+    }
     setSaving(true);
     const payload = {
       name: form.name.trim(),
@@ -99,6 +124,7 @@ export default function ProductsScreen() {
       price,
       stock: Number(form.stock) || 0,
       gnl_st_id: Number(form.gnl_st_id) || 1,
+      prod_spec_id: form.prod_spec_id,
     };
     try {
       if (editingId == null) {
@@ -226,6 +252,28 @@ export default function ProductsScreen() {
                 placeholderTextColor={colors.muted2}
                 multiline
               />
+
+              <Text style={styles.label}>Kategori</Text>
+              <View style={styles.specRow}>
+                {specs.map((s) => {
+                  const active = form.prod_spec_id === s.prod_spec_id;
+                  return (
+                    <TouchableOpacity
+                      key={s.prod_spec_id}
+                      style={[styles.specChip, active ? styles.specChipActive : styles.specChipInactive]}
+                      onPress={() => setForm((f) => ({ ...f, prod_spec_id: s.prod_spec_id }))}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={[styles.specChipText, active ? styles.specChipTextActive : styles.specChipTextInactive]}>
+                        {s.name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+                {specs.length === 0 && (
+                  <Text style={styles.specEmptyText}>Kategori listesi yüklenemedi.</Text>
+                )}
+              </View>
 
               <View style={styles.inputRow}>
                 <View style={{ flex: 1 }}>
@@ -369,6 +417,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
   },
   inputMultiline: { minHeight: 70, textAlignVertical: 'top' },
+  specRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },
+  specChip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: radius.full, borderWidth: 1 },
+  specChipActive: { backgroundColor: colors.buttonPrimary, borderColor: colors.buttonPrimary },
+  specChipInactive: { backgroundColor: colors.card, borderColor: colors.border },
+  specChipText: { fontFamily: fonts.sansBold, fontSize: 12.5 },
+  specChipTextActive: { color: colors.white },
+  specChipTextInactive: { color: colors.ink },
+  specEmptyText: { fontFamily: fonts.sans, fontSize: 12.5, color: colors.muted },
   inputRow: { flexDirection: 'row', gap: spacing.md },
   modalActions: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.sm },
   cancelButton: {

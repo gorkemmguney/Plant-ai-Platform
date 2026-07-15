@@ -28,9 +28,6 @@ class Prod(Base):
     # Ürünü ekleyen satıcı (app_user). Eski/sahipsiz ürünlerde NULL olabilir.
     seller_id: Mapped[int | None] = mapped_column(ForeignKey("app_user.user_id"), nullable=True)
     prod_spec_id: Mapped[int] = mapped_column(ForeignKey("prod_spec.prod_spec_id"), nullable=False)
-    owner_user_id: Mapped[int | None] = mapped_column(
-        ForeignKey("app_user.user_id", ondelete="SET NULL"), nullable=True
-    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

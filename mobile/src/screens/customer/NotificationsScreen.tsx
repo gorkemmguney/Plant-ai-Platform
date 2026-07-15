@@ -31,7 +31,7 @@ export default function NotificationsScreen() {
       const { data } = await apiClient.get<Notification[]>('/notifications');
       setItems(data);
     } catch (err: any) {
-      setError(err?.response?.data?.detail ?? 'Bildirimler yüklenemedi. Backend çalışıyor mu?');
+      setError(err?.response?.data?.detail ?? 'Bildirimler yüklenemedi.');
     } finally {
       setLoading(false);
       setRefreshing(false);

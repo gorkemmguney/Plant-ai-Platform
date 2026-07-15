@@ -3,11 +3,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import require_role
+from app.core.security import get_user_roles, require_role
 from app.db.session import get_db
 from app.models.catalog import Prod
 from app.models.customer import Cust
-from app.models.order import CustOrd
+from app.models.order import CustOrd, CustOrdItem
 from app.models.user import AppUser
 from app.rbac.roles import RoleName
 from app.schemas.order import OrderCreateIn, OrderOut, OrderStatusUpdateIn
@@ -54,12 +54,37 @@ async def list_my_orders(
 @router.get("/all", response_model=list[OrderOut])
 async def list_all_orders(
     db: AsyncSession = Depends(get_db),
-    _: AppUser = Depends(require_role(RoleName.SELLER, RoleName.ADMIN)),
+    user: AppUser = Depends(require_role(RoleName.SELLER, RoleName.ADMIN)),
 ):
-    result = await db.execute(
-        select(CustOrd).options(selectinload(CustOrd.items)).order_by(CustOrd.order_date.desc())
-    )
+    roles = await get_user_roles(user, db)
+    query = select(CustOrd).options(selectinload(CustOrd.items)).order_by(CustOrd.order_date.desc())
+
+    if RoleName.ADMIN not in roles:
+        # Satıcı sadece kendi ürünlerini içeren siparişleri görebilir
+        query = query.where(
+            CustOrd.cust_ord_id.in_(
+                select(CustOrdItem.cust_ord_id)
+                .join(Prod, Prod.prod_id == CustOrdItem.prod_id)
+                .where(Prod.seller_id == user.user_id)
+            )
+        )
+
+    result = await db.execute(query)
     return result.scalars().all()
+
+
+async def _ensure_seller_owns_order(cust_ord_id: int, user: AppUser, db: AsyncSession) -> None:
+    roles = await get_user_roles(user, db)
+    if RoleName.ADMIN in roles:
+        return
+    result = await db.execute(
+        select(CustOrdItem.cust_ord_item_id)
+        .join(Prod, Prod.prod_id == CustOrdItem.prod_id)
+        .where(CustOrdItem.cust_ord_id == cust_ord_id, Prod.seller_id == user.user_id)
+        .limit(1)
+    )
+    if result.first() is None:
+        raise HTTPException(status_code=403, detail="Bu sipariş üzerinde işlem yapma yetkiniz yok")
 
 
 @router.patch("/{cust_ord_id}/status", response_model=OrderOut)
@@ -67,8 +92,9 @@ async def update_order_status_endpoint(
     cust_ord_id: int,
     payload: OrderStatusUpdateIn,
     db: AsyncSession = Depends(get_db),
-    _: AppUser = Depends(require_role(RoleName.SELLER, RoleName.ADMIN)),
+    user: AppUser = Depends(require_role(RoleName.SELLER, RoleName.ADMIN)),
 ):
+    await _ensure_seller_owns_order(cust_ord_id, user, db)
     return await update_order_status(db, cust_ord_id, payload.gnl_st_id)
 
 

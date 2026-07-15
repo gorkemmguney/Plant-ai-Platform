@@ -86,7 +86,7 @@ export default function UserManagementScreen() {
       setUsers(data);
       await loadStats();
     } catch (err: any) {
-      setError(err?.response?.data?.detail ?? 'Kullanıcılar yüklenemedi. Backend çalışıyor mu?');
+      setError(err?.response?.data?.detail ?? 'Kullanıcılar yüklenemedi.');
     } finally {
       setLoading(false);
       setRefreshing(false);

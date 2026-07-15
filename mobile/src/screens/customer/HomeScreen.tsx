@@ -62,6 +62,7 @@ export default function HomeScreen({ navigation }: any) {
   }, []);
 
   const firstName = firebaseUser?.email?.split('@')[0] ?? 'Bitki Sever';
+  console.log('products:', products, typeof products);
   const featured = products.slice(0, 6);
 
   return (
