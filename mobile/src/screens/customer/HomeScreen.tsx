@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
+import { useCart } from '../../context/CartContext';
 import { apiClient } from '../../services/apiClient';
 import { badgeColors, colors, fonts, gradients, radius, shadow, spacing } from '../../theme/theme';
 
@@ -39,7 +40,7 @@ const statusColors: Record<CareStatus, { bg: string; text: string }> = {
 
 export default function HomeScreen({ navigation }: any) {
   const { firebaseUser } = useAuth();
-  const [query, setQuery] = useState('');
+  const { count } = useCart();
   const [products, setProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
 
@@ -74,6 +75,14 @@ export default function HomeScreen({ navigation }: any) {
             <Text style={styles.brand}>PLANT AI</Text>
           </View>
           <View style={styles.headerIcons}>
+            <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Cart')} activeOpacity={0.7}>
+              <Ionicons name="cart-outline" size={20} color={colors.white} />
+              {count > 0 && (
+                <View style={styles.cartBadge}>
+                  <Text style={styles.cartBadgeText}>{count}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
             <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Orders')} activeOpacity={0.7}>
               <Ionicons name="receipt-outline" size={20} color={colors.white} />
             </TouchableOpacity>
@@ -87,16 +96,14 @@ export default function HomeScreen({ navigation }: any) {
       </LinearGradient>
 
       <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: spacing.xxl }} showsVerticalScrollIndicator={false}>
-        <View style={styles.searchBar}>
+        <TouchableOpacity
+          style={styles.searchBar}
+          onPress={() => navigation.navigate('Marketplace')}
+          activeOpacity={0.7}
+        >
           <Text style={styles.searchIcon}>⌕</Text>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Bitki, tür veya satıcı ara"
-            placeholderTextColor={colors.muted2}
-            value={query}
-            onChangeText={setQuery}
-          />
-        </View>
+          <Text style={styles.searchPlaceholder}>Ürün ara</Text>
+        </TouchableOpacity>
 
         <LinearGradient
           colors={[colors.secondary, colors.secondaryDeep]}
@@ -197,6 +204,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  cartBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    minWidth: 17,
+    height: 17,
+    borderRadius: 9,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  cartBadgeText: { fontFamily: fonts.sansBold, fontSize: 9.5, color: colors.white },
   logoMark: {
     width: 22,
     height: 22,
@@ -218,11 +238,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     paddingHorizontal: spacing.md,
-    marginTop: -spacing.xl,
+    marginTop: spacing.md,
     ...shadow.sm,
   },
   searchIcon: { fontSize: 16, color: colors.muted2, marginRight: spacing.sm },
-  searchInput: { flex: 1, paddingVertical: 14, fontFamily: fonts.sans, fontSize: 14, color: colors.ink },
+  searchPlaceholder: { flex: 1, paddingVertical: 14, fontFamily: fonts.sans, fontSize: 14, color: colors.muted2 },
   banner: {
     flexDirection: 'row',
     alignItems: 'center',

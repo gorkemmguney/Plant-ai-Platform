@@ -72,11 +72,11 @@ Durum: `[ ]` yapılacak · `[~]` devam ediyor · `[x]` tamamlandı
 
 ## Faz 7 — Müşteri Deneyimi (Customer UX)
 ### Alışveriş akışı
-- [ ] Sepete ekleme (Satın Al → Sepete Ekle → sepet ekranı → tek siparişte çoklu ürün) — `/orders` çoklu `items` hazır
+- [x] Sepete ekleme (Sepete Ekle → sepet ekranı → adet ayarı → tek siparişte çoklu ürün, `CartContext`)
 - [x] "Siparişlerim" ekranı (müşteri kendi siparişleri, `GET /orders`, Ana Sayfa'dan erişim)
 ### Arama & keşif
 - [x] Ürün arama (Mağaza'da işlevli arama çubuğu, client-side filtre)
-- [~] Ana ekrandaki işlevsiz arama çubuğunu Mağaza'ya taşı — Mağaza'da işlevli arama var, Ana Sayfa çubuğu hâlâ duruyor
+- [x] Ana ekrandaki arama çubuğunu Mağaza'ya taşı — dokununca Mağaza'ya (arama ekranına) yönlendiriyor
 - [x] Ana Sayfa'yı gerçek veriye bağla (sahte listeler yerine `/catalog/products`)
 ### Satıcılar / mağazalar (Trendyol tarzı)
 - [ ] Alt bara "Mağazalar/Satıcılar" sekmesi — ürünleri satıcıya göre grupla ⚠️ backend gerekir (`prod`'a satıcı bağı)

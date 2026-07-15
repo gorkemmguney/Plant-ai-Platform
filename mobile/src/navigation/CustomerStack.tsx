@@ -3,7 +3,9 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React from 'react';
 import { Platform } from 'react-native';
+import { CartProvider } from '../context/CartContext';
 import AIChatScreen from '../screens/customer/AIChatScreen';
+import CartScreen from '../screens/customer/CartScreen';
 import HomeScreen from '../screens/customer/HomeScreen';
 import MarketplaceScreen from '../screens/customer/MarketplaceScreen';
 import NotificationsScreen from '../screens/customer/NotificationsScreen';
@@ -20,6 +22,7 @@ export type CustomerTabParamList = {
 
 export type CustomerStackParamList = {
   Tabs: undefined;
+  Cart: undefined;
   Orders: undefined;
   Notifications: undefined;
 };
@@ -73,10 +76,13 @@ function CustomerTabs() {
 
 export default function CustomerStack() {
   return (
-    <Stack.Navigator>
-      <Stack.Screen name="Tabs" component={CustomerTabs} options={{ headerShown: false }} />
-      <Stack.Screen name="Orders" component={OrdersScreen} options={{ title: 'Siparişlerim' }} />
-      <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Bildirimler' }} />
-    </Stack.Navigator>
+    <CartProvider>
+      <Stack.Navigator>
+        <Stack.Screen name="Tabs" component={CustomerTabs} options={{ headerShown: false }} />
+        <Stack.Screen name="Cart" component={CartScreen} options={{ title: 'Sepetim' }} />
+        <Stack.Screen name="Orders" component={OrdersScreen} options={{ title: 'Siparişlerim' }} />
+        <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Bildirimler' }} />
+      </Stack.Navigator>
+    </CartProvider>
   );
 }

@@ -1,8 +1,9 @@
+import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
+  Modal,
   RefreshControl,
   StyleSheet,
   Text,
@@ -10,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useCart } from '../../context/CartContext';
 import { apiClient } from '../../services/apiClient';
 import { colors, fonts, radius, shadow, spacing } from '../../theme/theme';
 
@@ -21,16 +23,26 @@ interface Product {
   stock: number;
 }
 
-// Seed ile eklenen varsayılan satış kanalı (sale_cnl_id = 1: "Mobil Uygulama")
-const SALE_CHANNEL_ID = 1;
-
-export default function MarketplaceScreen() {
+export default function MarketplaceScreen({ navigation }: any) {
+  const { addToCart, count } = useCart();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [buyingId, setBuyingId] = useState<number | null>(null);
   const [query, setQuery] = useState('');
+  // Adet seçme modalı
+  const [selected, setSelected] = useState<Product | null>(null);
+  const [qty, setQty] = useState(1);
+
+  const openAddModal = (product: Product) => {
+    setSelected(product);
+    setQty(1);
+  };
+
+  const confirmAdd = () => {
+    if (selected) addToCart(selected, qty);
+    setSelected(null);
+  };
 
   // Arama: ürün adına göre filtrele
   const filtered = products.filter((p) =>
@@ -54,44 +66,8 @@ export default function MarketplaceScreen() {
     loadProducts();
   }, [loadProducts]);
 
-  // Sipariş için müşteri profili gerekli; yoksa otomatik oluştur (bireysel)
-  const ensureCustomerProfile = async () => {
-    try {
-      await apiClient.get('/customers/me');
-    } catch (err: any) {
-      if (err?.response?.status === 404) {
-        await apiClient.post('/customers/me', { customer_type: 'IND', individual: {} });
-      } else {
-        throw err;
-      }
-    }
-  };
-
-  const handleBuy = async (product: Product) => {
-    if (product.stock < 1) {
-      Alert.alert('Stok yok', 'Bu ürün şu an stokta değil.');
-      return;
-    }
-    setBuyingId(product.prod_id);
-    try {
-      await ensureCustomerProfile();
-      await apiClient.post('/orders', {
-        sale_cnl_id: SALE_CHANNEL_ID,
-        items: [{ prod_id: product.prod_id, quantity: 1 }],
-      });
-      Alert.alert('Sipariş alındı 🎉', `"${product.name}" için siparişin oluşturuldu.`);
-      // Stok güncellensin diye listeyi yenile
-      loadProducts();
-    } catch (err: any) {
-      Alert.alert('Satın alınamadı', err?.response?.data?.detail ?? 'Sipariş oluşturulamadı.');
-    } finally {
-      setBuyingId(null);
-    }
-  };
-
   const renderProduct = ({ item }: { item: Product }) => {
     const out = item.stock < 1;
-    const busy = buyingId === item.prod_id;
     return (
       <View style={styles.card}>
         <View style={styles.thumb}>
@@ -109,16 +85,12 @@ export default function MarketplaceScreen() {
         <View style={styles.buyCol}>
           <Text style={styles.price}>₺{Number(item.price).toFixed(2)}</Text>
           <TouchableOpacity
-            style={[styles.buyButton, (out || busy) && styles.buyButtonDisabled]}
-            onPress={() => handleBuy(item)}
-            disabled={out || busy}
+            style={[styles.buyButton, out && styles.buyButtonDisabled]}
+            onPress={() => openAddModal(item)}
+            disabled={out}
             activeOpacity={0.85}
           >
-            {busy ? (
-              <ActivityIndicator size="small" color={colors.buttonPrimaryText} />
-            ) : (
-              <Text style={styles.buyButtonText}>Satın Al</Text>
-            )}
+            <Text style={styles.buyButtonText}>Sepete Ekle</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -128,8 +100,20 @@ export default function MarketplaceScreen() {
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Mağaza</Text>
-        <Text style={styles.headerSub}>Bitkileri keşfet ve satın al</Text>
+        <View style={styles.headerTop}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.headerTitle}>Mağaza</Text>
+            <Text style={styles.headerSub}>Bitkileri keşfet ve satın al</Text>
+          </View>
+          <TouchableOpacity style={styles.cartBtn} onPress={() => navigation.navigate('Cart')} activeOpacity={0.7}>
+            <Ionicons name="cart-outline" size={24} color={colors.ink} />
+            {count > 0 && (
+              <View style={styles.cartBadge}>
+                <Text style={styles.cartBadgeText}>{count}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
         <View style={styles.searchBar}>
           <Text style={styles.searchIcon}>⌕</Text>
           <TextInput
@@ -177,6 +161,40 @@ export default function MarketplaceScreen() {
           }
         />
       )}
+
+      <Modal visible={selected !== null} transparent animationType="fade" onRequestClose={() => setSelected(null)}>
+        <View style={styles.modalWrap}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle} numberOfLines={2}>{selected?.name}</Text>
+            <Text style={styles.modalPrice}>₺{Number(selected?.price ?? 0).toFixed(2)}</Text>
+            <Text style={styles.modalStock}>Stok: {selected?.stock ?? 0}</Text>
+
+            <Text style={styles.modalLabel}>Adet</Text>
+            <View style={styles.qtyRow}>
+              <TouchableOpacity style={styles.qtyBtn} onPress={() => setQty((q) => Math.max(1, q - 1))} activeOpacity={0.7}>
+                <Text style={styles.qtyBtnText}>−</Text>
+              </TouchableOpacity>
+              <Text style={styles.qtyValue}>{qty}</Text>
+              <TouchableOpacity
+                style={styles.qtyBtn}
+                onPress={() => setQty((q) => Math.min(selected?.stock ?? 1, q + 1))}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.qtyBtnText}>+</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => setSelected(null)} activeOpacity={0.85}>
+                <Text style={styles.modalCancelText}>Vazgeç</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalAdd} onPress={confirmAdd} activeOpacity={0.85}>
+                <Text style={styles.modalAddText}>Sepete Ekle ({qty})</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -184,8 +202,23 @@ export default function MarketplaceScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   header: { paddingTop: 56, paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
+  headerTop: { flexDirection: 'row', alignItems: 'center' },
   headerTitle: { fontFamily: fonts.display, fontSize: 24, color: colors.ink },
   headerSub: { fontFamily: fonts.sans, fontSize: 12.5, color: colors.muted, marginTop: 2 },
+  cartBtn: { padding: spacing.xs },
+  cartBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  cartBadgeText: { fontFamily: fonts.sansBold, fontSize: 10, color: colors.white },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -247,4 +280,52 @@ const styles = StyleSheet.create({
   },
   retryText: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.ink },
   emptyText: { fontFamily: fonts.sans, fontSize: 13, color: colors.muted, textAlign: 'center', marginTop: spacing.xl },
+  modalWrap: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    padding: spacing.xl,
+  },
+  modalCard: { backgroundColor: colors.bg, borderRadius: radius.lg, padding: spacing.xl },
+  modalTitle: { fontFamily: fonts.display, fontSize: 18, color: colors.ink },
+  modalPrice: { fontFamily: fonts.sansBold, fontSize: 15, color: colors.primaryDeep, marginTop: spacing.xs },
+  modalStock: { fontFamily: fonts.sans, fontSize: 12.5, color: colors.muted, marginTop: 2 },
+  modalLabel: {
+    fontFamily: fonts.sansSemi,
+    fontSize: 12,
+    color: colors.muted2,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  qtyRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
+  qtyBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.bgAlt,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  qtyBtnText: { fontFamily: fonts.sansBold, fontSize: 22, color: colors.ink },
+  qtyValue: { fontFamily: fonts.sansBold, fontSize: 18, color: colors.ink, minWidth: 28, textAlign: 'center' },
+  modalActions: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.xl },
+  modalCancel: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  modalCancelText: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.ink },
+  modalAdd: {
+    flex: 1.4,
+    backgroundColor: colors.buttonPrimary,
+    borderRadius: radius.md,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  modalAddText: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.buttonPrimaryText },
 });
