@@ -20,6 +20,8 @@ class AppUser(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     # Satıcı onay durumu: 'none' (başvuru yok) | 'pending' (onay bekliyor) | 'verified' | 'rejected'
     seller_status: Mapped[str] = mapped_column(String(20), server_default="none", nullable=False)
+    # Satıcının mağaza/marka adı — sadece seller rolündeki kullanıcılar için anlamlı, NULL olabilir
+    store_name: Mapped[str | None] = mapped_column(String(150), nullable=True)
 
     roles: Mapped[list["UserRole"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 

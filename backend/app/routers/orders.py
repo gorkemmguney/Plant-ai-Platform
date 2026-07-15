@@ -28,15 +28,17 @@ async def _get_cust_id(user: AppUser, db: AsyncSession) -> int:
     return cust.cust_id
 
 
-@router.post("", response_model=OrderOut)
+@router.post("", response_model=list[OrderOut])
 async def create_new_order(
     payload: OrderCreateIn,
     db: AsyncSession = Depends(get_db),
     user: AppUser = Depends(require_role(RoleName.CUSTOMER, RoleName.ADMIN)),
 ):
     cust_id = await _get_cust_id(user, db)
-    order = await create_order(db, cust_id, payload)
-    return order
+    # Sepet birden fazla satıcının ürününü içeriyorsa, burada satıcı başına
+    # ayrı bir sipariş oluşur — bu yüzden dönüş değeri her zaman bir listedir.
+    orders = await create_order(db, cust_id, payload)
+    return orders
 
 
 @router.get("", response_model=list[OrderOut])

@@ -24,6 +24,7 @@ def _user_out(user: AppUser, roles: list[str]) -> UserOut:
         created_at=user.created_at,
         roles=roles,
         seller_status=user.seller_status,
+        store_name=user.store_name,
     )
 
 
@@ -43,6 +44,8 @@ async def update_me(
         user.first_name = payload.first_name.strip() or user.first_name
     if payload.last_name is not None:
         user.last_name = payload.last_name.strip()
+    if payload.store_name is not None:
+        user.store_name = payload.store_name.strip() or None
     await db.commit()
     await db.refresh(user)
     roles = await get_user_roles(user, db)

@@ -44,12 +44,16 @@ async def update_order_status(db: AsyncSession, cust_ord_id: int, gnl_st_id: int
     await db.refresh(order)
     return order
 
-async def create_order(db: AsyncSession, cust_id: int, payload: OrderCreateIn) -> CustOrd:
+
+async def create_order(db: AsyncSession, cust_id: int, payload: OrderCreateIn) -> list[CustOrd]:
     if not payload.items:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Sepet boş olamaz")
 
-    total = Decimal("0")
-    order_items: list[CustOrdItem] = []
+    # Sepetteki ürünleri satıcıya göre grupluyoruz — her satıcı yalnızca
+    # kendi ürünlerini içeren ayrı bir sipariş görecek (seller_id=None olan
+    # sahipsiz ürünler kendi grubunda tek bir siparişte toplanır).
+    items_by_seller: dict[int | None, list[CustOrdItem]] = {}
+    totals_by_seller: dict[int | None, Decimal] = {}
 
     for item in payload.items:
         result = await db.execute(select(Prod).where(Prod.prod_id == item.prod_id))
@@ -61,20 +65,32 @@ async def create_order(db: AsyncSession, cust_id: int, payload: OrderCreateIn) -
 
         product.stock -= item.quantity
         line_total = product.price * item.quantity
-        total += line_total
-        order_items.append(CustOrdItem(prod_id=product.prod_id, quantity=item.quantity, unit_price=product.price))
 
-    order = CustOrd(
-        cust_id=cust_id,
-        sale_cnl_id=payload.sale_cnl_id,
-        total_price=total,
-        gnl_st_id=DEFAULT_ORDER_STATUS_ID,
-        items=order_items,
-    )
-    db.add(order)
+        seller_key = product.seller_id
+        items_by_seller.setdefault(seller_key, []).append(
+            CustOrdItem(prod_id=product.prod_id, quantity=item.quantity, unit_price=product.price)
+        )
+        totals_by_seller[seller_key] = totals_by_seller.get(seller_key, Decimal("0")) + line_total
+
+    new_orders: list[CustOrd] = []
+    for seller_key, order_items in items_by_seller.items():
+        order = CustOrd(
+            cust_id=cust_id,
+            sale_cnl_id=payload.sale_cnl_id,
+            total_price=totals_by_seller[seller_key],
+            gnl_st_id=DEFAULT_ORDER_STATUS_ID,
+            items=order_items,
+        )
+        db.add(order)
+        new_orders.append(order)
+
     await db.commit()
 
-    result = await db.execute(
-        select(CustOrd).options(selectinload(CustOrd.items)).where(CustOrd.cust_ord_id == order.cust_ord_id)
-    )
-    return result.scalar_one()
+    result_orders: list[CustOrd] = []
+    for order in new_orders:
+        result = await db.execute(
+            select(CustOrd).options(selectinload(CustOrd.items)).where(CustOrd.cust_ord_id == order.cust_ord_id)
+        )
+        result_orders.append(result.scalar_one())
+
+    return result_orders

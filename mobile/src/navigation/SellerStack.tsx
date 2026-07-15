@@ -2,9 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import React from 'react';
 import { Platform } from 'react-native';
-import SettingsScreen from '../screens/customer/SettingsScreen';
 import OrdersScreen from '../screens/seller/OrdersScreen';
 import ProductsScreen from '../screens/seller/ProductsScreen';
+import SettingsScreen from '../screens/seller/SettingsScreen';
 import { colors, fonts } from '../theme/theme';
 
 export type SellerTabParamList = {
