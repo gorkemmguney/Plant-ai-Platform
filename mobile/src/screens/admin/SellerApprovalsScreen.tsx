@@ -35,7 +35,7 @@ export default function SellerApprovalsScreen() {
       const { data } = await apiClient.get<PendingSeller[]>('/admin/sellers/pending');
       setSellers(data);
     } catch (err: any) {
-      setError(err?.response?.data?.detail ?? 'Başvurular yüklenemedi. Backend çalışıyor mu?');
+      setError(err?.response?.data?.detail ?? 'Başvurular yüklenemedi.');
     } finally {
       setLoading(false);
       setRefreshing(false);

@@ -3,10 +3,10 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import get_user_roles, require_role
 from app.db.session import get_db
-from app.models.catalog import Prod
+from app.models.catalog import Prod, ProdSpec
 from app.models.user import AppUser
 from app.rbac.roles import RoleName
-from app.schemas.catalog import ProductCreateIn, ProductOut, ProductUpdateIn, SellerOut
+from app.schemas.catalog import ProdSpecOut, ProductCreateIn, ProductOut, ProductUpdateIn, SellerOut
 
 router = APIRouter(prefix="/catalog", tags=["catalog"])
 
@@ -24,6 +24,7 @@ def _product_out(prod: Prod, first: str | None, last: str | None) -> ProductOut:
         price=prod.price,
         stock=prod.stock,
         gnl_st_id=prod.gnl_st_id,
+        prod_spec_id=prod.prod_spec_id,
         seller_id=prod.seller_id,
         seller_name=_full_name(first, last),
     )
@@ -41,7 +42,7 @@ async def _ensure_owner_or_admin(product: Prod, user: AppUser, db: AsyncSession)
     roles = await get_user_roles(user, db)
     if RoleName.ADMIN in roles:
         return
-    if product.owner_user_id != user.user_id:
+    if product.seller_id != user.user_id:
         raise HTTPException(
             status_code=403,
             detail="Bu ürün üzerinde işlem yapma yetkiniz yok",
@@ -76,12 +77,18 @@ async def list_sellers(db: AsyncSession = Depends(get_db)):
     ]
 
 
+@router.get("/product-specs", response_model=list[ProdSpecOut])
+async def list_product_specs(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(ProdSpec).order_by(ProdSpec.name))
+    return result.scalars().all()
+
+
 @router.get("/products/my-products", response_model=list[ProductOut])
 async def list_my_products(
     db: AsyncSession = Depends(get_db),
     user: AppUser = Depends(require_role(RoleName.SELLER, RoleName.ADMIN)),
 ):
-    result = await db.execute(select(Prod).where(Prod.owner_user_id == user.user_id))
+    result = await db.execute(select(Prod).where(Prod.seller_id == user.user_id))
     return result.scalars().all()
 
 

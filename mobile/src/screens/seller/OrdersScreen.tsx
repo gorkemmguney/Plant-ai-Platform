@@ -52,7 +52,7 @@ export default function OrdersScreen() {
       const { data } = await apiClient.get<Order[]>('/orders/all');
       setOrders(data);
     } catch (err: any) {
-      setError(err?.response?.data?.detail ?? 'Siparişler yüklenemedi. Backend çalışıyor mu?');
+      setError(err?.response?.data?.detail ?? 'Siparişler yüklenemedi.');
     } finally {
       setLoading(false);
       setRefreshing(false);

@@ -36,7 +36,7 @@ export default function StoreProductsScreen({ route }: any) {
       const { data } = await apiClient.get<Product[]>('/catalog/products');
       setProducts(data.filter((p) => p.seller_id === sellerId));
     } catch (err: any) {
-      setError(err?.response?.data?.detail ?? 'Ürünler yüklenemedi. Backend çalışıyor mu?');
+      setError(err?.response?.data?.detail ?? 'Ürünler yüklenemedi.');
     } finally {
       setLoading(false);
     }

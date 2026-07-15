@@ -62,7 +62,6 @@ const labels: Record<keyof CustomerTabParamList, string> = {
   Settings: 'Ayarlar',
 };
 
-function CustomerTabs() {
 function CustomerTabNavigator() {
   return (
     <Tab.Navigator
@@ -98,17 +97,15 @@ export default function CustomerStack() {
   return (
     <CartProvider>
       <Stack.Navigator>
-        <Stack.Screen name="Tabs" component={CustomerTabs} options={{ headerShown: false }} />
+        <Stack.Screen name="Tabs" component={CustomerTabNavigator} options={{ headerShown: false }} />
         <Stack.Screen name="Cart" component={CartScreen} options={{ title: 'Sepetim' }} />
         <Stack.Screen name="Orders" component={OrdersScreen} options={{ title: 'Siparişlerim' }} />
         <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Bildirimler' }} />
         <Stack.Screen name="StoreProducts" component={StoreProductsScreen} options={{ title: 'Mağaza' }} />
+        <Stack.Screen name="MainTabs" component={CustomerTabNavigator} options={{ headerShown: false }} />
+        <Stack.Screen name="ImageAnalysis" component={ImageAnalysisScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="AnalysisResult" component={AnalysisResultScreen} options={{ headerShown: false }} />
       </Stack.Navigator>
     </CartProvider>
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="MainTabs" component={CustomerTabNavigator} />
-      <Stack.Screen name="ImageAnalysis" component={ImageAnalysisScreen} />
-      <Stack.Screen name="AnalysisResult" component={AnalysisResultScreen} />
-    </Stack.Navigator>
   );
 }
