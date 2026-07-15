@@ -17,7 +17,6 @@ def _full_name(first: str | None, last: str | None) -> str | None:
 
 
 def _display_name(store_name: str | None, first: str | None, last: str | None) -> str | None:
-    # Mağaza adı varsa onu göster, yoksa ad-soyad'a düş
     return store_name or _full_name(first, last)
 
 
@@ -50,18 +49,15 @@ async def _ensure_owner_or_admin(product: Prod, user: AppUser, db: AsyncSession)
     if RoleName.ADMIN in roles:
         return
     if product.seller_id != user.user_id:
-        raise HTTPException(
-            status_code=403,
-            detail="Bu ürün üzerinde işlem yapma yetkiniz yok",
-        )
+        raise HTTPException(status_code=403, detail="Bu ürün üzerinde işlem yapma yetkiniz yok")
 
 
 @router.get("/products", response_model=list[ProductOut])
 async def list_products(db: AsyncSession = Depends(get_db)):
     result = await db.execute(
-        select(Prod, AppUser.store_name, AppUser.first_name, AppUser.last_name).outerjoin(
-            AppUser, AppUser.user_id == Prod.seller_id
-        )
+        select(Prod, AppUser.store_name, AppUser.first_name, AppUser.last_name)
+        .outerjoin(AppUser, AppUser.user_id == Prod.seller_id)
+        .where(Prod.seller_id.isnot(None), Prod.stock > 0)
     )
     return [_product_out(prod, store_name, first, last) for (prod, store_name, first, last) in result.all()]
 
@@ -70,13 +66,10 @@ async def list_products(db: AsyncSession = Depends(get_db)):
 async def list_sellers(db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(
-            AppUser.user_id,
-            AppUser.store_name,
-            AppUser.first_name,
-            AppUser.last_name,
-            func.count(Prod.prod_id),
+            AppUser.user_id, AppUser.store_name, AppUser.first_name, AppUser.last_name, func.count(Prod.prod_id),
         )
         .join(Prod, Prod.seller_id == AppUser.user_id)
+        .where(Prod.stock > 0)
         .group_by(AppUser.user_id, AppUser.store_name, AppUser.first_name, AppUser.last_name)
         .order_by(AppUser.user_id)
     )
