@@ -21,7 +21,7 @@ class SellerOut(BaseModel):
     seller_id: int
     seller_name: str
     product_count: int
-    prod_spec_id: int
+    prod_spec_id: int | None = None
     owner_user_id: int | None = None
 
 
