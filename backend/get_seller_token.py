@@ -2,7 +2,7 @@ import requests
 
 API_KEY = "AIzaSyAlVcSvhFXZ_8vIVSkutUeueQ1sjAALkHo"
 
-EMAIL = "seller@plantai.com"
+EMAIL = "seller2@plantai.com"
 PASSWORD = "123456"
 
 SIGN_UP_URL = (

@@ -13,6 +13,7 @@ class ProductOut(BaseModel):
     price: Decimal
     stock: int
     gnl_st_id: int
+    prod_spec_id: int
     seller_id: int | None = None
     seller_name: str | None = None
 
@@ -23,6 +24,14 @@ class SellerOut(BaseModel):
     product_count: int
     prod_spec_id: int | None = None
     owner_user_id: int | None = None
+
+
+class ProdSpecOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    prod_spec_id: int
+    name: str
+    description: str | None = None
 
 
 class ProductCreateIn(BaseModel):

@@ -63,7 +63,7 @@ export default function OrdersScreen() {
       });
       setProductNames(names);
     } catch (err: any) {
-      setError(err?.response?.data?.detail ?? 'Siparişler yüklenemedi. Backend çalışıyor mu?');
+      setError(err?.response?.data?.detail ?? 'Siparişler yüklenemedi.');
     } finally {
       setLoading(false);
       setRefreshing(false);

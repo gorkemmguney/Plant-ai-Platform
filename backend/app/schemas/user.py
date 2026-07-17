@@ -13,6 +13,7 @@ class UserOut(BaseModel):
     created_at: datetime
     roles: list[str] = []
     seller_status: str = "none"  # 'none' | 'pending' | 'verified' | 'rejected'
+    store_name: str | None = None
 
 
 class RoleAssignIn(BaseModel):
@@ -26,3 +27,4 @@ class RoleSelectIn(BaseModel):
 class ProfileUpdateIn(BaseModel):
     first_name: str | None = None
     last_name: str | None = None
+    store_name: str | None = None

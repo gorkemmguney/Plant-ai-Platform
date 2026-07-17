@@ -114,7 +114,7 @@ export default function SellerApprovalsScreen() {
       // Fire all AI analyses simultaneously (non-blocking)
       data.forEach(seller => fetchAiProfile(seller));
     } catch (err: any) {
-      setError(err?.response?.data?.detail ?? 'Başvurular yüklenemedi. Backend çalışıyor mu?');
+      setError(err?.response?.data?.detail ?? 'Başvurular yüklenemedi.');
     } finally {
       setLoading(false);
       setRefreshing(false);

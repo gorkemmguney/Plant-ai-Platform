@@ -1,16 +1,15 @@
 import axios from 'axios';
 import { firebaseAuth } from '../firebase/firebaseConfig';
 
-// Geliştirme sırasında gerçek makinenizin IP adresini kullanın (localhost telefonda çalışmaz).
-// Terminalde `ipconfig getifaddr en0` (Mac) ile yerel IP'nizi öğrenebilirsiniz.
-const BASE_URL = 'http://192.168.8.150:8000';
+
+const BASE_URL = 'http://192.168.1.225:8000';
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,
   timeout: 60000,
 });
 
-// Her istekte güncel Firebase ID token'ını otomatik ekler
+
 apiClient.interceptors.request.use(async (config) => {
   const currentUser = firebaseAuth.currentUser;
   if (currentUser) {
@@ -20,7 +19,6 @@ apiClient.interceptors.request.use(async (config) => {
   return config;
 });
 
-// 401 durumunda token'ı yenileyip tek seferlik retry
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {

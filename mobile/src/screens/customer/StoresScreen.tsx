@@ -29,7 +29,7 @@ export default function StoresScreen({ navigation }: any) {
       const { data } = await apiClient.get<Seller[]>('/catalog/sellers');
       setSellers(data);
     } catch (err: any) {
-      setError(err?.response?.data?.detail ?? 'Satıcılar yüklenemedi. Backend çalışıyor mu?');
+      setError(err?.response?.data?.detail ?? 'Satıcılar yüklenemedi.');
     } finally {
       setLoading(false);
       setRefreshing(false);

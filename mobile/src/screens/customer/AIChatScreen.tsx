@@ -1,3 +1,5 @@
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -20,6 +22,13 @@ interface ChatMessage {
   message: string;
 }
 
+const SUGGESTIONS = [
+  'Bitkim neden sarardı?',
+  'Ne sıklıkla sulamalıyım?',
+  'Zararlı böcek var mı?',
+  'İç mekan için hangi bitki uygun?',
+];
+
 export default function AIChatScreen() {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -33,8 +42,7 @@ export default function AIChatScreen() {
   const chatIdRef = useRef<number | null>(null);
   const listRef = useRef<FlatList>(null);
 
-  const handleSend = async () => {
-    const text = input.trim();
+  const sendMessage = async (text: string) => {
     if (!text || sending) return;
 
     const userMessage: ChatMessage = { id: `u-${Date.now()}`, role: 'user', message: text };
@@ -65,19 +73,24 @@ export default function AIChatScreen() {
     }
   };
 
+  const handleSend = () => sendMessage(input.trim());
+  const showSuggestions = messages.length === 1 && !sending;
+
   return (
     <KeyboardAvoidingView
       style={styles.screen}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
-      <View style={styles.header}>
-        <Text style={styles.headerEmoji}>🤖</Text>
+      <LinearGradient colors={[colors.secondary, colors.secondaryDeep]} style={styles.header}>
+        <View style={styles.headerAvatar}>
+          <Ionicons name="sparkles" size={20} color={colors.primary} />
+        </View>
         <View>
           <Text style={styles.headerTitle}>AI Bitki Asistanı</Text>
           <Text style={styles.headerSub}>Sorularını sor, öneriler al</Text>
         </View>
-      </View>
+      </LinearGradient>
 
       <FlatList
         ref={listRef}
@@ -92,6 +105,11 @@ export default function AIChatScreen() {
               item.role === 'user' ? styles.bubbleRowUser : styles.bubbleRowAssistant,
             ]}
           >
+            {item.role === 'assistant' && (
+              <View style={styles.bubbleAvatar}>
+                <Ionicons name="leaf" size={13} color={colors.primaryDeep} />
+              </View>
+            )}
             <View style={[styles.bubble, item.role === 'user' ? styles.bubbleUser : styles.bubbleAssistant]}>
               <Text style={[styles.bubbleText, item.role === 'user' && styles.bubbleTextUser]}>
                 {item.message}
@@ -99,11 +117,29 @@ export default function AIChatScreen() {
             </View>
           </View>
         )}
+        ListFooterComponent={
+          showSuggestions ? (
+            <View style={styles.suggestionsWrap}>
+              {SUGGESTIONS.map((s) => (
+                <TouchableOpacity
+                  key={s}
+                  style={styles.suggestionChip}
+                  activeOpacity={0.8}
+                  onPress={() => sendMessage(s)}
+                >
+                  <Text style={styles.suggestionText}>{s}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : null
+        }
       />
 
       {sending && (
         <View style={styles.typingRow}>
-          <ActivityIndicator size="small" color={colors.muted} />
+          <View style={styles.typingDots}>
+            <ActivityIndicator size="small" color={colors.muted} />
+          </View>
           <Text style={styles.typingText}>Yazıyor...</Text>
         </View>
       )}
@@ -124,7 +160,7 @@ export default function AIChatScreen() {
           activeOpacity={0.85}
           disabled={!input.trim() || sending}
         >
-          <Text style={styles.sendButtonText}>↑</Text>
+          <Ionicons name="arrow-up" size={19} color={colors.buttonPrimaryText} />
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -139,22 +175,36 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingTop: 56,
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    backgroundColor: colors.card,
+    paddingBottom: spacing.lg,
+    borderBottomLeftRadius: radius.lg,
+    borderBottomRightRadius: radius.lg,
   },
-  headerEmoji: { fontSize: 28 },
-  headerTitle: { fontFamily: fonts.sansBold, fontSize: 16, color: colors.ink },
-  headerSub: { fontFamily: fonts.sans, fontSize: 12, color: colors.muted },
+  headerAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: 'rgba(237,169,114,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: { fontFamily: fonts.sansBold, fontSize: 16, color: colors.white },
+  headerSub: { fontFamily: fonts.sans, fontSize: 12, color: '#c9c9d6' },
   messageList: { padding: spacing.lg, gap: spacing.sm },
-  bubbleRow: { flexDirection: 'row', marginBottom: spacing.sm },
+  bubbleRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.xs, marginBottom: spacing.sm },
   bubbleRowUser: { justifyContent: 'flex-end' },
   bubbleRowAssistant: { justifyContent: 'flex-start' },
+  bubbleAvatar: {
+    width: 26,
+    height: 26,
+    borderRadius: 10,
+    backgroundColor: colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   bubble: {
-    maxWidth: '80%',
+    maxWidth: '78%',
     borderRadius: radius.md,
-    paddingVertical: 10,
+    paddingVertical: 11,
     paddingHorizontal: spacing.md,
     ...shadow.sm,
   },
@@ -162,7 +212,19 @@ const styles = StyleSheet.create({
   bubbleAssistant: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderBottomLeftRadius: 4 },
   bubbleText: { fontFamily: fonts.sans, fontSize: 14, lineHeight: 20, color: colors.ink },
   bubbleTextUser: { color: colors.buttonPrimaryText },
+  suggestionsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
+  suggestionChip: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+    borderRadius: radius.full,
+    paddingVertical: 9,
+    paddingHorizontal: spacing.md,
+    ...shadow.sm,
+  },
+  suggestionText: { fontFamily: fonts.sansMedium, fontSize: 12.5, color: colors.ink },
   typingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.lg, paddingBottom: spacing.xs },
+  typingDots: { transform: [{ scale: 0.8 }] },
   typingText: { fontFamily: fonts.sans, fontSize: 12, color: colors.muted },
   inputBar: {
     flexDirection: 'row',
@@ -195,5 +257,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   sendButtonDisabled: { backgroundColor: colors.border },
-  sendButtonText: { fontFamily: fonts.sansBold, fontSize: 18, color: colors.buttonPrimaryText },
 });

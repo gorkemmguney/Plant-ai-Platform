@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
-import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, ImageBackground, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { colors, fonts, radius, spacing } from '../../theme/theme';
 
 const { height } = Dimensions.get('window');
@@ -8,26 +8,25 @@ const { height } = Dimensions.get('window');
 export default function WelcomeScreen({ navigation }: any) {
   return (
     <View style={styles.screen}>
-      <LinearGradient colors={[colors.secondary, colors.secondaryDeep]} style={styles.hero}>
-        <View style={styles.heroTopRow}>
-          <View style={styles.logoMark}>
-            <View style={styles.logoDot} />
+      <ImageBackground
+        source={require('../../../assets/PlantoraLogo.png')}
+        style={styles.hero}
+        imageStyle={styles.heroImage}
+      >
+        <LinearGradient
+          colors={['rgba(0,0,0,0.05)', 'rgba(0,0,0,0.45)']}
+          style={styles.heroOverlay}
+        >
+          <View style={styles.heroTopRow}>
           </View>
-          <Text style={styles.logoText}>plant ai</Text>
-        </View>
 
-        <View style={styles.heroIconWrap}>
-          <Text style={styles.heroIcon}>🌿</Text>
-        </View>
-
-        <Text style={styles.heroTitle}>BİTKİ ALIM SATIM{'\n'}TOPLULUĞU</Text>
-
-        <View style={styles.dotsRow}>
-          <View style={styles.dot} />
-          <View style={[styles.dot, styles.dotActive]} />
-          <View style={styles.dot} />
-        </View>
-      </LinearGradient>
+          <View style={styles.dotsRow}>
+            <View style={styles.dot} />
+            <View style={[styles.dot, styles.dotActive]} />
+            <View style={styles.dot} />
+          </View>
+        </LinearGradient>
+      </ImageBackground>
 
       <View style={styles.sheet}>
         <TouchableOpacity
@@ -47,7 +46,7 @@ export default function WelcomeScreen({ navigation }: any) {
         </TouchableOpacity>
 
         <Text style={styles.legal}>
-          Devam ederek Plant AI&apos;ın{' '}
+          Devam ederek PlantOra&apos;nın{' '}
           <Text style={styles.legalLink}>Gizlilik Politikası</Text> ve{' '}
           <Text style={styles.legalLink}>Kullanım Şartları</Text>&apos;nı kabul etmiş olursunuz.
         </Text>
@@ -60,9 +59,16 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   hero: {
     height: height * 0.62,
+  },
+  heroImage: {
+    resizeMode: 'cover',
+  },
+  heroOverlay: {
+    flex: 1,
     paddingTop: 56,
     paddingHorizontal: spacing.lg,
     justifyContent: 'space-between',
+    paddingBottom: spacing.lg,
   },
   heroTopRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   logoMark: {
@@ -75,16 +81,7 @@ const styles = StyleSheet.create({
   },
   logoDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.primary },
   logoText: { fontFamily: fonts.sansSemi, fontSize: 13, color: colors.white, letterSpacing: 0.5 },
-  heroIconWrap: { alignSelf: 'center' },
-  heroIcon: { fontSize: 84 },
-  heroTitle: {
-    fontFamily: fonts.display,
-    fontSize: 30,
-    lineHeight: 36,
-    color: colors.white,
-    textAlign: 'center',
-  },
-  dotsRow: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: spacing.md },
+  dotsRow: { flexDirection: 'row', justifyContent: 'center', gap: 6 },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.3)' },
   dotActive: { width: 18, backgroundColor: colors.primary },
   sheet: {

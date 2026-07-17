@@ -67,7 +67,7 @@ export default function MarketplaceScreen({ navigation }: any) {
       const { data } = await apiClient.get<Product[]>('/catalog/products');
       setProducts(data);
     } catch (err: any) {
-      setError(err?.response?.data?.detail ?? 'Ürünler yüklenemedi. Backend çalışıyor mu?');
+      setError(err?.response?.data?.detail ?? 'Ürünler yüklenemedi.');
     } finally {
       setLoading(false);
       setRefreshing(false);

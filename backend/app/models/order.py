@@ -33,7 +33,13 @@ class CustOrdItem(Base):
 
     cust_ord_item_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     cust_ord_id: Mapped[int] = mapped_column(ForeignKey("cust_ord.cust_ord_id", ondelete="CASCADE"), nullable=False)
-    prod_id: Mapped[int] = mapped_column(ForeignKey("prod.prod_id"), nullable=False)
+    # Ürün silinse/mağaza kalksa bile sipariş geçmişinde görünmeye devam etsin diye
+    # prod_id artık nullable ve SET NULL; gösterilecek isim ise sipariş anında
+    # prod_name alanına "donduruluyor" (canlı katalog verisine bağımlı değil).
+    prod_id: Mapped[int | None] = mapped_column(
+        ForeignKey("prod.prod_id", ondelete="SET NULL", name="fk_cust_ord_item_prod"), nullable=True
+    )
+    prod_name: Mapped[str] = mapped_column(String(255), nullable=False)
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)
     unit_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
 

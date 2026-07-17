@@ -1,5 +1,5 @@
 import { signOut } from 'firebase/auth';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -11,8 +11,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { firebaseAuth } from '../../firebase/firebaseConfig';
 import { apiClient } from '../../services/apiClient';
@@ -31,18 +29,41 @@ const sellerStatusInfo: Record<string, { label: string; badge: keyof typeof badg
 };
 
 export default function SettingsScreen() {
-  const navigation = useNavigation<any>();
-  const { firebaseUser, roles, sellerStatus, firstName, lastName, refreshProfile } = useAuth();
+  const { firebaseUser, roles, sellerStatus } = useAuth();
   const sellerInfo = sellerStatusInfo[sellerStatus];
 
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [storeName, setStoreName] = useState('');
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formFirst, setFormFirst] = useState('');
   const [formLast, setFormLast] = useState('');
+  const [formStore, setFormStore] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const { data } = await apiClient.get('/auth/me');
+        if (active) {
+          setFirstName(data.first_name ?? '');
+          setLastName(data.last_name ?? '');
+          setStoreName(data.store_name ?? '');
+        }
+      } catch {
+        // sessiz geç (isim gösterilemezse email zaten var)
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const openEdit = () => {
     setFormFirst(firstName);
     setFormLast(lastName);
+    setFormStore(storeName);
     setEditing(true);
   };
 
@@ -53,11 +74,14 @@ export default function SettingsScreen() {
     }
     setSaving(true);
     try {
-      await apiClient.patch('/auth/me', {
+      const { data } = await apiClient.patch('/auth/me', {
         first_name: formFirst.trim(),
         last_name: formLast.trim(),
+        store_name: formStore.trim(),
       });
-      await refreshProfile();
+      setFirstName(data.first_name ?? '');
+      setLastName(data.last_name ?? '');
+      setStoreName(data.store_name ?? '');
       setEditing(false);
     } catch (err: any) {
       Alert.alert('Kaydedilemedi', err?.response?.data?.detail ?? 'Profil güncellenemedi.');
@@ -71,10 +95,35 @@ export default function SettingsScreen() {
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Ayarlar</Text>
+        <Text style={styles.headerTitle}>Satıcı Ayarları</Text>
       </View>
 
       <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: spacing.xl }}>
+        <View style={styles.card}>
+          <Text style={styles.cardLabel}>Mağaza</Text>
+
+          <View style={styles.row}>
+            <Text style={styles.rowLabel}>Mağaza Adı</Text>
+            <View style={styles.nameRight}>
+              <Text style={styles.rowValue}>{storeName || 'Belirtilmemiş'}</Text>
+              <TouchableOpacity onPress={openEdit} activeOpacity={0.7}>
+                <Text style={styles.editLink}>Düzenle</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {sellerInfo && (
+            <View style={styles.rowLast}>
+              <Text style={styles.rowLabel}>Satıcı durumu</Text>
+              <View style={[styles.badge, { backgroundColor: badgeColors[sellerInfo.badge].bg }]}>
+                <Text style={[styles.badgeText, { color: badgeColors[sellerInfo.badge].text }]}>
+                  {sellerInfo.label}
+                </Text>
+              </View>
+            </View>
+          )}
+        </View>
+
         <View style={styles.card}>
           <Text style={styles.cardLabel}>Hesap Bilgileri</Text>
 
@@ -93,7 +142,7 @@ export default function SettingsScreen() {
             <Text style={styles.rowValue}>{firebaseUser?.email}</Text>
           </View>
 
-          <View style={sellerInfo ? styles.row : styles.rowLast}>
+          <View style={styles.rowLast}>
             <Text style={styles.rowLabel}>Roller</Text>
             <View style={styles.badgeRow}>
               {roles.length > 0 ? (
@@ -109,32 +158,7 @@ export default function SettingsScreen() {
               )}
             </View>
           </View>
-
-          {sellerInfo && (
-            <View style={styles.rowLast}>
-              <Text style={styles.rowLabel}>Satıcı başvurusu</Text>
-              <View style={[styles.badge, { backgroundColor: badgeColors[sellerInfo.badge].bg }]}>
-                <Text style={[styles.badgeText, { color: badgeColors[sellerInfo.badge].text }]}>
-                  {sellerInfo.label}
-                </Text>
-              </View>
-            </View>
-          )}
         </View>
-
-        {roles.includes('admin') && (
-          <View style={styles.card}>
-            <Text style={styles.cardLabel}>Yönetim Paneli</Text>
-            <TouchableOpacity 
-              style={styles.menuRow} 
-              onPress={() => navigation.navigate('AdminComplaints')}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.menuText}>Şikayet & Destek Yönetimi</Text>
-              <Ionicons name="chevron-forward" size={18} color={colors.muted2} />
-            </TouchableOpacity>
-          </View>
-        )}
 
         <TouchableOpacity style={styles.logoutButton} onPress={() => signOut(firebaseAuth)} activeOpacity={0.85}>
           <Text style={styles.logoutButtonText}>Çıkış Yap</Text>
@@ -144,7 +168,16 @@ export default function SettingsScreen() {
       <Modal visible={editing} transparent animationType="fade" onRequestClose={() => setEditing(false)}>
         <View style={styles.modalWrap}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Ad Soyad Düzenle</Text>
+            <Text style={styles.modalTitle}>Profili Düzenle</Text>
+
+            <Text style={styles.label}>Mağaza Adı</Text>
+            <TextInput
+              style={styles.input}
+              value={formStore}
+              onChangeText={setFormStore}
+              placeholder="Örn. Yeşil Yapraklar Bitkicilik"
+              placeholderTextColor={colors.muted2}
+            />
 
             <Text style={styles.label}>Ad</Text>
             <TextInput
@@ -269,15 +302,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   saveText: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.buttonPrimaryText },
-  menuRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: spacing.xs,
-  },
-  menuText: {
-    fontFamily: fonts.sansMedium,
-    fontSize: 14,
-    color: colors.ink,
-  },
 });
