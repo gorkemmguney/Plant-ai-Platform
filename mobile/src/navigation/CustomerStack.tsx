@@ -31,7 +31,6 @@ export type CustomerStackParamList = {
   Orders: undefined;
   Notifications: undefined;
   StoreProducts: { sellerId: number; sellerName: string };
-  MainTabs: undefined;
   ImageAnalysis: undefined;
   AnalysisResult: {
     analysisId: number;
