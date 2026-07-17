@@ -1,8 +1,3 @@
-"""
-Demo/test verisi oluşturur: 5 satıcı + her birine birkaç ürün.
-Kullanım:
-  python seed_demo_data.py
-"""
 import asyncio
 
 import asyncpg

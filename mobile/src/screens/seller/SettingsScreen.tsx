@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { firebaseAuth } from '../../firebase/firebaseConfig';
 import { apiClient } from '../../services/apiClient';
@@ -29,7 +30,7 @@ const sellerStatusInfo: Record<string, { label: string; badge: keyof typeof badg
 };
 
 export default function SettingsScreen() {
-  const { firebaseUser, roles, sellerStatus } = useAuth();
+  const { firebaseUser, roles, sellerStatus, chooseRole } = useAuth();
   const sellerInfo = sellerStatusInfo[sellerStatus];
 
   const [firstName, setFirstName] = useState('');
@@ -160,6 +161,13 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        {roles.length > 1 && (
+          <TouchableOpacity style={styles.switchButton} onPress={() => chooseRole(null)} activeOpacity={0.85}>
+            <Ionicons name="swap-horizontal" size={16} color={colors.ink} />
+            <Text style={styles.switchButtonText}>Panel Değiştir</Text>
+          </TouchableOpacity>
+        )}
+
         <TouchableOpacity style={styles.logoutButton} onPress={() => signOut(firebaseAuth)} activeOpacity={0.85}>
           <Text style={styles.logoutButtonText}>Çıkış Yap</Text>
         </TouchableOpacity>
@@ -255,6 +263,18 @@ const styles = StyleSheet.create({
   badgeRow: { flexDirection: 'row', gap: spacing.xs },
   badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.full },
   badgeText: { fontFamily: fonts.sansBold, fontSize: 10.5 },
+  switchButton: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
+  switchButtonText: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.ink },
   logoutButton: {
     borderWidth: 1,
     borderColor: colors.red,

@@ -5,10 +5,17 @@ import { useAuth } from '../context/AuthContext';
 import AdminStack from './AdminStack';
 import AuthStack from './AuthStack';
 import CustomerStack from './CustomerStack';
+import RoleSelectScreen from '../screens/auth/RoleSelectScreen';
 import SellerStack from './SellerStack';
 
+const stacksByRole = {
+  admin: AdminStack,
+  seller: SellerStack,
+  customer: CustomerStack,
+};
+
 export default function RootNavigator() {
-  const { firebaseUser, roles, loading } = useAuth();
+  const { firebaseUser, roles, activeRole, loading } = useAuth();
 
   if (loading) {
     return (
@@ -26,13 +33,17 @@ export default function RootNavigator() {
     );
   }
 
-  // Öncelik sırası: admin > seller > customer
-  let ActiveStack = CustomerStack;
-  if (roles.includes('admin')) {
-    ActiveStack = AdminStack;
-  } else if (roles.includes('seller')) {
-    ActiveStack = SellerStack;
+  // Birden fazla rolü olan bir kullanıcı henüz panel seçmediyse, seçim ekranını göster.
+  if (roles.length > 1 && (!activeRole || !roles.includes(activeRole))) {
+    return (
+      <NavigationContainer>
+        <RoleSelectScreen />
+      </NavigationContainer>
+    );
   }
+
+  const effectiveRole = activeRole && roles.includes(activeRole) ? activeRole : roles[0];
+  const ActiveStack = effectiveRole ? stacksByRole[effectiveRole] : CustomerStack;
 
   return (
     <NavigationContainer>

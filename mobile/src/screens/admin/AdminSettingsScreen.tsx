@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { firebaseAuth } from '../../firebase/firebaseConfig';
@@ -23,15 +24,9 @@ const roleLabels: Record<string, string> = {
   customer: 'Müşteri',
 };
 
-const sellerStatusInfo: Record<string, { label: string; badge: keyof typeof badgeColors }> = {
-  pending: { label: 'Onay bekliyor', badge: 'amber' },
-  verified: { label: 'Onaylandı', badge: 'green' },
-  rejected: { label: 'Reddedildi', badge: 'red' },
-};
-
-export default function SettingsScreen() {
-  const { firebaseUser, roles, sellerStatus, firstName, lastName, refreshProfile, chooseRole } = useAuth();
-  const sellerInfo = sellerStatusInfo[sellerStatus];
+export default function AdminSettingsScreen() {
+  const navigation = useNavigation<any>();
+  const { firebaseUser, roles, firstName, lastName, refreshProfile, chooseRole } = useAuth();
 
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -91,7 +86,7 @@ export default function SettingsScreen() {
             <Text style={styles.rowValue}>{firebaseUser?.email}</Text>
           </View>
 
-          <View style={sellerInfo ? styles.row : styles.rowLast}>
+          <View style={styles.rowLast}>
             <Text style={styles.rowLabel}>Roller</Text>
             <View style={styles.badgeRow}>
               {roles.length > 0 ? (
@@ -107,17 +102,18 @@ export default function SettingsScreen() {
               )}
             </View>
           </View>
+        </View>
 
-          {sellerInfo && (
-            <View style={styles.rowLast}>
-              <Text style={styles.rowLabel}>Satıcı başvurusu</Text>
-              <View style={[styles.badge, { backgroundColor: badgeColors[sellerInfo.badge].bg }]}>
-                <Text style={[styles.badgeText, { color: badgeColors[sellerInfo.badge].text }]}>
-                  {sellerInfo.label}
-                </Text>
-              </View>
-            </View>
-          )}
+        <View style={styles.card}>
+          <Text style={styles.cardLabel}>Yönetim Paneli</Text>
+          <TouchableOpacity
+            style={styles.menuRow}
+            onPress={() => navigation.navigate('AdminComplaints')}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.menuText}>Şikayet & Destek Yönetimi</Text>
+            <Ionicons name="chevron-forward" size={18} color={colors.muted2} />
+          </TouchableOpacity>
         </View>
 
         {roles.length > 1 && (

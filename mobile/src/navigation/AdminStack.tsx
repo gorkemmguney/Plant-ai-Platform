@@ -7,7 +7,7 @@ import SellerApprovalsScreen from '../screens/admin/SellerApprovalsScreen';
 import UserManagementScreen from '../screens/admin/UserManagementScreen';
 import AIDiagnosisCenterScreen from '../screens/admin/AIDiagnosisCenterScreen';
 import AIReportScreen from '../screens/admin/AIReportScreen';
-import SettingsScreen from '../screens/customer/SettingsScreen';
+import AdminSettingsScreen from '../screens/admin/AdminSettingsScreen';
 import AdminComplaintsScreen from '../screens/admin/AdminComplaintsScreen';
 import AdminComplaintDetailScreen from '../screens/admin/AdminComplaintDetailScreen';
 import { colors, fonts } from '../theme/theme';
@@ -71,7 +71,7 @@ function AdminTabs() {
       <Tab.Screen name="Approvals" component={SellerApprovalsScreen}   options={{ title: labels.Approvals }} />
       <Tab.Screen name="Diagnosis" component={AIDiagnosisCenterScreen} options={{ title: labels.Diagnosis }} />
       <Tab.Screen name="Reports"   component={AIReportScreen}          options={{ title: labels.Reports }} />
-      <Tab.Screen name="Settings"  component={SettingsScreen}          options={{ title: labels.Settings }} />
+      <Tab.Screen name="Settings"  component={AdminSettingsScreen}     options={{ title: labels.Settings }} />
     </Tab.Navigator>
   );
 }
