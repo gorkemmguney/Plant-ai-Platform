@@ -69,6 +69,13 @@ export default function UserManagementScreen() {
   const [broadcastTitle, setBroadcastTitle] = useState('');
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [sendingBroadcast, setSendingBroadcast] = useState(false);
+  const [aiDraftTopic, setAiDraftTopic] = useState('');
+  const [draftingAi, setDraftingAi] = useState(false);
+
+  // AI Insights States
+  const [insightsVisible, setInsightsVisible] = useState(false);
+  const [insightsReport, setInsightsReport] = useState<string | null>(null);
+  const [loadingInsights, setLoadingInsights] = useState(false);
 
   const loadStats = async () => {
     try {
@@ -145,6 +152,41 @@ export default function UserManagementScreen() {
       Alert.alert('Hata', err?.response?.data?.detail ?? 'Duyuru gönderilemedi.');
     } finally {
       setSendingBroadcast(false);
+    }
+  };
+
+  const handleAiDraft = async () => {
+    if (!aiDraftTopic.trim()) {
+      Alert.alert('Hata', 'Lütfen kısa bir konu girin.');
+      return;
+    }
+    setDraftingAi(true);
+    try {
+      const { data } = await apiClient.post<{ title: string; message: string }>(
+        '/admin/ai/draft-announcement',
+        { topic: aiDraftTopic }
+      );
+      setBroadcastTitle(data.title);
+      setBroadcastMessage(data.message);
+      setAiDraftTopic('');
+    } catch (err: any) {
+      Alert.alert('AI Hatası', err?.response?.data?.detail ?? 'Duyuru oluşturulamadı.');
+    } finally {
+      setDraftingAi(false);
+    }
+  };
+
+  const handleShowInsights = async () => {
+    setInsightsVisible(true);
+    if (insightsReport) return; // cached
+    setLoadingInsights(true);
+    try {
+      const { data } = await apiClient.get<{ report: string }>('/admin/ai/insights');
+      setInsightsReport(data.report);
+    } catch (err: any) {
+      setInsightsReport('Platform analizi şu anda yapılamıyor.');
+    } finally {
+      setLoadingInsights(false);
     }
   };
 
@@ -226,13 +268,22 @@ export default function UserManagementScreen() {
             <Text style={styles.headerTitle}>Kullanıcı Yönetimi</Text>
             <Text style={styles.headerSub}>Sistem üyelerini listeleyin ve yetkilerini yönetin</Text>
           </View>
-          <TouchableOpacity 
-            style={styles.megaphoneButton}
-            onPress={() => setBroadcastVisible(true)}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="megaphone-outline" size={20} color={colors.white} />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+            <TouchableOpacity 
+              style={styles.megaphoneButton}
+              onPress={handleShowInsights}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="bar-chart-outline" size={20} color={colors.white} />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.megaphoneButton}
+              onPress={() => setBroadcastVisible(true)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="megaphone-outline" size={20} color={colors.white} />
+            </TouchableOpacity>
+          </View>
         </View>
       </LinearGradient>
 
@@ -370,6 +421,36 @@ export default function UserManagementScreen() {
             </View>
             <Text style={styles.alertSub}>Bu bildirim sistemdeki tüm kayıtlı müşterilere anlık gönderilecektir.</Text>
 
+            {/* AI Wizard Section */}
+            <View style={styles.aiWizardBox}>
+              <View style={styles.aiWizardHeader}>
+                <Ionicons name="sparkles" size={15} color="#7c4dff" />
+                <Text style={styles.aiWizardTitle}>AI ile Otomatik Yaz</Text>
+              </View>
+              <View style={styles.aiWizardRow}>
+                <TextInput
+                  placeholder="Kısa bir konu yaz (ör: bahar kampanyası)..."
+                  placeholderTextColor={colors.muted2}
+                  value={aiDraftTopic}
+                  onChangeText={setAiDraftTopic}
+                  style={styles.aiWizardInput}
+                  editable={!draftingAi}
+                />
+                <TouchableOpacity
+                  style={[styles.aiWizardButton, draftingAi && { opacity: 0.6 }]}
+                  onPress={handleAiDraft}
+                  disabled={draftingAi}
+                  activeOpacity={0.8}
+                >
+                  {draftingAi ? (
+                    <ActivityIndicator size="small" color={colors.white} />
+                  ) : (
+                    <Ionicons name="sparkles" size={16} color={colors.white} />
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+
             <TextInput
               placeholder="Duyuru Başlığı"
               placeholderTextColor={colors.muted2}
@@ -415,7 +496,54 @@ export default function UserManagementScreen() {
         </View>
       </Modal>
 
-      {/* Role Management Bottom Sheet Modal */}
+      {/* AI Insights Modal */}
+      <Modal
+        visible={insightsVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setInsightsVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity style={styles.modalDismissArea} activeOpacity={1} onPress={() => setInsightsVisible(false)} />
+          <View style={[styles.modalContent, { maxHeight: '80%' }]}>
+            <View style={styles.modalDragHandle} />
+            <View style={[styles.alertHeader, { marginBottom: spacing.md }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                <LinearGradient colors={['#7c4dff', '#5c35cc']} style={styles.insightsIconBox}>
+                  <Ionicons name="bar-chart" size={16} color="#fff" />
+                </LinearGradient>
+                <Text style={[styles.alertTitle, { marginLeft: spacing.sm }]}>AI Platform Analizi</Text>
+              </View>
+              <TouchableOpacity style={styles.alertCloseButton} onPress={() => setInsightsVisible(false)} activeOpacity={0.8}>
+                <Ionicons name="close" size={18} color={colors.ink} />
+              </TouchableOpacity>
+            </View>
+
+            {loadingInsights ? (
+              <View style={{ paddingVertical: 40, alignItems: 'center', gap: spacing.md }}>
+                <ActivityIndicator size="large" color="#7c4dff" />
+                <Text style={styles.alertSub}>Gemini platform verilerini analiz ediyor...</Text>
+              </View>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>
+                <View style={styles.insightsCard}>
+                  <Text style={styles.insightsText}>{insightsReport}</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.insightsRefreshButton}
+                  onPress={() => { setInsightsReport(null); handleShowInsights(); }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="refresh" size={14} color="#7c4dff" style={{ marginRight: 6 }} />
+                  <Text style={styles.insightsRefreshText}>Raporu Yenile</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+
       <Modal
         visible={selectedUser !== null}
         transparent
@@ -905,4 +1033,88 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+
+  // AI Wizard Styles
+  aiWizardBox: {
+    backgroundColor: '#f5efff',
+    borderRadius: radius.sm,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: '#d8c8ff',
+    gap: spacing.sm,
+  },
+  aiWizardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  aiWizardTitle: {
+    fontFamily: fonts.sansBold,
+    fontSize: 12,
+    color: '#7c4dff',
+  },
+  aiWizardRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    alignItems: 'center',
+  },
+  aiWizardInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#d8c8ff',
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.md,
+    height: 38,
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    color: colors.ink,
+    backgroundColor: colors.white,
+  },
+  aiWizardButton: {
+    width: 38,
+    height: 38,
+    borderRadius: radius.sm,
+    backgroundColor: '#7c4dff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // AI Insights Modal Styles
+  insightsIconBox: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  insightsCard: {
+    backgroundColor: '#f5efff',
+    borderRadius: radius.md,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: '#d8c8ff',
+    marginBottom: spacing.md,
+  },
+  insightsText: {
+    fontFamily: fonts.sans,
+    fontSize: 13.5,
+    color: colors.ink,
+    lineHeight: 22,
+  },
+  insightsRefreshButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#d8c8ff',
+    borderRadius: radius.sm,
+    marginBottom: spacing.md,
+  },
+  insightsRefreshText: {
+    fontFamily: fonts.sansBold,
+    fontSize: 12,
+    color: '#7c4dff',
+  },
 });
+

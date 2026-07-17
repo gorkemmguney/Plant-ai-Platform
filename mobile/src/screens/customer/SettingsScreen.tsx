@@ -11,6 +11,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { firebaseAuth } from '../../firebase/firebaseConfig';
 import { apiClient } from '../../services/apiClient';
@@ -29,6 +31,7 @@ const sellerStatusInfo: Record<string, { label: string; badge: keyof typeof badg
 };
 
 export default function SettingsScreen() {
+  const navigation = useNavigation<any>();
   const { firebaseUser, roles, sellerStatus, firstName, lastName, refreshProfile } = useAuth();
   const sellerInfo = sellerStatusInfo[sellerStatus];
 
@@ -118,6 +121,20 @@ export default function SettingsScreen() {
             </View>
           )}
         </View>
+
+        {roles.includes('admin') && (
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>Yönetim Paneli</Text>
+            <TouchableOpacity 
+              style={styles.menuRow} 
+              onPress={() => navigation.navigate('AdminComplaints')}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.menuText}>Şikayet & Destek Yönetimi</Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.muted2} />
+            </TouchableOpacity>
+          </View>
+        )}
 
         <TouchableOpacity style={styles.logoutButton} onPress={() => signOut(firebaseAuth)} activeOpacity={0.85}>
           <Text style={styles.logoutButtonText}>Çıkış Yap</Text>
@@ -252,4 +269,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   saveText: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.buttonPrimaryText },
+  menuRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.xs,
+  },
+  menuText: {
+    fontFamily: fonts.sansMedium,
+    fontSize: 14,
+    color: colors.ink,
+  },
 });

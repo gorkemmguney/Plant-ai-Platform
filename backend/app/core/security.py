@@ -32,30 +32,42 @@ async def get_current_user(
     user = result.scalar_one_or_none()
 
     if user is None:
-        user = AppUser(
-            firebase_uid=firebase_uid,
-            email=email,
-            first_name=first_name or "İsimsiz",
-            last_name=last_name or "",
-            is_active=True,
-        )
-        db.add(user)
-        
-        try:
-            await db.flush()
-        except IntegrityError:
-            # Aynı yeni kullanıcı için eşzamanlı ilk istekler (ör. kayıt anında
-            # /auth/me ve /auth/select-role) çakışabilir; diğeri oluşturmuşsa onu kullan.
-            await db.rollback()
-            result = await db.execute(select(AppUser).where(AppUser.firebase_uid == firebase_uid))
-            user = result.scalar_one()
-        else:
-            default_role = await db.execute(select(Role).where(Role.role_name == settings.DEFAULT_ROLE))
-            role_obj = default_role.scalar_one_or_none()
-            if role_obj:
-                db.add(UserRole(user_id=user.user_id, role_id=role_obj.role_id))
+        # E-posta ile kaydolmuş eski bir hesap varsa, Firebase UID'yi ona bağla
+        email_result = await db.execute(select(AppUser).where(AppUser.email == email))
+        existing_user = email_result.scalar_one_or_none()
+
+        if existing_user is not None:
+            existing_user.firebase_uid = firebase_uid
+            if not existing_user.first_name or existing_user.first_name == "İsimsiz":
+                existing_user.first_name = first_name or "İsimsiz"
+            if not existing_user.last_name:
+                existing_user.last_name = last_name or ""
             await db.commit()
-            await db.refresh(user)
+            await db.refresh(existing_user)
+            user = existing_user
+        else:
+            user = AppUser(
+                firebase_uid=firebase_uid,
+                email=email,
+                first_name=first_name or "İsimsiz",
+                last_name=last_name or "",
+                is_active=True,
+            )
+            db.add(user)
+            try:
+                await db.flush()
+            except IntegrityError:
+                # Aynı yeni kullanıcı için eşzamanlı ilk istekler çakışabilir
+                await db.rollback()
+                result = await db.execute(select(AppUser).where(AppUser.firebase_uid == firebase_uid))
+                user = result.scalar_one()
+            else:
+                default_role = await db.execute(select(Role).where(Role.role_name == settings.DEFAULT_ROLE))
+                role_obj = default_role.scalar_one_or_none()
+                if role_obj:
+                    db.add(UserRole(user_id=user.user_id, role_id=role_obj.role_id))
+                await db.commit()
+                await db.refresh(user)
 
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Hesap devre dışı bırakılmış")
