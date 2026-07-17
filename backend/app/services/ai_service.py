@@ -352,3 +352,197 @@ SADECE aşağıdaki JSON formatında yanıt ver:
         }
 
 
+# ─── Admin AI Feature 8: Complaint Auto-Response Generator ──────────────────
+
+_COMPLAINT_RESPONSE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "suggested_note": {"type": "string"}
+    },
+    "required": ["suggested_note"]
+}
+
+async def generate_complaint_response(
+    complaint_title: str,
+    complaint_description: str,
+    complaint_type: str,
+    target_status: str,
+    user_name: str | None = None,
+    product_name: str | None = None,
+    reported_seller_name: str | None = None,
+) -> dict:
+    """Gemini generates a professional, polite, and helpful resolution response for a complaint."""
+    model = genai.GenerativeModel(settings.GEMINI_CHAT_MODEL)
+    
+    status_meanings = {
+        "pending": "Şikayet beklemede. Müşteriye şikayet talebinin ulaştığını, en kısa sürede inceleme sırasına alınacağını belirt.",
+        "in_progress": "Şikayet şu anda inceleniyor/araştırılıyor aşamasında. Kullanıcıya konuyu incelediğimizi ve en kısa sürede çözmek için çalıştığımızı belirt.",
+        "resolved": "Şikayet çözüldü. Kullanıcıya sorunun çözüldüğünü (veya varsa para iadesi/satıcı uyarısı gibi detayları) belirt ve teşekkür et.",
+        "rejected": "Şikayet reddedildi. Kullanıcıya şikayetinin neden kabul edilmediğini nazik ve kurallara uygun şekilde açıkla."
+    }
+    
+    status_desc = status_meanings.get(target_status, "Destek talebi güncellendi.")
+    
+    ref_info = ""
+    if user_name:
+        ref_info += f"- Müşteri Adı: {user_name}\n"
+    if complaint_type == "product" and product_name:
+        ref_info += f"- Şikayet Edilen Ürün: {product_name}\n"
+    if complaint_type == "seller" and reported_seller_name:
+        ref_info += f"- Şikayet Edilen Satıcı: {reported_seller_name}\n"
+
+    prompt = f"""Sen bir bitki alım-satım ve AI teşhis platformunun Müşteri İlişkileri ve Destek yöneticisisin.
+Aşağıda bilgileri verilen kullanıcı destek/şikayet talebine yönelik Türkçe, son derece profesyonel, yapıcı ve samimi bir yanıt taslağı hazırla.
+
+📋 Şikayet Detayları:
+- Şikayet Başlığı: "{complaint_title}"
+- Şikayet Açıklaması: "{complaint_description}"
+- Şikayet Türü: {complaint_type}
+{ref_info}
+
+🎯 Şikayetin Güncellenecek Hedef Durumu:
+{target_status} ({status_desc})
+
+SADECE aşağıdaki JSON formatında yanıt ver:
+{{
+  "suggested_note": "Yazılacak yanıt metni (Kullanıcıya hitap ederek başla, Türkçe)"
+}}"""
+    try:
+        response = model.generate_content(
+            prompt,
+            generation_config={
+                "response_mime_type": "application/json",
+                "response_schema": _COMPLAINT_RESPONSE_SCHEMA,
+            },
+        )
+        return json.loads(response.text)
+    except Exception as e:
+        print(f"⚠️ Gemini Complaint Response Hatası: {e}")
+        return {"suggested_note": "Talebiniz alınmış olup incelenmektedir. En kısa sürede bilgi verilecektir."}
+
+
+# ─── Admin AI Feature 9: Complaint Initial Analysis ─────────────────────────
+
+_COMPLAINT_ANALYSIS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "sentiment": {"type": "string"},
+        "urgency": {"type": "string"},
+        "ai_summary": {"type": "string"},
+        "ai_tags": {"type": "array", "items": {"type": "string"}}
+    },
+    "required": ["sentiment", "urgency", "ai_summary", "ai_tags"]
+}
+
+async def analyze_new_complaint(title: str, description: str, complaint_type: str) -> dict:
+    """Gemini analyzes a new complaint to determine sentiment, urgency, tags, and summary."""
+    model = genai.GenerativeModel(settings.GEMINI_CHAT_MODEL)
+    
+    prompt = f"""Bir müşteri destek sistemine yeni bir şikayet/destek talebi girildi.
+Bu talebi analiz ederek duygu durumunu, aciliyet derecesini, 1-2 cümlelik kısa bir özetini ve konu etiketlerini belirle.
+
+Talep Bilgileri:
+- Başlık: "{title}"
+- Açıklama: "{description}"
+- Tür: {complaint_type}
+
+Değerlendirme Kriterleri:
+1. sentiment: Müşterinin ses tonu çok agresif, kızgın veya sert ise 'angry', üzgün veya hayal kırıklığına uğramış ise 'sad', sakin ve düz bir geri bildirim ise 'neutral'.
+2. urgency: Ödeme/para iadesi sorunları, dolandırıcılık şüphesi veya kargo ulaşmaması gibi acil çözülmesi gereken finansal/operasyonel krizlerde 'high', orta derecede aksaklıklarda 'medium', genel bilgi/öneri/küçük hatalarda 'low'.
+3. ai_summary: Yönetici için 1-2 cümlelik Türkçe kısa özet.
+4. ai_tags: Şikayeti tanımlayan 2-3 adet Türkçe kısa etiket (örn: ["kargo", "iade", "hasarlı_ürün"]).
+
+SADECE aşağıdaki JSON formatında yanıt ver:
+{{
+  "sentiment": "angry | sad | neutral",
+  "urgency": "high | medium | low",
+  "ai_summary": "Türkçe yönetici özeti...",
+  "ai_tags": ["etiket1", "etiket2"]
+}}"""
+    try:
+        response = model.generate_content(
+            prompt,
+            generation_config={
+                "response_mime_type": "application/json",
+                "response_schema": _COMPLAINT_ANALYSIS_SCHEMA,
+            },
+        )
+        return json.loads(response.text)
+    except Exception as e:
+        print(f"⚠️ Gemini Complaint Analysis Hatası: {e}")
+        return {
+            "sentiment": "neutral",
+            "urgency": "medium",
+            "ai_summary": "Şikayet analizi yapılamadı.",
+            "ai_tags": ["genel"]
+        }
+
+
+# ─── Admin AI Feature 10: Seller Risk Advisor ────────────────────────────────
+
+_SELLER_RISK_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "risk_level": {"type": "string"},
+        "risk_label": {"type": "string"},
+        "analysis": {"type": "string"},
+        "recommendation": {"type": "string"}
+    },
+    "required": ["risk_level", "risk_label", "analysis", "recommendation"]
+}
+
+async def generate_seller_risk_advice(
+    seller_name: str,
+    total_complaints: int,
+    pending_count: int,
+    resolved_count: int,
+    recent_types: list[str],
+) -> dict:
+    """Gemini evaluates the historical complaints against a seller and suggests an action plan."""
+    model = genai.GenerativeModel(settings.GEMINI_CHAT_MODEL)
+    
+    types_text = ", ".join(recent_types) if recent_types else "Bilinmiyor"
+    
+    prompt = f"""Sen bir bitki alım-satım platformunun risk yönetimi analistisin.
+Aşağıda şikayet geçmişi verilen satıcıyı değerlendirerek yöneticimiz (Admin) için bir risk analizi ve öneri planı hazırla.
+
+Satıcı Adı: "{seller_name}"
+İstatistikler:
+- Toplam Şikayet Sayısı: {total_complaints}
+- Çözülmemiş / Bekleyen Şikayet: {pending_count}
+- Çözülmüş / Kapatılmış Şikayet: {resolved_count}
+- Son Şikayet Türleri: [{types_text}]
+
+Değerlendirme Kriterleri:
+1. risk_level: Satıcının risk seviyesini belirle ('low', 'medium' veya 'high'). Toplam şikayet sayısı 5'ten fazla ise ve çözülmemiş sayısı yüksekse 'high', 2-4 arası ise 'medium', 0-1 ise 'low' seçebilirsin.
+2. risk_label: Türkçe karşılığı ('Düşük Risk', 'Orta Risk', 'Yüksek Risk').
+3. analysis: Satıcının şikayet geçmişine dair Türkçe 2-3 cümlelik durum analizi.
+4. recommendation: Yöneticiye yönelik somut tavsiye eylemi (örn. 'Satıcıyla iletişime geçip uyarın', 'Mağazayı 3 gün askıya alın', 'Herhangi bir aksiyona gerek yok').
+
+SADECE aşağıdaki JSON formatında yanıt ver:
+{{
+  "risk_level": "low | medium | high",
+  "risk_label": "Düşük Risk | Orta Risk | Yüksek Risk",
+  "analysis": "Durum analizi...",
+  "recommendation": "Tavsiye eylem..."
+}}"""
+    try:
+        response = model.generate_content(
+            prompt,
+            generation_config={
+                "response_mime_type": "application/json",
+                "response_schema": _SELLER_RISK_SCHEMA,
+            },
+        )
+        return json.loads(response.text)
+    except Exception as e:
+        print(f"⚠️ Gemini Seller Risk Advice Hatası: {e}")
+        return {
+            "risk_level": "medium",
+            "risk_label": "Orta Risk (Hata)",
+            "analysis": "Satıcı geçmiş şikayet verileri şu anda analiz edilemiyor.",
+            "recommendation": "Gelişmeleri takip etmeye devam edin."
+        }
+
+
+
