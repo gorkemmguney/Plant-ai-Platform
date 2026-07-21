@@ -142,7 +142,6 @@ Madde işareti kullan, emoji ekle, Türkçe yaz."""
         return "Platform analizi şu anda yapılamıyor. Lütfen daha sonra tekrar deneyin."
 
 
-# ─── Admin AI Feature 3: Seller Risk Profiler ───────────────────────────────
 
 _SELLER_PROFILE_SCHEMA = {
     "type": "object",
@@ -194,7 +193,6 @@ SADECE şu JSON formatında yanıt ver:
         }
 
 
-# ─── Admin AI Feature 4: Diagnosis Center Commentary ────────────────────────
 
 async def generate_diagnosis_commentary(disease_stats: list[dict], total: int) -> str:
     """Gemini analyses platform-wide disease data and returns admin insights."""

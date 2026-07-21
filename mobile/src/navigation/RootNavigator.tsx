@@ -33,7 +33,6 @@ export default function RootNavigator() {
     );
   }
 
-  // Birden fazla rolü olan bir kullanıcı henüz panel seçmediyse, seçim ekranını göster.
   if (roles.length > 1 && (!activeRole || !roles.includes(activeRole))) {
     return (
       <NavigationContainer>

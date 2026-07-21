@@ -61,13 +61,10 @@ async def create_order(db: AsyncSession, cust_id: int, payload: OrderCreateIn) -
     if not payload.items:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Sepet boş olamaz")
 
-    # Sepetteki ürünleri satıcıya göre grupluyoruz — her satıcı yalnızca
-    # kendi ürünlerini içeren ayrı bir sipariş görecek (seller_id=None olan
-    # sahipsiz ürünler kendi grubunda tek bir siparişte toplanır).
+    
     items_by_seller: dict[int | None, list[CustOrdItem]] = {}
     totals_by_seller: dict[int | None, Decimal] = {}
-    # Flush sonrası cust_ord_item_id atandığında karakteristik satırlarını
-    # yazabilmek için (CustOrdItem nesnesi, [(gnl_char_id, value_text), ...]) eşlemesi
+   
     pending_char_snapshots: list[tuple[CustOrdItem, list[tuple[int, str]]]] = []
 
     for item in payload.items:
@@ -78,8 +75,7 @@ async def create_order(db: AsyncSession, cust_id: int, payload: OrderCreateIn) -
         if product.stock < item.quantity:
             raise HTTPException(status_code=400, detail=f"Yetersiz stok: {product.name}")
 
-        # Seçilen varyantları doğrula: sadece bu ürüne atanmış değerler seçilebilir,
-        # ve aynı karakteristik (ör. Renk) için birden fazla değer seçilemez.
+    
         char_snapshots: list[tuple[int, str]] = []
         if item.selected_char_value_ids:
             valid_values = await _valid_char_values_for_product(db, product.prod_id)
@@ -128,8 +124,7 @@ async def create_order(db: AsyncSession, cust_id: int, payload: OrderCreateIn) -
         db.add(order)
         new_orders.append(order)
 
-    # cust_ord_item_id'lerin atanması için flush (henüz commit değil) — bu sayede
-    # aşağıda CustOrdItemCharVal satırları doğru FK ile oluşturulabilir.
+    
     await db.flush()
 
     for order_item, char_snapshots in pending_char_snapshots:

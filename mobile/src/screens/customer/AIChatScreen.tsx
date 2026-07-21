@@ -13,6 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiClient } from '../../services/apiClient';
 import { colors, fonts, radius, shadow, spacing } from '../../theme/theme';
 
@@ -29,7 +30,8 @@ const SUGGESTIONS = [
   'İç mekan için hangi bitki uygun?',
 ];
 
-export default function AIChatScreen() {
+export default function AIChatScreen({ navigation }: any) {
+  const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome',
@@ -83,6 +85,9 @@ export default function AIChatScreen() {
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       <LinearGradient colors={[colors.secondary, colors.secondaryDeep]} style={styles.header}>
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+          <Ionicons name="arrow-back" size={20} color={colors.white} />
+        </TouchableOpacity>
         <View style={styles.headerAvatar}>
           <Ionicons name="sparkles" size={20} color={colors.primary} />
         </View>
@@ -144,7 +149,7 @@ export default function AIChatScreen() {
         </View>
       )}
 
-      <View style={styles.inputBar}>
+      <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
         <TextInput
           style={styles.input}
           placeholder="Bir mesaj yaz..."
@@ -178,6 +183,14 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.lg,
     borderBottomLeftRadius: radius.lg,
     borderBottomRightRadius: radius.lg,
+  },
+  backButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerAvatar: {
     width: 40,

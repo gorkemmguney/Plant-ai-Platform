@@ -112,7 +112,7 @@ export default function StoreProductsScreen({ route }: any) {
   const renderProduct = ({ item }: { item: Product }) => {
     const out = item.stock < 1;
     return (
-      <View style={styles.card}>
+      <TouchableOpacity style={styles.card} activeOpacity={0.9} onPress={() => openProduct(item)}>
         <View style={styles.thumb}>
           <Text style={styles.thumbEmoji}>🪴</Text>
         </View>
@@ -133,7 +133,7 @@ export default function StoreProductsScreen({ route }: any) {
             <Text style={styles.buyButtonText}>Sepete Ekle</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 

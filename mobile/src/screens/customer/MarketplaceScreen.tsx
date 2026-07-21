@@ -192,7 +192,7 @@ export default function MarketplaceScreen({ navigation }: any) {
     const info = priceByName[item.name.trim().toLowerCase()];
     const cheapest = info && info.count > 1 && Number(item.price) === info.min;
     return (
-      <View style={styles.card}>
+      <TouchableOpacity style={styles.card} activeOpacity={0.9} onPress={() => openAddModal(item)}>
         <View style={styles.thumb}>
           <Text style={styles.thumbEmoji}>🪴</Text>
         </View>
@@ -223,7 +223,7 @@ export default function MarketplaceScreen({ navigation }: any) {
             <Text style={styles.buyButtonText}>Sepete Ekle</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -571,7 +571,7 @@ const styles = StyleSheet.create({
   searchIcon: { fontSize: 16, color: colors.muted2, marginRight: spacing.sm },
   searchInput: { flex: 1, paddingVertical: 12, fontFamily: fonts.sans, fontSize: 14, color: colors.ink },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.md },
-  list: { padding: spacing.lg, gap: spacing.md },
+  list: { padding: spacing.lg, paddingBottom: 110, gap: spacing.md },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
