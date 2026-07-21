@@ -89,6 +89,12 @@ export default function MarketplaceScreen({ navigation }: any) {
   const infoGroups = charGroups.filter((g) => g.options.length === 1);
   const canAdd = multiChoiceGroups.every((g) => picked[g.gnl_char_id] != null);
 
+  const [prodReviews, setProdReviews] = useState<{ average: number; count: number; reviews: any[] }>({
+    average: 0,
+    count: 0,
+    reviews: [],
+  });
+
   const openAddModal = (product: Product) => {
     const initial: Record<number, number> = {};
     (product.characteristics ?? []).forEach((c) => {
@@ -98,6 +104,12 @@ export default function MarketplaceScreen({ navigation }: any) {
     setPicked(initial);
     setSelected(product);
     setQty(1);
+    // Ürünün değerlendirmelerini çek (ortalama + yorumlar)
+    setProdReviews({ average: 0, count: 0, reviews: [] });
+    apiClient
+      .get(`/reviews/product/${product.prod_id}`)
+      .then((res) => setProdReviews(res.data))
+      .catch(() => {});
   };
 
   const confirmAdd = () => {
@@ -232,7 +244,7 @@ export default function MarketplaceScreen({ navigation }: any) {
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.headerTitle}>Mağaza</Text>
+            <Text style={styles.headerTitle}>Ürünler</Text>
             <Text style={styles.headerSub}>Bitkileri keşfet ve satın al</Text>
           </View>
           <TouchableOpacity style={styles.cartBtn} onPress={() => navigation.navigate('Cart')} activeOpacity={0.7}>
@@ -321,6 +333,23 @@ export default function MarketplaceScreen({ navigation }: any) {
               <Text style={styles.modalTitle} numberOfLines={2}>{selected?.name}</Text>
               <Text style={styles.modalPrice}>₺{Number(selected?.price ?? 0).toFixed(2)}</Text>
               <Text style={styles.modalStock}>Stok: {selected?.stock ?? 0}</Text>
+
+              {prodReviews.count > 0 && (
+                <View style={styles.reviewBox}>
+                  <View style={styles.reviewSummary}>
+                    <Text style={styles.reviewAvg}>⭐ {prodReviews.average.toFixed(1)}</Text>
+                    <Text style={styles.reviewCount}>{prodReviews.count} değerlendirme</Text>
+                  </View>
+                  {prodReviews.reviews.slice(0, 3).map((r: any) => (
+                    <View key={r.review_id} style={styles.reviewItem}>
+                      <Text style={styles.reviewStars}>
+                        {'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}
+                      </Text>
+                      {!!r.comment && <Text style={styles.reviewComment}>{r.comment}</Text>}
+                    </View>
+                  ))}
+                </View>
+              )}
 
               {infoGroups.length > 0 && (
                 <View style={styles.infoBadgeRow}>
@@ -633,6 +662,19 @@ const styles = StyleSheet.create({
   modalTitle: { fontFamily: fonts.display, fontSize: 18, color: colors.ink },
   modalPrice: { fontFamily: fonts.sansBold, fontSize: 15, color: colors.primaryDeep, marginTop: spacing.xs },
   modalStock: { fontFamily: fonts.sans, fontSize: 12.5, color: colors.muted, marginTop: 2 },
+  reviewBox: {
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderSoft,
+    gap: spacing.sm,
+  },
+  reviewSummary: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  reviewAvg: { fontFamily: fonts.sansBold, fontSize: 15, color: '#b3711a' },
+  reviewCount: { fontFamily: fonts.sans, fontSize: 12.5, color: colors.muted },
+  reviewItem: { gap: 2 },
+  reviewStars: { fontSize: 13, color: '#f5a524' },
+  reviewComment: { fontFamily: fonts.sans, fontSize: 12.5, color: colors.ink, lineHeight: 17 },
   infoBadgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.md },
   infoBadge: {
     backgroundColor: colors.bgAlt,
