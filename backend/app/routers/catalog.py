@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import get_user_roles, require_role
 from app.db.session import get_db
 from app.models.catalog import GnlChar, GnlCharVal, Prod, ProdCharVal, ProdSpec
+from app.models.order import CustOrdItem
 from app.models.user import AppUser
 from app.rbac.roles import RoleName
 from app.schemas.catalog import (
@@ -259,6 +260,76 @@ async def list_products(
         _product_out(prod, store_name, first, last, char_map.get(prod.prod_id, []))
         for (prod, store_name, first, last) in rows
     ]
+
+
+@router.get("/products/{prod_id}/related", response_model=list[ProductOut])
+async def related_products(
+    prod_id: int,
+    limit: int = Query(default=4, ge=1, le=10),
+    db: AsyncSession = Depends(get_db),
+):
+    """Bu ürünle 'birlikte alınan' öneriler. Yeterli sipariş verisi yoksa
+    aynı mağaza ve aynı türdeki ürünlerle tamamlanır."""
+    target = (await db.execute(select(Prod).where(Prod.prod_id == prod_id))).scalar_one_or_none()
+    if target is None:
+        raise HTTPException(status_code=404, detail="Ürün bulunamadı")
+
+    # 1) Gerçekten birlikte alınanlar (aynı siparişte geçen diğer ürünler, sıklığa göre)
+    order_ids = select(CustOrdItem.cust_ord_id).where(CustOrdItem.prod_id == prod_id)
+    co_rows = (
+        await db.execute(
+            select(CustOrdItem.prod_id)
+            .where(CustOrdItem.cust_ord_id.in_(order_ids), CustOrdItem.prod_id != prod_id)
+            .group_by(CustOrdItem.prod_id)
+            .order_by(func.count().desc())
+        )
+    ).scalars().all()
+
+    # Aday sıralaması: önce birlikte alınanlar, sonra aynı mağaza, sonra aynı tür
+    ordered_ids: list[int] = list(co_rows)
+
+    async def _extend(condition):
+        ids = (
+            await db.execute(
+                select(Prod.prod_id)
+                .where(condition, Prod.prod_id != prod_id, Prod.stock > 0, Prod.is_active.is_(True))
+            )
+        ).scalars().all()
+        for pid in ids:
+            if pid not in ordered_ids:
+                ordered_ids.append(pid)
+
+    if target.seller_id is not None:
+        await _extend(Prod.seller_id == target.seller_id)
+    # Bitki malzemeleri de öner (saksı, toprak, gübre vb.) — ama malzemenin yanına başka
+    # malzeme değil, bitki önerelim diye yalnızca hedef bir bitkiyse ekle
+    if target.category == "plant":
+        await _extend(Prod.category == "supply")
+    await _extend(Prod.prod_spec_id == target.prod_spec_id)
+
+    if not ordered_ids:
+        return []
+
+    # Geçerli (stokta + aktif) ürünleri çek, aday sırasına göre diz, limitle
+    rows = (
+        await db.execute(
+            select(Prod, AppUser.store_name, AppUser.first_name, AppUser.last_name)
+            .outerjoin(AppUser, AppUser.user_id == Prod.seller_id)
+            .where(Prod.prod_id.in_(ordered_ids), Prod.stock > 0, Prod.is_active.is_(True))
+        )
+    ).all()
+    by_id = {prod.prod_id: (prod, store_name, first, last) for (prod, store_name, first, last) in rows}
+
+    result: list[ProductOut] = []
+    for pid in ordered_ids:
+        entry = by_id.get(pid)
+        if entry is None:
+            continue
+        prod, store_name, first, last = entry
+        result.append(_product_out(prod, store_name, first, last, []))
+        if len(result) >= limit:
+            break
+    return result
 
 
 @router.get("/sellers", response_model=list[SellerOut])

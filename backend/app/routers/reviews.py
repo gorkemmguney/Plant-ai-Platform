@@ -95,6 +95,27 @@ async def my_reviews(
     return out
 
 
+@router.get("/seller", response_model=list[ReviewOut])
+async def seller_reviews(
+    db: AsyncSession = Depends(get_db),
+    user: AppUser = Depends(require_role(RoleName.SELLER, RoleName.ADMIN)),
+):
+    """Satıcının kendi ürünlerine gelen tüm yorumlar (cevaplamak için)."""
+    result = await db.execute(
+        select(Review, Prod.name, AppUser.first_name, AppUser.last_name)
+        .join(Prod, Prod.prod_id == Review.prod_id)
+        .join(AppUser, AppUser.user_id == Review.user_id)
+        .where(Prod.seller_id == user.user_id)
+        .order_by(Review.created_at.desc())
+    )
+    out: list[ReviewOut] = []
+    for review, prod_name, first, last in result.all():
+        item = _review_out(review, first, last)
+        item.prod_name = prod_name
+        out.append(item)
+    return out
+
+
 @router.get("/product/{prod_id}", response_model=ReviewSummaryOut)
 async def product_reviews(prod_id: int, db: AsyncSession = Depends(get_db)):
     result = await db.execute(

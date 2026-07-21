@@ -24,12 +24,36 @@ interface Coupon {
   seller_name: string | null;
 }
 
+interface Suggestion {
+  prod_id: number;
+  name: string;
+  price: string | number;
+  stock: number;
+  seller_id: number | null;
+  seller_name: string | null;
+}
+
 export default function CartScreen({ navigation }: any) {
-  const { items, total, changeQty, clearCart } = useCart();
+  const { items, total, addToCart, changeQty, clearCart } = useCart();
   const [placing, setPlacing] = useState(false);
 
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [selectedCouponId, setSelectedCouponId] = useState<number | null>(null);
+
+  // Birlikte alınabilecek öneriler (sepetteki ilk ürüne göre)
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const cartKey = items.map((i) => i.product.prod_id).join(',');
+  useEffect(() => {
+    if (items.length === 0) {
+      setSuggestions([]);
+      return;
+    }
+    const cartIds = items.map((i) => i.product.prod_id);
+    apiClient
+      .get<Suggestion[]>(`/catalog/products/${items[0].product.prod_id}/related?limit=6`)
+      .then(({ data }) => setSuggestions(data.filter((s) => !cartIds.includes(s.prod_id)).slice(0, 3)))
+      .catch(() => setSuggestions([]));
+  }, [cartKey]);
 
   const loadCoupons = useCallback(async () => {
     try {
@@ -158,6 +182,44 @@ export default function CartScreen({ navigation }: any) {
         keyExtractor={(item) => item.lineKey}
         contentContainerStyle={styles.list}
         renderItem={renderItem}
+        ListFooterComponent={
+          suggestions.length > 0 ? (
+            <View style={styles.suggestBox}>
+              <Text style={styles.suggestTitle}>Birlikte alınabilir</Text>
+              <View style={styles.suggestRow}>
+                {suggestions.map((s) => (
+                  <View key={s.prod_id} style={styles.suggestCard}>
+                    <View style={styles.suggestThumb}>
+                      <Text style={styles.suggestEmoji}>🪴</Text>
+                    </View>
+                    <Text style={styles.suggestName} numberOfLines={1}>{s.name}</Text>
+                    <Text style={styles.suggestPrice}>₺{Number(s.price).toFixed(2)}</Text>
+                    <TouchableOpacity
+                      style={styles.suggestAdd}
+                      onPress={() =>
+                        addToCart(
+                          {
+                            prod_id: s.prod_id,
+                            name: s.name,
+                            price: s.price,
+                            stock: s.stock,
+                            seller_id: s.seller_id,
+                            seller_name: s.seller_name,
+                          },
+                          1,
+                          []
+                        )
+                      }
+                      activeOpacity={0.85}
+                    >
+                      <Text style={styles.suggestAddText}>+ Ekle</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            </View>
+          ) : null
+        }
       />
 
       <View style={styles.footer}>
@@ -279,6 +341,37 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
     gap: spacing.md,
   },
+  suggestBox: { marginTop: spacing.lg, gap: spacing.sm },
+  suggestTitle: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.ink },
+  suggestRow: { flexDirection: 'row', gap: spacing.sm },
+  suggestCard: {
+    flex: 1,
+    backgroundColor: colors.card,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.sm,
+    gap: 5,
+    ...shadow.sm,
+  },
+  suggestThumb: {
+    height: 48,
+    borderRadius: radius.sm,
+    backgroundColor: colors.bgAlt,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  suggestEmoji: { fontSize: 22 },
+  suggestName: { fontFamily: fonts.sansBold, fontSize: 11.5, color: colors.ink },
+  suggestPrice: { fontFamily: fonts.sansMedium, fontSize: 11, color: colors.primaryDeep },
+  suggestAdd: {
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.full,
+    paddingVertical: 6,
+    alignItems: 'center',
+    marginTop: 1,
+  },
+  suggestAddText: { fontFamily: fonts.sansBold, fontSize: 11, color: colors.primaryDeep },
   couponSection: { gap: spacing.sm },
   couponTitle: { fontFamily: fonts.sansSemi, fontSize: 13, color: colors.muted },
   couponRow: { gap: spacing.sm, paddingBottom: 2 },
