@@ -25,6 +25,7 @@ def _user_out(user: AppUser, roles: list[str]) -> UserOut:
         roles=roles,
         seller_status=user.seller_status,
         store_name=user.store_name,
+        points=user.points,
     )
 
 

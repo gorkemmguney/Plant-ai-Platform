@@ -3,6 +3,7 @@ import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import React, { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
@@ -43,7 +44,14 @@ const QUICK_TILES: QuickTile[] = [
 const FALLBACK_COORDS = { latitude: 41.0082, longitude: 28.9784 };
 
 export default function HomeScreen({ navigation }: any) {
-  const { firebaseUser, firstName } = useAuth();
+  const { firebaseUser, firstName, points, refreshProfile } = useAuth();
+
+  // Ekrana her dönüşte profili (puan dahil) yenile — sipariş sonrası puan güncellensin
+  useFocusEffect(
+    useCallback(() => {
+      refreshProfile();
+    }, [])
+  );
   const { count, addToCart } = useCart();
   const [products, setProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
@@ -110,6 +118,10 @@ export default function HomeScreen({ navigation }: any) {
             <View style={{ flex: 1 }}>
               <Text style={styles.h1}>Merhaba, {displayName}</Text>
               <Text style={styles.headerSub}>Bugün bitkilerine göz atalım 🌿</Text>
+              <View style={styles.pointsPill}>
+                <Ionicons name="sparkles" size={12} color={colors.primaryDeep} />
+                <Text style={styles.pointsText}>{points} puan</Text>
+              </View>
             </View>
             <View style={styles.headerIcons}>
               <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Orders')} activeOpacity={0.7}>
@@ -302,6 +314,18 @@ const styles = StyleSheet.create({
   headerTopRow: { flexDirection: 'row', alignItems: 'flex-start' },
   h1: { fontFamily: fonts.display, fontSize: 26, color: colors.ink },
   headerSub: { fontFamily: fonts.sans, fontSize: 13.5, color: colors.muted, marginTop: 5 },
+  pointsPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    alignSelf: 'flex-start',
+    backgroundColor: colors.primarySoft,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginTop: 8,
+  },
+  pointsText: { fontFamily: fonts.sansBold, fontSize: 12, color: colors.primaryDeep },
   headerIcons: { flexDirection: 'row', gap: spacing.sm },
   iconBtn: {
     width: 38,

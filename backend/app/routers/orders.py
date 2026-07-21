@@ -38,6 +38,11 @@ async def create_new_order(
     # Sepet birden fazla satıcının ürününü içeriyorsa, burada satıcı başına
     # ayrı bir sipariş oluşur — bu yüzden dönüş değeri her zaman bir listedir.
     orders = await create_order(db, cust_id, payload)
+    # Oyunlaştırma: harcanan her ₺ için 1 puan kazandır
+    earned = int(sum(float(o.total_price) for o in orders))
+    if earned > 0:
+        user.points = (user.points or 0) + earned
+        await db.commit()
     return orders
 
 
@@ -131,6 +136,9 @@ async def cancel_my_order(
             prod.stock += item.quantity
 
     order.gnl_st_id = CANCELLED_STATUS
+    # Sipariş için kazanılan puanı geri al (0'ın altına düşürme)
+    refunded_points = int(float(order.total_price))
+    user.points = max(0, (user.points or 0) - refunded_points)
     await db.commit()
     await db.refresh(order)
     return order

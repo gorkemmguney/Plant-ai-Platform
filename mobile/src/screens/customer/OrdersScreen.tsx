@@ -1,9 +1,11 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   FlatList,
   Modal,
+  PanResponder,
   RefreshControl,
   StyleSheet,
   Text,
@@ -13,6 +15,42 @@ import {
 } from 'react-native';
 import { apiClient } from '../../services/apiClient';
 import { badgeColors, colors, fonts, radius, shadow, spacing } from '../../theme/theme';
+
+// İptal edilen siparişi sola kaydırınca "Gizle" butonu açılır (ek paket gerekmez)
+const HIDE_BTN_W = 92;
+
+function SwipeToHide({ children, onHide }: { children: React.ReactNode; onHide: () => void }) {
+  const translateX = useRef(new Animated.Value(0)).current;
+  const offset = useRef(0); // mevcut dinlenme konumu: 0 (kapalı) veya -HIDE_BTN_W (açık)
+
+  const pan = useRef(
+    PanResponder.create({
+      // Her iki yöndeki yatay hareketi yakala (açmak sola, kapatmak sağa)
+      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 8 && Math.abs(g.dx) > Math.abs(g.dy),
+      onPanResponderMove: (_, g) => {
+        const next = Math.min(0, Math.max(-HIDE_BTN_W, offset.current + g.dx));
+        translateX.setValue(next);
+      },
+      onPanResponderRelease: (_, g) => {
+        const next = offset.current + g.dx;
+        const open = next < -HIDE_BTN_W / 2;
+        offset.current = open ? -HIDE_BTN_W : 0;
+        Animated.spring(translateX, { toValue: offset.current, useNativeDriver: true }).start();
+      },
+    })
+  ).current;
+
+  return (
+    <View style={styles.swipeWrap}>
+      <TouchableOpacity style={styles.hideAction} onPress={onHide} activeOpacity={0.85}>
+        <Text style={styles.hideActionText}>Gizle</Text>
+      </TouchableOpacity>
+      <Animated.View style={{ transform: [{ translateX }] }} {...pan.panHandlers}>
+        {children}
+      </Animated.View>
+    </View>
+  );
+}
 
 interface OrderItemChar {
   gnl_char_id: number;
@@ -55,6 +93,7 @@ export default function OrdersScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<number | null>(null);
+  const [hiddenIds, setHiddenIds] = useState<number[]>([]);
 
   // Değerlendirme (yıldız + yorum) modalı
   const [reviewItem, setReviewItem] = useState<{ prod_id: number; prod_name: string } | null>(null);
@@ -135,7 +174,7 @@ export default function OrdersScreen() {
     const dateText = Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('tr-TR');
     const itemCount = item.items.reduce((sum, i) => sum + i.quantity, 0);
     const expanded = expandedId === item.cust_ord_id;
-    return (
+    const card = (
       <TouchableOpacity
         style={styles.card}
         activeOpacity={0.85}
@@ -151,11 +190,16 @@ export default function OrdersScreen() {
           {itemCount} ürün
         </Text>
         <View style={styles.badgeRow}>
-          <View style={[styles.badge, { backgroundColor: badgeColors.secondary.bg }]}>
-            <Text style={[styles.badgeText, { color: badgeColors.secondary.text }]}>
-              {statusLabels[item.gnl_st_id] ?? 'Durum bilinmiyor'}
-            </Text>
-          </View>
+          {(() => {
+            const sb = item.gnl_st_id === 9 ? badgeColors.red : badgeColors.secondary;
+            return (
+              <View style={[styles.badge, { backgroundColor: sb.bg }]}>
+                <Text style={[styles.badgeText, { color: sb.text }]}>
+                  {statusLabels[item.gnl_st_id] ?? 'Durum bilinmiyor'}
+                </Text>
+              </View>
+            );
+          })()}
           <Text style={styles.detailHint}>{expanded ? 'Gizle ▲' : 'Detay ▼'}</Text>
         </View>
 
@@ -214,6 +258,16 @@ export default function OrdersScreen() {
         )}
       </TouchableOpacity>
     );
+
+    // İptal edilen siparişler sola kaydırılıp "Gizle" ile listeden gizlenebilir
+    if (item.gnl_st_id === 9) {
+      return (
+        <SwipeToHide onHide={() => setHiddenIds((prev) => [...prev, item.cust_ord_id])}>
+          {card}
+        </SwipeToHide>
+      );
+    }
+    return card;
   };
 
   return (
@@ -236,7 +290,7 @@ export default function OrdersScreen() {
         </View>
       ) : (
         <FlatList
-          data={orders}
+          data={orders.filter((o) => !hiddenIds.includes(o.cust_ord_id))}
           keyExtractor={(item) => String(item.cust_ord_id)}
           contentContainerStyle={styles.list}
           renderItem={renderOrder}
@@ -302,6 +356,19 @@ const styles = StyleSheet.create({
   headerSub: { fontFamily: fonts.sans, fontSize: 12.5, color: colors.muted, marginTop: 2 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.md },
   list: { padding: spacing.lg, gap: spacing.md },
+  swipeWrap: { position: 'relative', justifyContent: 'center' },
+  hideAction: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: 92,
+    backgroundColor: colors.red,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hideActionText: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.white },
   card: {
     backgroundColor: colors.card,
     borderRadius: radius.md,

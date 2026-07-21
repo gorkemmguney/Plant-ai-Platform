@@ -12,6 +12,7 @@ class UserOut(BaseModel):
     is_active: bool
     created_at: datetime
     roles: list[str] = []
+    points: int = 0
     seller_status: str = "none"  # 'none' | 'pending' | 'verified' | 'rejected'
     store_name: str | None = None
 
