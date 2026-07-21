@@ -15,6 +15,7 @@ class OrderItemIn(BaseModel):
 class OrderCreateIn(BaseModel):
     sale_cnl_id: int
     items: list[OrderItemIn]
+    coupon_id: int | None = None  # sepette seçilen indirim kuponu (opsiyonel)
 
 
 class OrderItemCharOut(BaseModel):

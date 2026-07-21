@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -86,6 +87,9 @@ const statusLabels: Record<number, string> = {
 // Sadece erken aşamada iptal edilebilir (Alındı, Hazırlanıyor)
 const CANCELLABLE = [5, 6];
 
+// Gizlenen sipariş id'leri cihazda saklanır — ekran yenilense/uygulama kapansa da kalıcı
+const HIDDEN_ORDERS_KEY = 'hidden_order_ids';
+
 export default function OrdersScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -147,6 +151,26 @@ export default function OrdersScreen() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Cihazda saklı gizlenmiş sipariş id'lerini bir kez yükle
+  useEffect(() => {
+    (async () => {
+      try {
+        const stored = await AsyncStorage.getItem(HIDDEN_ORDERS_KEY);
+        if (stored) setHiddenIds(JSON.parse(stored));
+      } catch {
+        // sessizce geç
+      }
+    })();
+  }, []);
+
+  const hideOrder = (id: number) => {
+    setHiddenIds((prev) => {
+      const next = [...prev, id];
+      AsyncStorage.setItem(HIDDEN_ORDERS_KEY, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  };
 
   const handleCancel = (order: Order) => {
     Alert.alert('Siparişi iptal et', `Sipariş #${order.cust_ord_id} iptal edilsin mi?`, [
@@ -262,7 +286,7 @@ export default function OrdersScreen() {
     // İptal edilen siparişler sola kaydırılıp "Gizle" ile listeden gizlenebilir
     if (item.gnl_st_id === 9) {
       return (
-        <SwipeToHide onHide={() => setHiddenIds((prev) => [...prev, item.cust_ord_id])}>
+        <SwipeToHide onHide={() => hideOrder(item.cust_ord_id)}>
           {card}
         </SwipeToHide>
       );

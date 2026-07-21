@@ -118,10 +118,15 @@ export default function HomeScreen({ navigation }: any) {
             <View style={{ flex: 1 }}>
               <Text style={styles.h1}>Merhaba, {displayName}</Text>
               <Text style={styles.headerSub}>Bugün bitkilerine göz atalım 🌿</Text>
-              <View style={styles.pointsPill}>
+              <TouchableOpacity
+                style={styles.pointsPill}
+                activeOpacity={0.8}
+                onPress={() => navigation.navigate('Campaigns')}
+              >
                 <Ionicons name="sparkles" size={12} color={colors.primaryDeep} />
                 <Text style={styles.pointsText}>{points} puan</Text>
-              </View>
+                <Ionicons name="chevron-forward" size={12} color={colors.primaryDeep} />
+              </TouchableOpacity>
             </View>
             <View style={styles.headerIcons}>
               <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Orders')} activeOpacity={0.7}>

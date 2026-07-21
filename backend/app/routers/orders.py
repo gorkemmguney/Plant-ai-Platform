@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import get_user_roles, require_role
 from app.db.session import get_db
+from app.models.campaign import UserCoupon
 from app.models.catalog import Prod
 from app.models.customer import Cust
 from app.models.order import CustOrd, CustOrdItem
@@ -38,7 +39,26 @@ async def create_new_order(
     # Sepet birden fazla satıcının ürününü içeriyorsa, burada satıcı başına
     # ayrı bir sipariş oluşur — bu yüzden dönüş değeri her zaman bir listedir.
     orders = await create_order(db, cust_id, payload)
-    # Oyunlaştırma: harcanan her ₺ için 1 puan kazandır
+
+    # Kupon seçildiyse indirimi ilk siparişe uygula ve kuponu harca
+    if payload.coupon_id is not None:
+        coupon = (
+            await db.execute(
+                select(UserCoupon).where(
+                    UserCoupon.coupon_id == payload.coupon_id,
+                    UserCoupon.user_id == user.user_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if coupon is None or coupon.is_used:
+            raise HTTPException(status_code=400, detail="Kupon geçersiz veya zaten kullanılmış")
+        discount = float(coupon.discount_amount)
+        first = orders[0]
+        first.total_price = max(0.0, float(first.total_price) - discount)
+        coupon.is_used = True
+        await db.commit()
+
+    # Oyunlaştırma: harcanan her ₺ için 1 puan kazandır (indirim sonrası tutar üzerinden)
     earned = int(sum(float(o.total_price) for o in orders))
     if earned > 0:
         user.points = (user.points or 0) + earned

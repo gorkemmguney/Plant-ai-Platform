@@ -4,6 +4,7 @@ from app.models.complaint import Complaint
 from app.models.customer import Cust, Ind, Org
 from app.models.misc import BsnInter, BsnInterSpec, Notification, SchJob, UserPreference
 from app.models.order import CustOrd, CustOrdCharVal, CustOrdItem, CustOrdItemCharVal, SaleCnl
+from app.models.campaign import Campaign, UserCoupon
 from app.models.review import Review
 from app.models.user import AppUser, Role, UserRole
 
@@ -14,5 +15,5 @@ __all__ = [
     "SaleCnl", "CustOrd", "CustOrdItem", "CustOrdCharVal", "CustOrdItemCharVal",
     "AiChat", "AiMessage", "AiImageAnalysis", "AiRecommendation", "AiFeedback",
     "Notification", "BsnInter", "BsnInterSpec", "SchJob", "UserPreference",
-    "Complaint", "Review",
+    "Complaint", "Review", "Campaign", "UserCoupon",
 ]

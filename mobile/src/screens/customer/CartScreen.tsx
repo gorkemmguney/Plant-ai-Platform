@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -15,9 +16,35 @@ import { colors, fonts, radius, shadow, spacing } from '../../theme/theme';
 // Seed ile eklenen varsayılan satış kanalı (sale_cnl_id = 1: "Mobil Uygulama")
 const SALE_CHANNEL_ID = 1;
 
+interface Coupon {
+  coupon_id: number;
+  code: string;
+  discount_amount: number;
+}
+
 export default function CartScreen({ navigation }: any) {
   const { items, total, changeQty, clearCart } = useCart();
   const [placing, setPlacing] = useState(false);
+
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [selectedCouponId, setSelectedCouponId] = useState<number | null>(null);
+
+  const loadCoupons = useCallback(async () => {
+    try {
+      const { data } = await apiClient.get<Coupon[]>('/coupons/mine');
+      setCoupons(data);
+    } catch {
+      setCoupons([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadCoupons();
+  }, [loadCoupons]);
+
+  const selectedCoupon = coupons.find((c) => c.coupon_id === selectedCouponId) ?? null;
+  const discount = selectedCoupon ? Number(selectedCoupon.discount_amount) : 0;
+  const finalTotal = Math.max(0, total - discount);
 
   // Sipariş için müşteri profili gerekli; yoksa otomatik oluştur (bireysel)
   const ensureCustomerProfile = async () => {
@@ -39,6 +66,7 @@ export default function CartScreen({ navigation }: any) {
       await ensureCustomerProfile();
       await apiClient.post('/orders', {
         sale_cnl_id: SALE_CHANNEL_ID,
+        coupon_id: selectedCouponId,
         items: items.map((i) => ({
           prod_id: i.product.prod_id,
           quantity: i.quantity,
@@ -46,6 +74,8 @@ export default function CartScreen({ navigation }: any) {
         })),
       });
       clearCart();
+      setSelectedCouponId(null);
+      loadCoupons();
       Alert.alert('Sipariş alındı 🎉', 'Siparişin oluşturuldu.', [
         { text: 'Siparişlerim', onPress: () => navigation.navigate('Orders') },
         { text: 'Tamam' },
@@ -121,9 +151,44 @@ export default function CartScreen({ navigation }: any) {
       />
 
       <View style={styles.footer}>
+        {coupons.length > 0 && (
+          <View style={styles.couponSection}>
+            <Text style={styles.couponTitle}>Kampanyalarım</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.couponRow}>
+              {coupons.map((c) => {
+                const active = c.coupon_id === selectedCouponId;
+                return (
+                  <TouchableOpacity
+                    key={c.coupon_id}
+                    style={[styles.couponChip, active && styles.couponChipActive]}
+                    onPress={() => setSelectedCouponId(active ? null : c.coupon_id)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.couponChipText, active && styles.couponChipTextActive]}>
+                      ₺{Number(c.discount_amount).toFixed(0)} indirim
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
+
+        {discount > 0 && (
+          <>
+            <View style={styles.totalRow}>
+              <Text style={styles.subLabel}>Ara toplam</Text>
+              <Text style={styles.subValue}>₺{total.toFixed(2)}</Text>
+            </View>
+            <View style={styles.totalRow}>
+              <Text style={styles.discountLabel}>İndirim</Text>
+              <Text style={styles.discountValue}>−₺{discount.toFixed(2)}</Text>
+            </View>
+          </>
+        )}
         <View style={styles.totalRow}>
           <Text style={styles.totalLabel}>Toplam</Text>
-          <Text style={styles.totalValue}>₺{total.toFixed(2)}</Text>
+          <Text style={styles.totalValue}>₺{finalTotal.toFixed(2)}</Text>
         </View>
         <TouchableOpacity
           style={[styles.checkoutButton, placing && styles.checkoutDisabled]}
@@ -199,7 +264,25 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
     gap: spacing.md,
   },
+  couponSection: { gap: spacing.sm },
+  couponTitle: { fontFamily: fonts.sansSemi, fontSize: 13, color: colors.muted },
+  couponRow: { gap: spacing.sm, paddingBottom: 2 },
+  couponChip: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.full,
+    paddingVertical: 8,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.card,
+  },
+  couponChipActive: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
+  couponChipText: { fontFamily: fonts.sansBold, fontSize: 12.5, color: colors.muted },
+  couponChipTextActive: { color: colors.primaryDeep },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  subLabel: { fontFamily: fonts.sans, fontSize: 13, color: colors.muted },
+  subValue: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.ink },
+  discountLabel: { fontFamily: fonts.sans, fontSize: 13, color: colors.primaryDeep },
+  discountValue: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.primaryDeep },
   totalLabel: { fontFamily: fonts.sansSemi, fontSize: 14, color: colors.muted },
   totalValue: { fontFamily: fonts.display, fontSize: 20, color: colors.ink },
   checkoutButton: {
