@@ -8,6 +8,7 @@ from app.models.bundle import Bundle, BundleItem
 from app.models.campaign import Campaign, UserCoupon
 from app.models.review import Review
 from app.models.user import AppUser, Role, UserRole
+from app.models.community import CommunityPost, CommunityLike, CommunityComment
 
 __all__ = [
     "AppUser", "Role", "UserRole",
@@ -17,4 +18,5 @@ __all__ = [
     "AiChat", "AiMessage", "AiImageAnalysis", "AiRecommendation", "AiFeedback",
     "Notification", "BsnInter", "BsnInterSpec", "SchJob", "UserPreference",
     "Complaint", "Review", "Campaign", "UserCoupon", "Bundle", "BundleItem",
+    "CommunityPost", "CommunityLike", "CommunityComment",
 ]

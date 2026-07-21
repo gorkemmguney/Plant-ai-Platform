@@ -39,10 +39,11 @@ async def get_current_user(
         email_result = await db.execute(select(AppUser).where(AppUser.email == email))
         existing_user = email_result.scalar_one_or_none()
 
+        default_name = (email.split("@")[0].capitalize() if email and "@" in email else "Bitki Sever")
         if existing_user is not None:
             existing_user.firebase_uid = firebase_uid
-            if not existing_user.first_name or existing_user.first_name == "İsimsiz":
-                existing_user.first_name = first_name or "İsimsiz"
+            if not existing_user.first_name or existing_user.first_name.lower() in ("isimsiz", "i̇simsiz"):
+                existing_user.first_name = first_name or default_name
             if not existing_user.last_name:
                 existing_user.last_name = last_name or ""
             await db.commit()
@@ -52,7 +53,7 @@ async def get_current_user(
             user = AppUser(
                 firebase_uid=firebase_uid,
                 email=email,
-                first_name=first_name or "İsimsiz",
+                first_name=first_name or default_name,
                 last_name=last_name or "",
                 is_active=True,
             )

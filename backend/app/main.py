@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
-from app.routers import admin, ai, auth, bundles, campaigns, catalog, complaints, coupons, customers, notifications, orders, reviews
+from app.routers import admin, ai, auth, bundles, campaigns, catalog, community, complaints, coupons, customers, notifications, orders, reviews
 settings = get_settings()
 
 app = FastAPI(
@@ -33,6 +33,7 @@ app.include_router(reviews.router)
 app.include_router(campaigns.router)
 app.include_router(coupons.router)
 app.include_router(bundles.router)
+app.include_router(community.router)
 
 
 @app.get("/health")
