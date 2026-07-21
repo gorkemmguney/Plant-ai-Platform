@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Modal,
   Pressable,
@@ -30,10 +31,37 @@ interface Product {
   description: string | null;
   price: string | number;
   stock: number;
+  category: string;
   seller_id: number | null;
   seller_name: string | null;
   characteristics: ProductCharacteristic[];
 }
+
+interface BundleItem {
+  prod_id: number;
+  name: string;
+  price: number;
+  quantity: number;
+  stock: number;
+  seller_id: number | null;
+  seller_name: string | null;
+}
+
+interface Bundle {
+  bundle_id: number;
+  title: string;
+  description: string | null;
+  total_price: number;
+  items: BundleItem[];
+}
+
+// Ürünler ekranı sekmeleri
+type Segment = 'plant' | 'supply' | 'bundles';
+const SEGMENTS: { key: Segment; label: string }[] = [
+  { key: 'plant', label: 'Çiçekler' },
+  { key: 'supply', label: 'Malzemeler' },
+  { key: 'bundles', label: 'Paketler' },
+];
 
 interface CharacteristicOption {
   gnl_char_id: number;
@@ -67,6 +95,11 @@ export default function MarketplaceScreen({ navigation }: any) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [segment, setSegment] = useState<Segment>('plant');
+
+  // Paketler sekmesi
+  const [bundles, setBundles] = useState<Bundle[]>([]);
+  const [bundlesLoaded, setBundlesLoaded] = useState(false);
 
   // Sepete ekle modalı
   const [selected, setSelected] = useState<Product | null>(null);
@@ -145,6 +178,60 @@ export default function MarketplaceScreen({ navigation }: any) {
     loadProducts();
   }, [loadProducts]);
 
+  // Paketleri ilk kez "Paketler" sekmesine geçilince yükle
+  const loadBundles = useCallback(async () => {
+    try {
+      const { data } = await apiClient.get<Bundle[]>('/bundles');
+      setBundles(data);
+    } catch {
+      setBundles([]);
+    } finally {
+      setBundlesLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (segment === 'bundles' && !bundlesLoaded) loadBundles();
+  }, [segment, bundlesLoaded, loadBundles]);
+
+  // Paketi sepete ekle: içindeki tüm ürünleri güncel bilgiyle sepete atar
+  const addBundleToCart = (bundle: Bundle) => {
+    let added = 0;
+    let skipped = 0;
+    bundle.items.forEach((it) => {
+      if (it.stock <= 0) {
+        skipped += 1;
+        return;
+      }
+      const qtyToAdd = Math.min(it.quantity, it.stock);
+      addToCart(
+        {
+          prod_id: it.prod_id,
+          name: it.name,
+          price: it.price,
+          stock: it.stock,
+          seller_id: it.seller_id,
+          seller_name: it.seller_name,
+        },
+        qtyToAdd,
+        []
+      );
+      added += 1;
+    });
+    if (added === 0) {
+      Alert.alert('Eklenemedi', 'Bu paketteki ürünler şu an stokta yok.');
+    } else {
+      Alert.alert(
+        'Sepete eklendi 🛒',
+        skipped > 0 ? `${added} ürün eklendi, ${skipped} ürün stokta yok.` : `${bundle.title} sepete eklendi.`,
+        [
+          { text: 'Sepete git', onPress: () => navigation.navigate('Cart') },
+          { text: 'Tamam' },
+        ]
+      );
+    }
+  };
+
   useEffect(() => {
     apiClient
       .get<CharacteristicOption[]>('/catalog/characteristics')
@@ -166,7 +253,9 @@ export default function MarketplaceScreen({ navigation }: any) {
 
   // Arama -> karakteristik filtresi -> sıralama (bu sırayla, hepsi client-side)
   const visibleProducts = useMemo(() => {
-    let list = products.filter((p) => p.name.toLowerCase().includes(query.trim().toLowerCase()));
+    let list = products.filter(
+      (p) => p.category === segment && p.name.toLowerCase().includes(query.trim().toLowerCase())
+    );
 
     if (activeFilterCount > 0) {
       list = list.filter((p) =>
@@ -184,7 +273,7 @@ export default function MarketplaceScreen({ navigation }: any) {
     }
 
     return list;
-  }, [products, query, activeCharFilters, activeFilterCount, sortMode]);
+  }, [products, segment, query, activeCharFilters, activeFilterCount, sortMode]);
 
   const toggleFilterValue = (charId: number, valId: number) => {
     setActiveCharFilters((prev) => {
@@ -239,6 +328,33 @@ export default function MarketplaceScreen({ navigation }: any) {
     );
   };
 
+  const renderBundle = ({ item }: { item: Bundle }) => (
+    <View style={styles.bundleCard}>
+      <Text style={styles.bundleTitle}>{item.title}</Text>
+      {!!item.description && <Text style={styles.bundleDesc}>{item.description}</Text>}
+      <View style={styles.bundleItems}>
+        {item.items.map((it) => (
+          <View key={it.prod_id} style={styles.bundleItemRow}>
+            <Text style={styles.bundleItemName} numberOfLines={1}>
+              🌿 {it.name}
+              {it.quantity > 1 ? ` × ${it.quantity}` : ''}
+            </Text>
+            <Text style={styles.bundleItemPrice}>₺{Number(it.price).toFixed(2)}</Text>
+          </View>
+        ))}
+      </View>
+      <View style={styles.bundleFooter}>
+        <View>
+          <Text style={styles.bundleTotalLabel}>Paket toplamı</Text>
+          <Text style={styles.bundleTotal}>₺{Number(item.total_price).toFixed(2)}</Text>
+        </View>
+        <TouchableOpacity style={styles.bundleAddBtn} onPress={() => addBundleToCart(item)} activeOpacity={0.85}>
+          <Text style={styles.bundleAddText}>Sepete Ekle</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
@@ -257,39 +373,74 @@ export default function MarketplaceScreen({ navigation }: any) {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.toolbarRow}>
-          <TouchableOpacity
-            style={styles.toolbarBtn}
-            onPress={() => {
-              setFilterDrillChar(null);
-              setFilterModalVisible(true);
-            }}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="options-outline" size={15} color={colors.ink} />
-            <Text style={styles.toolbarBtnText}>
-              Filtrele{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.toolbarBtn} onPress={() => setSortModalVisible(true)} activeOpacity={0.8}>
-            <Ionicons name="swap-vertical-outline" size={15} color={colors.ink} />
-            <Text style={styles.toolbarBtnText}>{SORT_LABELS[sortMode]}</Text>
-          </TouchableOpacity>
+        {/* Sekmeler: Çiçekler / Malzemeler / Paketler */}
+        <View style={styles.segmentRow}>
+          {SEGMENTS.map((s) => {
+            const active = segment === s.key;
+            return (
+              <TouchableOpacity
+                key={s.key}
+                style={[styles.segmentBtn, active && styles.segmentBtnActive]}
+                onPress={() => setSegment(s.key)}
+                activeOpacity={0.85}
+              >
+                <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{s.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
-        <View style={styles.searchBar}>
-          <Text style={styles.searchIcon}>⌕</Text>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Ürün ara"
-            placeholderTextColor={colors.muted2}
-            value={query}
-            onChangeText={setQuery}
-          />
-        </View>
+        {segment !== 'bundles' && (
+          <>
+            <View style={styles.toolbarRow}>
+              <TouchableOpacity
+                style={styles.toolbarBtn}
+                onPress={() => {
+                  setFilterDrillChar(null);
+                  setFilterModalVisible(true);
+                }}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="options-outline" size={15} color={colors.ink} />
+                <Text style={styles.toolbarBtnText}>
+                  Filtrele{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.toolbarBtn} onPress={() => setSortModalVisible(true)} activeOpacity={0.8}>
+                <Ionicons name="swap-vertical-outline" size={15} color={colors.ink} />
+                <Text style={styles.toolbarBtnText}>{SORT_LABELS[sortMode]}</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.searchBar}>
+              <Text style={styles.searchIcon}>⌕</Text>
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Ürün ara"
+                placeholderTextColor={colors.muted2}
+                value={query}
+                onChangeText={setQuery}
+              />
+            </View>
+          </>
+        )}
       </View>
 
-      {loading ? (
+      {segment === 'bundles' ? (
+        !bundlesLoaded ? (
+          <View style={styles.center}>
+            <ActivityIndicator size="large" color={colors.buttonPrimary} />
+          </View>
+        ) : (
+          <FlatList
+            data={bundles}
+            keyExtractor={(item) => String(item.bundle_id)}
+            contentContainerStyle={styles.list}
+            renderItem={renderBundle}
+            ListEmptyComponent={<Text style={styles.emptyText}>Şu an hazır paket yok.</Text>}
+          />
+        )
+      ) : loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={colors.buttonPrimary} />
         </View>
@@ -319,6 +470,8 @@ export default function MarketplaceScreen({ navigation }: any) {
             <Text style={styles.emptyText}>
               {query.trim() || activeFilterCount > 0
                 ? 'Bu kriterlere uyan ürün bulunamadı.'
+                : segment === 'supply'
+                ? 'Henüz malzeme ürünü yok.'
                 : 'Henüz ürün yok. Satıcılar ekledikçe burada görünür.'}
             </Text>
           }
@@ -574,6 +727,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   cartBadgeText: { fontFamily: fonts.sansBold, fontSize: 10, color: colors.white },
+  segmentRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: spacing.md,
+    backgroundColor: colors.bgAlt,
+    borderRadius: radius.full,
+    padding: 4,
+  },
+  segmentBtn: { flex: 1, paddingVertical: 9, borderRadius: radius.full, alignItems: 'center' },
+  segmentBtnActive: { backgroundColor: colors.buttonPrimary },
+  segmentText: { fontFamily: fonts.sansSemi, fontSize: 13, color: colors.muted },
+  segmentTextActive: { color: colors.buttonPrimaryText, fontFamily: fonts.sansBold },
   toolbarRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
   toolbarBtn: {
     flexDirection: 'row',
@@ -642,6 +807,46 @@ const styles = StyleSheet.create({
   },
   buyButtonDisabled: { backgroundColor: colors.border },
   buyButtonText: { fontFamily: fonts.sansBold, fontSize: 12, color: colors.buttonPrimaryText },
+  // Paket kartı
+  bundleCard: {
+    backgroundColor: colors.card,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+    ...shadow.sm,
+  },
+  bundleTitle: { fontFamily: fonts.sansBold, fontSize: 15.5, color: colors.ink },
+  bundleDesc: { fontFamily: fonts.sans, fontSize: 12.5, color: colors.muted, marginTop: 3, lineHeight: 18 },
+  bundleItems: {
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderSoft,
+    gap: spacing.sm,
+  },
+  bundleItemRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  bundleItemName: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.ink, flex: 1, marginRight: spacing.sm },
+  bundleItemPrice: { fontFamily: fonts.sansMedium, fontSize: 12.5, color: colors.muted },
+  bundleFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderSoft,
+  },
+  bundleTotalLabel: { fontFamily: fonts.sans, fontSize: 11.5, color: colors.muted },
+  bundleTotal: { fontFamily: fonts.display, fontSize: 18, color: colors.primaryDeep },
+  bundleAddBtn: {
+    backgroundColor: colors.buttonPrimary,
+    borderRadius: radius.full,
+    paddingVertical: 11,
+    paddingHorizontal: spacing.lg,
+    alignItems: 'center',
+  },
+  bundleAddText: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.buttonPrimaryText },
   errorText: { fontFamily: fonts.sans, fontSize: 13.5, color: colors.muted, textAlign: 'center', lineHeight: 20 },
   retryButton: {
     borderWidth: 1,

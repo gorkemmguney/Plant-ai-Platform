@@ -49,6 +49,7 @@ def _product_out(
         stock=prod.stock,
         gnl_st_id=prod.gnl_st_id,
         prod_spec_id=prod.prod_spec_id,
+        category=prod.category,
         seller_id=prod.seller_id,
         seller_name=_display_name(store_name, first, last),
         characteristics=characteristics or [],
@@ -219,6 +220,7 @@ async def list_products(
     char_value_ids: str | None = Query(
         default=None, description="Virgülle ayrılmış gnl_char_val_id listesi (AND mantığı), ör: 3,7"
     ),
+    category: str | None = Query(default=None, description="Ürün kategorisi filtresi: 'plant' veya 'supply'"),
     db: AsyncSession = Depends(get_db),
 ):
     query = (
@@ -231,6 +233,9 @@ async def list_products(
             AppUser.is_active.is_(True),
         )
     )
+
+    if category:
+        query = query.where(Prod.category == category)
 
     if char_value_ids:
         try:
