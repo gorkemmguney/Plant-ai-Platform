@@ -112,6 +112,9 @@ export default function HomeScreen({ navigation }: any) {
               <Text style={styles.headerSub}>Bugün bitkilerine göz atalım 🌿</Text>
             </View>
             <View style={styles.headerIcons}>
+              <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Orders')} activeOpacity={0.7}>
+                <Ionicons name="receipt-outline" size={18} color={colors.ink} />
+              </TouchableOpacity>
               <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Cart')} activeOpacity={0.7}>
                 <Ionicons name="cart-outline" size={18} color={colors.ink} />
                 {count > 0 && (

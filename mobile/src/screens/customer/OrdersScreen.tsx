@@ -3,9 +3,11 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Modal,
   RefreshControl,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -53,6 +55,39 @@ export default function OrdersScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<number | null>(null);
+
+  // Değerlendirme (yıldız + yorum) modalı
+  const [reviewItem, setReviewItem] = useState<{ prod_id: number; prod_name: string } | null>(null);
+  const [stars, setStars] = useState(0);
+  const [comment, setComment] = useState('');
+  const [savingReview, setSavingReview] = useState(false);
+
+  const openReview = (prod_id: number, prod_name: string) => {
+    setReviewItem({ prod_id, prod_name });
+    setStars(0);
+    setComment('');
+  };
+
+  const submitReview = async () => {
+    if (!reviewItem || stars < 1) {
+      Alert.alert('Puan gerekli', 'Lütfen 1-5 arası yıldız ver.');
+      return;
+    }
+    setSavingReview(true);
+    try {
+      await apiClient.post('/reviews', {
+        prod_id: reviewItem.prod_id,
+        rating: stars,
+        comment: comment.trim() || null,
+      });
+      setReviewItem(null);
+      Alert.alert('Teşekkürler 🌿', 'Değerlendirmen kaydedildi.');
+    } catch (err: any) {
+      Alert.alert('Kaydedilemedi', err?.response?.data?.detail ?? 'Değerlendirme kaydedilemedi.');
+    } finally {
+      setSavingReview(false);
+    }
+  };
 
   const load = useCallback(async () => {
     try {
@@ -129,16 +164,27 @@ export default function OrdersScreen() {
             {item.items.map((it) => {
               const variantLabel = (it.char_values ?? []).map((c) => c.value).join(' · ');
               return (
-                <View key={it.cust_ord_item_id} style={styles.itemRow}>
-                  <View style={{ flex: 1, marginRight: spacing.sm }}>
-                    <Text style={styles.itemName} numberOfLines={1}>
-                      {it.prod_name} × {it.quantity}
-                    </Text>
-                    {variantLabel ? (
-                      <Text style={styles.itemVariant} numberOfLines={1}>{variantLabel}</Text>
-                    ) : null}
+                <View key={it.cust_ord_item_id} style={styles.itemBlock}>
+                  <View style={styles.itemRow}>
+                    <View style={{ flex: 1, marginRight: spacing.sm }}>
+                      <Text style={styles.itemName} numberOfLines={1}>
+                        {it.prod_name} × {it.quantity}
+                      </Text>
+                      {variantLabel ? (
+                        <Text style={styles.itemVariant} numberOfLines={1}>{variantLabel}</Text>
+                      ) : null}
+                    </View>
+                    <Text style={styles.itemPrice}>₺{(Number(it.unit_price) * it.quantity).toFixed(2)}</Text>
                   </View>
-                  <Text style={styles.itemPrice}>₺{(Number(it.unit_price) * it.quantity).toFixed(2)}</Text>
+                  {it.prod_id != null && (
+                    <TouchableOpacity
+                      style={styles.rateBtn}
+                      onPress={() => openReview(it.prod_id as number, it.prod_name)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.rateBtnText}>⭐ Değerlendir</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               );
             })}
@@ -199,13 +245,52 @@ export default function OrdersScreen() {
           ListEmptyComponent={<Text style={styles.emptyText}>Henüz siparişin yok. Mağaza'dan alışverişe başla!</Text>}
         />
       )}
+
+      <Modal visible={reviewItem !== null} transparent animationType="fade" onRequestClose={() => setReviewItem(null)}>
+        <View style={styles.modalWrap}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle} numberOfLines={2}>{reviewItem?.prod_name}</Text>
+            <Text style={styles.modalSub}>Bu ürünü değerlendir</Text>
+
+            <View style={styles.starsRow}>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <TouchableOpacity key={n} onPress={() => setStars(n)} activeOpacity={0.7}>
+                  <Text style={[styles.star, n <= stars ? styles.starOn : styles.starOff]}>★</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TextInput
+              style={styles.commentInput}
+              value={comment}
+              onChangeText={setComment}
+              placeholder="Yorumun (isteğe bağlı)"
+              placeholderTextColor={colors.muted2}
+              multiline
+            />
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => setReviewItem(null)} disabled={savingReview}>
+                <Text style={styles.modalCancelText}>Vazgeç</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalSave} onPress={submitReview} disabled={savingReview}>
+                {savingReview ? (
+                  <ActivityIndicator size="small" color={colors.white} />
+                ) : (
+                  <Text style={styles.modalSaveText}>Gönder</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  header: { paddingTop: 56, paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
+  header: { paddingTop: 16, paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
   headerTitle: { fontFamily: fonts.display, fontSize: 24, color: colors.ink },
   headerSub: { fontFamily: fonts.sans, fontSize: 12.5, color: colors.muted, marginTop: 2 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.md },
@@ -233,8 +318,11 @@ const styles = StyleSheet.create({
     borderTopColor: colors.borderSoft,
     gap: spacing.sm,
   },
+  itemBlock: { gap: 6 },
   itemRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   itemName: { fontFamily: fonts.sans, fontSize: 13, color: colors.ink },
+  rateBtn: { alignSelf: 'flex-start' },
+  rateBtnText: { fontFamily: fonts.sansBold, fontSize: 12, color: colors.primaryDeep },
   itemVariant: { fontFamily: fonts.sansMedium, fontSize: 11, color: colors.muted2, marginTop: 1 },
   itemPrice: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.muted },
   cancelOrderBtn: {
@@ -256,4 +344,42 @@ const styles = StyleSheet.create({
   },
   retryText: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.ink },
   emptyText: { fontFamily: fonts.sans, fontSize: 13, color: colors.muted, textAlign: 'center', marginTop: spacing.xl },
+  modalWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', padding: spacing.xl },
+  modalCard: { backgroundColor: colors.bg, borderRadius: radius.lg, padding: spacing.xl },
+  modalTitle: { fontFamily: fonts.display, fontSize: 18, color: colors.ink },
+  modalSub: { fontFamily: fonts.sans, fontSize: 13, color: colors.muted, marginTop: 2 },
+  starsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg, marginBottom: spacing.lg },
+  star: { fontSize: 38 },
+  starOn: { color: '#f5a524' },
+  starOff: { color: colors.border },
+  commentInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    minHeight: 70,
+    textAlignVertical: 'top',
+    fontFamily: fonts.sans,
+    fontSize: 14,
+    color: colors.ink,
+    backgroundColor: colors.card,
+  },
+  modalActions: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg },
+  modalCancel: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  modalCancelText: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.ink },
+  modalSave: {
+    flex: 1.3,
+    backgroundColor: colors.buttonPrimary,
+    borderRadius: radius.md,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  modalSaveText: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.buttonPrimaryText },
 });
