@@ -14,8 +14,19 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useCart } from '../../context/CartContext';
 import { apiClient } from '../../services/apiClient';
 import { badgeColors, colors, fonts, radius, shadow, spacing } from '../../theme/theme';
+
+// Katalogdaki güncel ürün (fiyat/stok/mağaza) — tekrar sipariş için gerekli
+interface CatalogProduct {
+  prod_id: number;
+  name: string;
+  price: string | number;
+  stock: number;
+  seller_id: number | null;
+  seller_name: string | null;
+}
 
 // İptal edilen siparişi sola kaydırınca "Gizle" butonu açılır (ek paket gerekmez)
 const HIDE_BTN_W = 92;
@@ -90,13 +101,15 @@ const CANCELLABLE = [5, 6];
 // Gizlenen sipariş id'leri cihazda saklanır — ekran yenilense/uygulama kapansa da kalıcı
 const HIDDEN_ORDERS_KEY = 'hidden_order_ids';
 
-export default function OrdersScreen() {
+export default function OrdersScreen({ navigation }: any) {
+  const { addToCart } = useCart();
   const [orders, setOrders] = useState<Order[]>([]);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<number | null>(null);
+  const [reorderingId, setReorderingId] = useState<number | null>(null);
   const [hiddenIds, setHiddenIds] = useState<number[]>([]);
 
   // Değerlendirme (yıldız + yorum) modalı
@@ -170,6 +183,54 @@ export default function OrdersScreen() {
       AsyncStorage.setItem(HIDDEN_ORDERS_KEY, JSON.stringify(next)).catch(() => {});
       return next;
     });
+  };
+
+  // Tekrar sipariş: siparişteki ürünleri güncel fiyat/stokla sepete ekler
+  const handleReorder = async (order: Order) => {
+    setReorderingId(order.cust_ord_id);
+    try {
+      const { data: products } = await apiClient.get<CatalogProduct[]>('/catalog/products');
+      const byId = new Map(products.map((p) => [p.prod_id, p]));
+      let added = 0;
+      let skipped = 0;
+      for (const it of order.items) {
+        const p = it.prod_id != null ? byId.get(it.prod_id) : undefined;
+        if (!p || p.stock <= 0) {
+          skipped += 1;
+          continue;
+        }
+        const qty = Math.min(it.quantity, p.stock);
+        addToCart(
+          {
+            prod_id: p.prod_id,
+            name: p.name,
+            price: p.price,
+            stock: p.stock,
+            seller_id: p.seller_id,
+            seller_name: p.seller_name,
+          },
+          qty,
+          []
+        );
+        added += 1;
+      }
+      if (added === 0) {
+        Alert.alert('Eklenemedi', 'Bu siparişteki ürünler artık satışta değil.');
+      } else {
+        Alert.alert(
+          'Sepete eklendi 🛒',
+          skipped > 0 ? `${added} ürün eklendi, ${skipped} ürün artık mevcut değil.` : `${added} ürün sepete eklendi.`,
+          [
+            { text: 'Sepete git', onPress: () => navigation.navigate('Cart') },
+            { text: 'Tamam' },
+          ]
+        );
+      }
+    } catch (err: any) {
+      Alert.alert('Hata', err?.response?.data?.detail ?? 'Ürünler yüklenemedi.');
+    } finally {
+      setReorderingId(null);
+    }
   };
 
   const handleCancel = (order: Order) => {
@@ -263,6 +324,19 @@ export default function OrdersScreen() {
                 </View>
               );
             })}
+
+            <TouchableOpacity
+              style={styles.reorderBtn}
+              onPress={() => handleReorder(item)}
+              disabled={reorderingId === item.cust_ord_id}
+              activeOpacity={0.85}
+            >
+              {reorderingId === item.cust_ord_id ? (
+                <ActivityIndicator size="small" color={colors.buttonPrimaryText} />
+              ) : (
+                <Text style={styles.reorderText}>🔁 Tekrar Sipariş Ver</Text>
+              )}
+            </TouchableOpacity>
 
             {CANCELLABLE.includes(item.gnl_st_id) && (
               <TouchableOpacity
@@ -441,6 +515,14 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   cancelOrderText: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.red },
+  reorderBtn: {
+    backgroundColor: colors.buttonPrimary,
+    borderRadius: radius.sm,
+    paddingVertical: 11,
+    alignItems: 'center',
+    marginTop: spacing.sm,
+  },
+  reorderText: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.buttonPrimaryText },
   errorText: { fontFamily: fonts.sans, fontSize: 13.5, color: colors.muted, textAlign: 'center', lineHeight: 20 },
   retryButton: {
     borderWidth: 1,
