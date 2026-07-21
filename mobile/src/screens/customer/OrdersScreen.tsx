@@ -159,6 +159,22 @@ export default function OrdersScreen() {
           <Text style={styles.detailHint}>{expanded ? 'Gizle ▲' : 'Detay ▼'}</Text>
         </View>
 
+        {/* Değerlendir — durum satırının hemen altında, her zaman görünür */}
+        <View style={styles.rateSection}>
+          {item.items
+            .filter((it) => it.prod_id != null)
+            .map((it) => (
+              <TouchableOpacity
+                key={`rate-${it.cust_ord_item_id}`}
+                style={styles.rateRowBtn}
+                onPress={() => openReview(it.prod_id as number, it.prod_name)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.rateRowText} numberOfLines={1}>⭐ Değerlendir — {it.prod_name}</Text>
+              </TouchableOpacity>
+            ))}
+        </View>
+
         {expanded && (
           <View style={styles.itemsBox}>
             {item.items.map((it) => {
@@ -176,15 +192,6 @@ export default function OrdersScreen() {
                     </View>
                     <Text style={styles.itemPrice}>₺{(Number(it.unit_price) * it.quantity).toFixed(2)}</Text>
                   </View>
-                  {it.prod_id != null && (
-                    <TouchableOpacity
-                      style={styles.rateBtn}
-                      onPress={() => openReview(it.prod_id as number, it.prod_name)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.rateBtnText}>⭐ Değerlendir</Text>
-                    </TouchableOpacity>
-                  )}
                 </View>
               );
             })}
@@ -321,8 +328,17 @@ const styles = StyleSheet.create({
   itemBlock: { gap: 6 },
   itemRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   itemName: { fontFamily: fonts.sans, fontSize: 13, color: colors.ink },
-  rateBtn: { alignSelf: 'flex-start' },
-  rateBtnText: { fontFamily: fonts.sansBold, fontSize: 12, color: colors.primaryDeep },
+  rateSection: { marginTop: spacing.sm, gap: spacing.xs },
+  rateRowBtn: {
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: radius.sm,
+    paddingVertical: 9,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+    backgroundColor: colors.primarySoft,
+  },
+  rateRowText: { fontFamily: fonts.sansBold, fontSize: 12.5, color: colors.primaryDeep },
   itemVariant: { fontFamily: fonts.sansMedium, fontSize: 11, color: colors.muted2, marginTop: 1 },
   itemPrice: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.muted },
   cancelOrderBtn: {

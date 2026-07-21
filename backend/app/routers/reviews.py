@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import get_user_roles, require_role
+from app.core.security import get_current_user, get_user_roles, require_role
 from app.db.session import get_db
 from app.models.catalog import Prod
 from app.models.customer import Cust
@@ -74,6 +74,25 @@ async def create_review(
     await db.commit()
     await db.refresh(review)
     return _review_out(review, user.first_name, user.last_name)
+
+
+@router.get("/mine", response_model=list[ReviewOut])
+async def my_reviews(
+    db: AsyncSession = Depends(get_db),
+    user: AppUser = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(Review, Prod.name)
+        .join(Prod, Prod.prod_id == Review.prod_id)
+        .where(Review.user_id == user.user_id)
+        .order_by(Review.created_at.desc())
+    )
+    out: list[ReviewOut] = []
+    for review, prod_name in result.all():
+        item = _review_out(review, user.first_name, user.last_name)
+        item.prod_name = prod_name
+        out.append(item)
+    return out
 
 
 @router.get("/product/{prod_id}", response_model=ReviewSummaryOut)

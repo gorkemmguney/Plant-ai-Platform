@@ -23,6 +23,7 @@ class ReviewOut(BaseModel):
     seller_reply: str | None = None
     created_at: datetime
     reviewer_name: str | None = None
+    prod_name: str | None = None
 
 
 class ReviewSummaryOut(BaseModel):

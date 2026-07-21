@@ -28,7 +28,7 @@ const sellerStatusInfo: Record<string, { label: string; badge: keyof typeof badg
   rejected: { label: 'Reddedildi', badge: 'red' },
 };
 
-export default function SettingsScreen() {
+export default function SettingsScreen({ navigation }: any) {
   const { firebaseUser, roles, sellerStatus, firstName, lastName, refreshProfile, chooseRole } = useAuth();
   const sellerInfo = sellerStatusInfo[sellerStatus];
 
@@ -117,6 +117,24 @@ export default function SettingsScreen() {
               </View>
             </View>
           )}
+        </View>
+
+        <View style={styles.menuCard}>
+          <TouchableOpacity style={styles.menuRow} onPress={() => navigation.navigate('Orders')} activeOpacity={0.7}>
+            <View style={styles.menuLeft}>
+              <Ionicons name="receipt-outline" size={18} color={colors.ink} />
+              <Text style={styles.menuText}>Siparişlerim</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.muted2} />
+          </TouchableOpacity>
+          <View style={styles.menuDivider} />
+          <TouchableOpacity style={styles.menuRow} onPress={() => navigation.navigate('MyReviews')} activeOpacity={0.7}>
+            <View style={styles.menuLeft}>
+              <Ionicons name="star-outline" size={18} color={colors.ink} />
+              <Text style={styles.menuText}>Değerlendirmelerim</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.muted2} />
+          </TouchableOpacity>
         </View>
 
         {roles.length > 1 && (
@@ -271,12 +289,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   saveText: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.buttonPrimaryText },
+  menuCard: {
+    backgroundColor: colors.card,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.lg,
+    ...shadow.sm,
+    marginBottom: spacing.lg,
+  },
   menuRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: spacing.xs,
+    paddingVertical: 15,
   },
+  menuLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  menuDivider: { height: 1, backgroundColor: colors.borderSoft },
   menuText: {
     fontFamily: fonts.sansMedium,
     fontSize: 14,
