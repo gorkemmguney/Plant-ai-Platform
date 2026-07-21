@@ -20,6 +20,8 @@ interface Campaign {
   description: string | null;
   required_points: number;
   reward_text: string | null;
+  seller_id: number | null;
+  seller_name: string | null;
 }
 
 export default function CampaignsScreen() {
@@ -80,6 +82,7 @@ export default function CampaignsScreen() {
           <Ionicons name="gift" size={22} color={colors.primaryDeep} />
         </View>
         <View style={styles.info}>
+          {!!item.seller_name && <Text style={styles.store}>🏪 {item.seller_name}</Text>}
           <Text style={styles.title}>{item.title}</Text>
           {!!item.description && <Text style={styles.desc}>{item.description}</Text>}
           <Text style={styles.points}>{item.required_points} puan</Text>
@@ -186,6 +189,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   info: { flex: 1 },
+  store: { fontFamily: fonts.sansSemi, fontSize: 11.5, color: colors.muted, marginBottom: 2 },
   title: { fontFamily: fonts.sansBold, fontSize: 14.5, color: colors.ink },
   desc: { fontFamily: fonts.sans, fontSize: 12, color: colors.muted, marginTop: 2 },
   points: { fontFamily: fonts.sansBold, fontSize: 12.5, color: colors.primaryDeep, marginTop: 4 },

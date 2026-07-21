@@ -9,6 +9,8 @@ class CampaignOut(BaseModel):
     description: str | None = None
     required_points: int
     reward_text: str | None = None
+    seller_id: int | None = None
+    seller_name: str | None = None
 
 
 class RedeemOut(BaseModel):
@@ -23,3 +25,5 @@ class CouponOut(BaseModel):
     coupon_id: int
     code: str
     discount_amount: float
+    seller_id: int | None = None
+    seller_name: str | None = None

@@ -5,6 +5,8 @@ export interface CartProduct {
   name: string;
   price: string | number;
   stock: number;
+  seller_id?: number | null;
+  seller_name?: string | null;
 }
 
 export interface SelectedCharacteristic {

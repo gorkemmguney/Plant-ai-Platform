@@ -40,7 +40,7 @@ async def create_new_order(
     # ayrı bir sipariş oluşur — bu yüzden dönüş değeri her zaman bir listedir.
     orders = await create_order(db, cust_id, payload)
 
-    # Kupon seçildiyse indirimi ilk siparişe uygula ve kuponu harca
+    # Kupon seçildiyse: sadece kuponun ait olduğu mağazanın siparişine indirim uygula
     if payload.coupon_id is not None:
         coupon = (
             await db.execute(
@@ -52,9 +52,27 @@ async def create_new_order(
         ).scalar_one_or_none()
         if coupon is None or coupon.is_used:
             raise HTTPException(status_code=400, detail="Kupon geçersiz veya zaten kullanılmış")
+
+        # Her sipariş tek bir satıcıya ait — kuponun mağazasına ait olanı bul
+        target = None
+        for o in orders:
+            prod_ids = [it.prod_id for it in o.items if it.prod_id is not None]
+            if not prod_ids:
+                continue
+            seller_id = (
+                await db.execute(select(Prod.seller_id).where(Prod.prod_id == prod_ids[0]))
+            ).scalar_one_or_none()
+            if seller_id == coupon.seller_id:
+                target = o
+                break
+        if target is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Bu kupon sadece kendi mağazasında geçerli; sepette o mağazadan ürün yok",
+            )
+
         discount = float(coupon.discount_amount)
-        first = orders[0]
-        first.total_price = max(0.0, float(first.total_price) - discount)
+        target.total_price = max(0.0, float(target.total_price) - discount)
         coupon.is_used = True
         await db.commit()
 

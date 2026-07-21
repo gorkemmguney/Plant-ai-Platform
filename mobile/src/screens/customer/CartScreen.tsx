@@ -20,6 +20,8 @@ interface Coupon {
   coupon_id: number;
   code: string;
   discount_amount: number;
+  seller_id: number | null;
+  seller_name: string | null;
 }
 
 export default function CartScreen({ navigation }: any) {
@@ -42,8 +44,16 @@ export default function CartScreen({ navigation }: any) {
     loadCoupons();
   }, [loadCoupons]);
 
+  // Bir kuponun kendi mağazasındaki sepet ara toplamı (indirim sadece o kadarına uygulanır)
+  const storeSubtotal = (sellerId: number | null) =>
+    items
+      .filter((i) => i.product.seller_id === sellerId)
+      .reduce((sum, i) => sum + Number(i.product.price) * i.quantity, 0);
+
   const selectedCoupon = coupons.find((c) => c.coupon_id === selectedCouponId) ?? null;
-  const discount = selectedCoupon ? Number(selectedCoupon.discount_amount) : 0;
+  const discount = selectedCoupon
+    ? Math.min(Number(selectedCoupon.discount_amount), storeSubtotal(selectedCoupon.seller_id))
+    : 0;
   const finalTotal = Math.max(0, total - discount);
 
   // Sipariş için müşteri profili gerekli; yoksa otomatik oluştur (bireysel)
@@ -157,15 +167,20 @@ export default function CartScreen({ navigation }: any) {
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.couponRow}>
               {coupons.map((c) => {
                 const active = c.coupon_id === selectedCouponId;
+                const usable = storeSubtotal(c.seller_id) > 0; // bu mağazadan sepette ürün var mı
                 return (
                   <TouchableOpacity
                     key={c.coupon_id}
-                    style={[styles.couponChip, active && styles.couponChipActive]}
-                    onPress={() => setSelectedCouponId(active ? null : c.coupon_id)}
+                    style={[styles.couponChip, active && styles.couponChipActive, !usable && styles.couponChipDisabled]}
+                    onPress={() => usable && setSelectedCouponId(active ? null : c.coupon_id)}
+                    disabled={!usable}
                     activeOpacity={0.8}
                   >
                     <Text style={[styles.couponChipText, active && styles.couponChipTextActive]}>
                       ₺{Number(c.discount_amount).toFixed(0)} indirim
+                    </Text>
+                    <Text style={[styles.couponChipStore, active && styles.couponChipTextActive]} numberOfLines={1}>
+                      {c.seller_name ?? 'Mağaza'}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -276,7 +291,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
   },
   couponChipActive: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
+  couponChipDisabled: { opacity: 0.45 },
   couponChipText: { fontFamily: fonts.sansBold, fontSize: 12.5, color: colors.muted },
+  couponChipStore: { fontFamily: fonts.sansMedium, fontSize: 10.5, color: colors.muted2, marginTop: 1 },
   couponChipTextActive: { color: colors.primaryDeep },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   subLabel: { fontFamily: fonts.sans, fontSize: 13, color: colors.muted },
