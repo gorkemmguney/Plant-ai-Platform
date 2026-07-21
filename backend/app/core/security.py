@@ -6,7 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.core.firebase import InvalidTokenError, verify_id_token
+from app.core.supabase_auth import InvalidTokenError, verify_id_token
 from app.db.session import get_db
 from app.models.user import AppUser, Role, UserRole
 
@@ -23,10 +23,13 @@ async def get_current_user(
     except InvalidTokenError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Geçersiz veya süresi dolmuş token")
 
-    firebase_uid = decoded["uid"]
+    firebase_uid = decoded["uid"]  # NOT: artık Supabase kullanıcı UUID'si (sub claim)
     email = decoded.get("email", "")
-    name = decoded.get("name", "")
-    first_name, _, last_name = name.partition(" ")
+    user_metadata = decoded.get("user_metadata") or {}
+    first_name = user_metadata.get("first_name", "")
+    last_name = user_metadata.get("last_name", "")
+    if not first_name and user_metadata.get("full_name"):
+        first_name, _, last_name = user_metadata["full_name"].partition(" ")
 
     result = await db.execute(select(AppUser).where(AppUser.firebase_uid == firebase_uid))
     user = result.scalar_one_or_none()

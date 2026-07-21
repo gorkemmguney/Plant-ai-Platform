@@ -1,16 +1,24 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
   Modal,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useCart } from '../../context/CartContext';
+import { SelectedCharacteristic, useCart } from '../../context/CartContext';
 import { apiClient } from '../../services/apiClient';
 import { colors, fonts, radius, shadow, spacing } from '../../theme/theme';
+
+interface ProductCharacteristic {
+  gnl_char_id: number;
+  char_name: string;
+  gnl_char_val_id: number;
+  value: string;
+}
 
 interface Product {
   prod_id: number;
@@ -19,6 +27,20 @@ interface Product {
   price: string | number;
   stock: number;
   seller_id: number | null;
+  characteristics: ProductCharacteristic[];
+}
+
+// Bir ürünün karakteristiklerini isimlerine göre gruplar.
+// Bir karakteristiğin TEK değeri varsa bilgi amaçlı (otomatik seçili) rozet olur;
+// BİRDEN FAZLA değeri varsa müşterinin seçim yapması gereken bir varyant grubudur.
+function groupCharacteristics(characteristics: ProductCharacteristic[]) {
+  const byChar = new Map<number, { char_name: string; options: { gnl_char_val_id: number; value: string }[] }>();
+  for (const c of characteristics) {
+    const group = byChar.get(c.gnl_char_id) ?? { char_name: c.char_name, options: [] };
+    group.options.push({ gnl_char_val_id: c.gnl_char_val_id, value: c.value });
+    byChar.set(c.gnl_char_id, group);
+  }
+  return Array.from(byChar.entries()).map(([gnl_char_id, group]) => ({ gnl_char_id, ...group }));
 }
 
 export default function StoreProductsScreen({ route }: any) {
@@ -29,6 +51,8 @@ export default function StoreProductsScreen({ route }: any) {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Product | null>(null);
   const [qty, setQty] = useState(1);
+  // gnl_char_id -> seçilen gnl_char_val_id
+  const [picked, setPicked] = useState<Record<number, number>>({});
 
   const load = useCallback(async () => {
     try {
@@ -46,8 +70,42 @@ export default function StoreProductsScreen({ route }: any) {
     load();
   }, [load]);
 
+  const charGroups = useMemo(
+    () => (selected ? groupCharacteristics(selected.characteristics ?? []) : []),
+    [selected]
+  );
+  const multiChoiceGroups = charGroups.filter((g) => g.options.length > 1);
+  const infoGroups = charGroups.filter((g) => g.options.length === 1);
+
+  const openProduct = (item: Product) => {
+    // Tek seçenekli karakteristikler otomatik "seçili" sayılır (bilgi amaçlı,
+    // sipariş anlık kopyasına yine de dahil edilir). Çok seçenekli olanlar
+    // için başlangıçta hiçbir şey seçili değildir, müşteri seçmelidir.
+    const initial: Record<number, number> = {};
+    (item.characteristics ?? []).forEach((c) => {
+      const sameChar = (item.characteristics ?? []).filter((x) => x.gnl_char_id === c.gnl_char_id);
+      if (sameChar.length === 1) initial[c.gnl_char_id] = c.gnl_char_val_id;
+    });
+    setPicked(initial);
+    setSelected(item);
+    setQty(1);
+  };
+
+  const canAdd = multiChoiceGroups.every((g) => picked[g.gnl_char_id] != null);
+
   const confirmAdd = () => {
-    if (selected) addToCart(selected, qty);
+    if (!selected || !canAdd) return;
+    const selectedCharacteristics: SelectedCharacteristic[] = charGroups
+      .map((g) => {
+        const valId = picked[g.gnl_char_id];
+        if (valId == null) return null;
+        const opt = g.options.find((o) => o.gnl_char_val_id === valId);
+        if (!opt) return null;
+        return { gnl_char_id: g.gnl_char_id, char_name: g.char_name, gnl_char_val_id: valId, value: opt.value };
+      })
+      .filter((x): x is SelectedCharacteristic => x !== null);
+
+    addToCart(selected, qty, selectedCharacteristics);
     setSelected(null);
   };
 
@@ -68,10 +126,7 @@ export default function StoreProductsScreen({ route }: any) {
           <Text style={styles.price}>₺{Number(item.price).toFixed(2)}</Text>
           <TouchableOpacity
             style={[styles.buyButton, out && styles.buyButtonDisabled]}
-            onPress={() => {
-              setSelected(item);
-              setQty(1);
-            }}
+            onPress={() => openProduct(item)}
             disabled={out}
             activeOpacity={0.85}
           >
@@ -110,33 +165,78 @@ export default function StoreProductsScreen({ route }: any) {
       <Modal visible={selected !== null} transparent animationType="fade" onRequestClose={() => setSelected(null)}>
         <View style={styles.modalWrap}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle} numberOfLines={2}>{selected?.name}</Text>
-            <Text style={styles.modalPrice}>₺{Number(selected?.price ?? 0).toFixed(2)}</Text>
-            <Text style={styles.modalStock}>Stok: {selected?.stock ?? 0}</Text>
+            <ScrollView showsVerticalScrollIndicator={false} bounces={false} overScrollMode="never">
+              <Text style={styles.modalTitle} numberOfLines={2}>{selected?.name}</Text>
+              <Text style={styles.modalPrice}>₺{Number(selected?.price ?? 0).toFixed(2)}</Text>
+              <Text style={styles.modalStock}>Stok: {selected?.stock ?? 0}</Text>
 
-            <Text style={styles.modalLabel}>Adet</Text>
-            <View style={styles.qtyRow}>
-              <TouchableOpacity style={styles.qtyBtn} onPress={() => setQty((q) => Math.max(1, q - 1))} activeOpacity={0.7}>
-                <Text style={styles.qtyBtnText}>−</Text>
-              </TouchableOpacity>
-              <Text style={styles.qtyValue}>{qty}</Text>
-              <TouchableOpacity
-                style={styles.qtyBtn}
-                onPress={() => setQty((q) => Math.min(selected?.stock ?? 1, q + 1))}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.qtyBtnText}>+</Text>
-              </TouchableOpacity>
-            </View>
+              {infoGroups.length > 0 && (
+                <View style={styles.infoBadgeRow}>
+                  {infoGroups.map((g) => (
+                    <View key={g.gnl_char_id} style={styles.infoBadge}>
+                      <Text style={styles.infoBadgeText}>
+                        {g.char_name}: {g.options[0].value}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
 
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.modalCancel} onPress={() => setSelected(null)} activeOpacity={0.85}>
-                <Text style={styles.modalCancelText}>Vazgeç</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalAdd} onPress={confirmAdd} activeOpacity={0.85}>
-                <Text style={styles.modalAddText}>Sepete Ekle ({qty})</Text>
-              </TouchableOpacity>
-            </View>
+              {multiChoiceGroups.map((g) => (
+                <View key={g.gnl_char_id} style={styles.choiceGroup}>
+                  <Text style={styles.modalLabel}>{g.char_name}</Text>
+                  <View style={styles.choiceRow}>
+                    {g.options.map((opt) => {
+                      const active = picked[g.gnl_char_id] === opt.gnl_char_val_id;
+                      return (
+                        <TouchableOpacity
+                          key={opt.gnl_char_val_id}
+                          style={[styles.choiceChip, active && styles.choiceChipActive]}
+                          onPress={() => setPicked((prev) => ({ ...prev, [g.gnl_char_id]: opt.gnl_char_val_id }))}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={[styles.choiceChipText, active && styles.choiceChipTextActive]}>
+                            {opt.value}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              ))}
+
+              <Text style={styles.modalLabel}>Adet</Text>
+              <View style={styles.qtyRow}>
+                <TouchableOpacity style={styles.qtyBtn} onPress={() => setQty((q) => Math.max(1, q - 1))} activeOpacity={0.7}>
+                  <Text style={styles.qtyBtnText}>−</Text>
+                </TouchableOpacity>
+                <Text style={styles.qtyValue}>{qty}</Text>
+                <TouchableOpacity
+                  style={styles.qtyBtn}
+                  onPress={() => setQty((q) => Math.min(selected?.stock ?? 1, q + 1))}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.qtyBtnText}>+</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity style={styles.modalCancel} onPress={() => setSelected(null)} activeOpacity={0.85}>
+                  <Text style={styles.modalCancelText}>Vazgeç</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalAdd, !canAdd && styles.modalAddDisabled]}
+                  onPress={confirmAdd}
+                  disabled={!canAdd}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.modalAddText}>Sepete Ekle ({qty})</Text>
+                </TouchableOpacity>
+              </View>
+              {!canAdd && (
+                <Text style={styles.warnText}>Devam etmeden önce yukarıdaki seçenekleri belirleyin.</Text>
+              )}
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -190,10 +290,31 @@ const styles = StyleSheet.create({
   errorText: { fontFamily: fonts.sans, fontSize: 13.5, color: colors.muted, textAlign: 'center', lineHeight: 20 },
   emptyText: { fontFamily: fonts.sans, fontSize: 13, color: colors.muted, textAlign: 'center', marginTop: spacing.xl },
   modalWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', padding: spacing.xl },
-  modalCard: { backgroundColor: colors.bg, borderRadius: radius.lg, padding: spacing.xl },
+  modalCard: { backgroundColor: colors.bg, borderRadius: radius.lg, padding: spacing.xl, maxHeight: '80%' },
   modalTitle: { fontFamily: fonts.display, fontSize: 18, color: colors.ink },
   modalPrice: { fontFamily: fonts.sansBold, fontSize: 15, color: colors.primaryDeep, marginTop: spacing.xs },
   modalStock: { fontFamily: fonts.sans, fontSize: 12.5, color: colors.muted, marginTop: 2 },
+  infoBadgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.md },
+  infoBadge: {
+    backgroundColor: colors.bgAlt,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 5,
+  },
+  infoBadgeText: { fontFamily: fonts.sansMedium, fontSize: 11.5, color: colors.muted },
+  choiceGroup: { marginTop: spacing.md },
+  choiceRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  choiceChip: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+    backgroundColor: colors.card,
+  },
+  choiceChipActive: { backgroundColor: colors.buttonPrimary, borderColor: colors.buttonPrimary },
+  choiceChipText: { fontFamily: fonts.sansSemi, fontSize: 12.5, color: colors.ink },
+  choiceChipTextActive: { color: colors.buttonPrimaryText },
   modalLabel: {
     fontFamily: fonts.sansSemi,
     fontSize: 12,
@@ -231,5 +352,13 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     alignItems: 'center',
   },
+  modalAddDisabled: { backgroundColor: colors.border },
   modalAddText: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.buttonPrimaryText },
+  warnText: {
+    fontFamily: fonts.sans,
+    fontSize: 11.5,
+    color: colors.red,
+    textAlign: 'center',
+    marginTop: spacing.sm,
+  },
 });

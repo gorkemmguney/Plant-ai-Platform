@@ -14,6 +14,14 @@ class Settings(BaseSettings):
     DB_USERNAME: str
     DB_PASSWORD: str = "etiya41"
 
+    # ==== Supabase (Auth + DB + Storage) ====
+    SUPABASE_URL: str = ""
+    SUPABASE_PUBLISHABLE_KEY: str = ""  # eski adıyla "anon key" — client tarafı için
+    SUPABASE_SECRET_KEY: str = ""  # eski adıyla "service_role key" — SADECE backend'de kullanılır
+
+    # ==== DEPRECATED: Firebase — sadece eski geliştirici script'leri
+    # (manage_users.py, seed_demo_data.py) tarafından kullanılıyor.
+    # Uygulama çalışma zamanında (backend/mobile) artık Firebase kullanmıyor.
     FIREBASE_CREDENTIALS_PATH: str = "./firebase-service-account.json"
     FIREBASE_PROJECT_ID: str = ""
 

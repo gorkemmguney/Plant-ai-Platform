@@ -44,6 +44,9 @@ class CustOrdItem(Base):
     unit_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
 
     order: Mapped["CustOrd"] = relationship(back_populates="items")
+    # lazy="selectin": async ortamda güvenli, CustOrdItem her yüklendiğinde
+    # (mevcut selectinload(CustOrd.items) sorgularına dokunmadan) otomatik gelir.
+    char_values: Mapped[list["CustOrdItemCharVal"]] = relationship(lazy="selectin", cascade="all, delete-orphan")
 
 
 class CustOrdCharVal(Base):

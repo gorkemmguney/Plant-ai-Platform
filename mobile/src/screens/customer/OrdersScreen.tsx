@@ -12,11 +12,18 @@ import {
 import { apiClient } from '../../services/apiClient';
 import { badgeColors, colors, fonts, radius, shadow, spacing } from '../../theme/theme';
 
+interface OrderItemChar {
+  gnl_char_id: number;
+  value: string;
+}
+
 interface OrderItem {
   cust_ord_item_id: number;
-  prod_id: number;
+  prod_id: number | null;
+  prod_name: string;
   quantity: number;
   unit_price: string | number;
+  char_values: OrderItemChar[];
 }
 
 interface Order {
@@ -41,7 +48,6 @@ const CANCELLABLE = [5, 6];
 
 export default function OrdersScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
-  const [productNames, setProductNames] = useState<Record<number, string>>({});
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -51,17 +57,11 @@ export default function OrdersScreen() {
   const load = useCallback(async () => {
     try {
       setError(null);
-      // Siparişler + ürün adları (item'larda sadece prod_id var, adı katalogdan alıyoruz)
-      const [ordersRes, productsRes] = await Promise.all([
-        apiClient.get<Order[]>('/orders'),
-        apiClient.get<{ prod_id: number; name: string }[]>('/catalog/products'),
-      ]);
-      setOrders(ordersRes.data);
-      const names: Record<number, string> = {};
-      productsRes.data.forEach((p) => {
-        names[p.prod_id] = p.name;
-      });
-      setProductNames(names);
+      // Ürün adı artık her sipariş kaleminde anlık kopya (prod_name) olarak
+      // geliyor — ayrıca katalog sorgusuna gerek yok, ürün silinse/adı
+      // değişse bile geçmiş sipariş burada bozulmadan görünür.
+      const { data } = await apiClient.get<Order[]>('/orders');
+      setOrders(data);
     } catch (err: any) {
       setError(err?.response?.data?.detail ?? 'Siparişler yüklenemedi.');
     } finally {
@@ -126,14 +126,22 @@ export default function OrdersScreen() {
 
         {expanded && (
           <View style={styles.itemsBox}>
-            {item.items.map((it) => (
-              <View key={it.cust_ord_item_id} style={styles.itemRow}>
-                <Text style={styles.itemName} numberOfLines={1}>
-                  {productNames[it.prod_id] ?? `Ürün #${it.prod_id}`} × {it.quantity}
-                </Text>
-                <Text style={styles.itemPrice}>₺{(Number(it.unit_price) * it.quantity).toFixed(2)}</Text>
-              </View>
-            ))}
+            {item.items.map((it) => {
+              const variantLabel = (it.char_values ?? []).map((c) => c.value).join(' · ');
+              return (
+                <View key={it.cust_ord_item_id} style={styles.itemRow}>
+                  <View style={{ flex: 1, marginRight: spacing.sm }}>
+                    <Text style={styles.itemName} numberOfLines={1}>
+                      {it.prod_name} × {it.quantity}
+                    </Text>
+                    {variantLabel ? (
+                      <Text style={styles.itemVariant} numberOfLines={1}>{variantLabel}</Text>
+                    ) : null}
+                  </View>
+                  <Text style={styles.itemPrice}>₺{(Number(it.unit_price) * it.quantity).toFixed(2)}</Text>
+                </View>
+              );
+            })}
 
             {CANCELLABLE.includes(item.gnl_st_id) && (
               <TouchableOpacity
@@ -226,7 +234,8 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   itemRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  itemName: { fontFamily: fonts.sans, fontSize: 13, color: colors.ink, flex: 1, marginRight: spacing.sm },
+  itemName: { fontFamily: fonts.sans, fontSize: 13, color: colors.ink },
+  itemVariant: { fontFamily: fonts.sansMedium, fontSize: 11, color: colors.muted2, marginTop: 1 },
   itemPrice: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.muted },
   cancelOrderBtn: {
     borderWidth: 1,

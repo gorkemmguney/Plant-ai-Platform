@@ -8,8 +8,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.catalog import Prod
-from app.models.order import CustOrd, CustOrdItem
+from app.models.catalog import GnlCharVal, Prod, ProdCharVal
+from app.models.order import CustOrd, CustOrdItem, CustOrdItemCharVal
 from app.schemas.order import OrderCreateIn
 
 DEFAULT_ORDER_STATUS_ID = 5
@@ -45,6 +45,18 @@ async def update_order_status(db: AsyncSession, cust_ord_id: int, gnl_st_id: int
     return order
 
 
+async def _valid_char_values_for_product(db: AsyncSession, prod_id: int) -> dict[int, tuple[int, str]]:
+    """Bir ürüne satıcı tarafından atanmış geçerli karakteristik değerlerini döner.
+    Dönen dict: {gnl_char_val_id: (gnl_char_id, value_text)}
+    """
+    result = await db.execute(
+        select(ProdCharVal.gnl_char_val_id, ProdCharVal.gnl_char_id, GnlCharVal.value)
+        .join(GnlCharVal, GnlCharVal.gnl_char_val_id == ProdCharVal.gnl_char_val_id)
+        .where(ProdCharVal.prod_id == prod_id)
+    )
+    return {val_id: (char_id, value) for (val_id, char_id, value) in result.all()}
+
+
 async def create_order(db: AsyncSession, cust_id: int, payload: OrderCreateIn) -> list[CustOrd]:
     if not payload.items:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Sepet boş olamaz")
@@ -54,6 +66,9 @@ async def create_order(db: AsyncSession, cust_id: int, payload: OrderCreateIn) -
     # sahipsiz ürünler kendi grubunda tek bir siparişte toplanır).
     items_by_seller: dict[int | None, list[CustOrdItem]] = {}
     totals_by_seller: dict[int | None, Decimal] = {}
+    # Flush sonrası cust_ord_item_id atandığında karakteristik satırlarını
+    # yazabilmek için (CustOrdItem nesnesi, [(gnl_char_id, value_text), ...]) eşlemesi
+    pending_char_snapshots: list[tuple[CustOrdItem, list[tuple[int, str]]]] = []
 
     for item in payload.items:
         result = await db.execute(select(Prod).where(Prod.prod_id == item.prod_id))
@@ -63,19 +78,43 @@ async def create_order(db: AsyncSession, cust_id: int, payload: OrderCreateIn) -
         if product.stock < item.quantity:
             raise HTTPException(status_code=400, detail=f"Yetersiz stok: {product.name}")
 
+        # Seçilen varyantları doğrula: sadece bu ürüne atanmış değerler seçilebilir,
+        # ve aynı karakteristik (ör. Renk) için birden fazla değer seçilemez.
+        char_snapshots: list[tuple[int, str]] = []
+        if item.selected_char_value_ids:
+            valid_values = await _valid_char_values_for_product(db, product.prod_id)
+            seen_char_ids: set[int] = set()
+            for val_id in item.selected_char_value_ids:
+                if val_id not in valid_values:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"'{product.name}' için geçersiz karakteristik değeri: {val_id}",
+                    )
+                char_id, value_text = valid_values[val_id]
+                if char_id in seen_char_ids:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"'{product.name}' için aynı karakteristikten yalnızca bir değer seçebilirsiniz",
+                    )
+                seen_char_ids.add(char_id)
+                char_snapshots.append((char_id, value_text))
+
         product.stock -= item.quantity
         line_total = product.price * item.quantity
 
-        seller_key = product.seller_id
-        items_by_seller.setdefault(seller_key, []).append(
-            CustOrdItem(
-                prod_id=product.prod_id,
-                prod_name=product.name,
-                quantity=item.quantity,
-                unit_price=product.price,
-            )
+        order_item = CustOrdItem(
+            prod_id=product.prod_id,
+            prod_name=product.name,
+            quantity=item.quantity,
+            unit_price=product.price,
         )
+
+        seller_key = product.seller_id
+        items_by_seller.setdefault(seller_key, []).append(order_item)
         totals_by_seller[seller_key] = totals_by_seller.get(seller_key, Decimal("0")) + line_total
+
+        if char_snapshots:
+            pending_char_snapshots.append((order_item, char_snapshots))
 
     new_orders: list[CustOrd] = []
     for seller_key, order_items in items_by_seller.items():
@@ -88,6 +127,20 @@ async def create_order(db: AsyncSession, cust_id: int, payload: OrderCreateIn) -
         )
         db.add(order)
         new_orders.append(order)
+
+    # cust_ord_item_id'lerin atanması için flush (henüz commit değil) — bu sayede
+    # aşağıda CustOrdItemCharVal satırları doğru FK ile oluşturulabilir.
+    await db.flush()
+
+    for order_item, char_snapshots in pending_char_snapshots:
+        for gnl_char_id, value_text in char_snapshots:
+            db.add(
+                CustOrdItemCharVal(
+                    cust_ord_item_id=order_item.cust_ord_item_id,
+                    gnl_char_id=gnl_char_id,
+                    value=value_text,
+                )
+            )
 
     await db.commit()
 

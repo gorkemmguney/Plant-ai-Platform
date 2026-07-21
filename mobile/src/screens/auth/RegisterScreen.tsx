@@ -1,5 +1,4 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -14,8 +13,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { PENDING_ROLE_PREFIX } from '../../constants/auth';
 import { useAuth } from '../../context/AuthContext';
-import { firebaseAuth } from '../../firebase/firebaseConfig';
+import { supabase } from '../../lib/supabaseClient';
 import { apiClient } from '../../services/apiClient';
 import { colors, fonts, radius, spacing } from '../../theme/theme';
 
@@ -33,20 +34,34 @@ export default function RegisterScreen({ navigation }: any) {
   const handleRegister = async () => {
     setLoading(true);
     try {
-      await createUserWithEmailAndPassword(firebaseAuth, email.trim(), password);
-      // Seçilen başlangıç rolünü backend'e bildir (müşteri / satıcı)
-      try {
-        await apiClient.post('/auth/select-role', { role_name: role });
-        if (role === 'seller') {
-          Alert.alert(
-            'Satıcı başvurun alındı',
-            'Hesabın oluşturuldu. Satıcı paneline erişebilmen için başvurunun bir admin tarafından onaylanması gerekiyor. Onaya kadar müşteri olarak devam edebilirsin.'
-          );
+      const trimmedEmail = email.trim();
+      const { data, error } = await supabase.auth.signUp({ email: trimmedEmail, password });
+      if (error) throw error;
+
+      if (data.session) {
+        // "Confirm email" kapalı — hesap anında aktif, rolü şimdi bildirebiliriz.
+        try {
+          await apiClient.post('/auth/select-role', { role_name: role });
+          if (role === 'seller') {
+            Alert.alert(
+              'Satıcı başvurun alındı',
+              'Hesabın oluşturuldu. Satıcı paneline erişebilmen için başvurunun bir admin tarafından onaylanması gerekiyor. Onaya kadar müşteri olarak devam edebilirsin.'
+            );
+          }
+          await refreshProfile();
+        } catch (roleErr: any) {
+          console.log('[Register] rol seçimi gönderilemedi:', roleErr?.message ?? roleErr);
         }
-        await refreshProfile();
-      } catch (roleErr: any) {
-        // Backend'e ulaşılamazsa kayıt yine de tamam; rol sonradan atanabilir
-        console.log('[Register] rol seçimi gönderilemedi:', roleErr?.message ?? roleErr);
+      } else {
+        // "Confirm email" açık — henüz oturum yok. Seçilen rolü cihazda sakla,
+        // kullanıcı e-postasını onaylayıp ilk kez giriş yaptığında
+        // AuthContext bu rolü otomatik olarak backend'e bildirecek.
+        await AsyncStorage.setItem(`${PENDING_ROLE_PREFIX}${trimmedEmail.toLowerCase()}`, role);
+        Alert.alert(
+          'E-postanı onayla',
+          `${trimmedEmail} adresine bir onay bağlantısı gönderdik. Onayladıktan sonra giriş yapabilirsin.`
+        );
+        navigation.navigate('Login');
       }
     } catch (err: any) {
       Alert.alert('Kayıt başarısız', err.message);

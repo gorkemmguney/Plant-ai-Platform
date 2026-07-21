@@ -82,7 +82,6 @@ async def chat_reply(history: list[dict], new_message: str) -> str:
         return "Yapay zeka asistanı şu anda yanıt veremiyor. Lütfen API anahtarınızı kontrol edin."
 
 
-# ─── Admin AI Feature 1: Announcement Draft Wizard ─────────────────────────
 
 _DRAFT_ANNOUNCEMENT_SCHEMA = {
     "type": "object",
@@ -118,7 +117,6 @@ SADECE aşağıdaki JSON formatında, başka hiçbir açıklama eklemeden yanıt
         return {"title": "Duyuru", "message": topic}
 
 
-# ─── Admin AI Feature 2: Platform Insights ──────────────────────────────────
 
 async def generate_platform_insights(stats: dict) -> str:
     """Gemini analyses platform stats and returns Turkish business advice."""

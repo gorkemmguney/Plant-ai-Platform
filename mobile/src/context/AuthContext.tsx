@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { onAuthStateChanged, User } from 'firebase/auth';
+import { Session, User } from '@supabase/supabase-js';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { firebaseAuth } from '../firebase/firebaseConfig';
+import { PENDING_ROLE_PREFIX } from '../constants/auth';
+import { supabase } from '../lib/supabaseClient';
 import { apiClient } from '../services/apiClient';
 
 type Role = 'admin' | 'seller' | 'customer';
@@ -10,6 +11,8 @@ export type SellerStatus = 'none' | 'pending' | 'verified' | 'rejected';
 const ACTIVE_ROLE_KEY = 'plantai:activeRole';
 
 interface AuthContextValue {
+  // NOT: alan adı tarihsel nedenlerle "firebaseUser" kaldı (Firebase -> Supabase
+  // geçişinde diğer ekranları değiştirmemek için) — artık Supabase User taşıyor.
   firebaseUser: User | null;
   roles: Role[];
   activeRole: Role | null;
@@ -18,7 +21,6 @@ interface AuthContextValue {
   lastName: string;
   loading: boolean;
   refreshProfile: () => Promise<void>;
-  /** Panel seçimini ayarlar. `null` verilirse seçim ekranına geri döner. */
   chooseRole: (role: Role | null) => void;
 }
 
@@ -52,26 +54,55 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const applyPendingRoleIfAny = async (email: string | undefined) => {
+    if (!email) return false;
+    const key = `${PENDING_ROLE_PREFIX}${email.toLowerCase()}`;
+    const pendingRole = await AsyncStorage.getItem(key).catch(() => null);
+    if (!pendingRole) return false;
+    try {
+      await apiClient.post('/auth/select-role', { role_name: pendingRole });
+      await AsyncStorage.removeItem(key).catch(() => {});
+      return true;
+    } catch (err: any) {
+      console.log('[AuthContext] bekleyen rol uygulanamadı:', err?.message ?? err);
+      return false;
+    }
+  };
+
   const refreshProfile = async () => {
-    if (!firebaseAuth.currentUser) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session) {
       setRoles([]);
       setSellerStatus('none');
       setFirstName('');
       setLastName('');
       return;
     }
+
     try {
-      const { data } = await apiClient.get('/auth/me');
+      let { data } = await apiClient.get('/auth/me');
+
+      // Kayıt sırasında email onayı beklendiği için seçilen rol (özellikle 'seller'
+      // başvurusu) backend'e bildirilememişse, kullanıcı ilk kez giriş yaptığında
+      // burada tamamlanır. Backend zaten her kullanıcıya varsayılan 'customer'
+      // rolünü otomatik atadığı için bu kontrolü rolün boş olmasına değil,
+      // cihazda bekleyen bir seçim olup olmadığına dayandırıyoruz.
+      const applied = await applyPendingRoleIfAny(session.user.email);
+      if (applied) {
+        ({ data } = await apiClient.get('/auth/me'));
+      }
+
       const nextRoles: Role[] = data.roles ?? [];
       setRoles(nextRoles);
       setSellerStatus(data.seller_status ?? 'none');
       setFirstName(data.first_name ?? '');
       setLastName(data.last_name ?? '');
 
-      // Kayıtlı panel seçimi hâlâ geçerli mi kontrol et; değilse temizle.
       setActiveRole((current) => (current && !nextRoles.includes(current) ? null : current));
       if (nextRoles.length === 1) {
-        // Tek rolü olan kullanıcı için seçim ekranına hiç gerek yok.
         chooseRole(nextRoles[0]);
       }
     } catch (err: any) {
@@ -84,13 +115,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(firebaseAuth, async (user) => {
-      // Her giriş/çıkışta, profil (roller) netleşene kadar tekrar "loading" durumuna geç.
-      // Bu, giriş anında kısa süreliğine yanlış panelin (ör. Customer) görünüp
-      // ardından doğru panele (ör. Admin/Seller) geçmesi sorununu önler.
+    let mounted = true;
+
+    const handleSession = async (session: Session | null) => {
+      if (!mounted) return;
       setLoading(true);
-      setFirebaseUser(user);
-      if (user) {
+      setFirebaseUser(session?.user ?? null);
+      if (session?.user) {
         const savedRole = (await AsyncStorage.getItem(ACTIVE_ROLE_KEY).catch(() => null)) as Role | null;
         if (savedRole) setActiveRole(savedRole);
         await refreshProfile();
@@ -101,9 +132,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setFirstName('');
         setLastName('');
       }
-      setLoading(false);
+      if (mounted) setLoading(false);
+    };
+
+    supabase.auth.getSession().then(({ data: { session } }) => handleSession(session));
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      handleSession(session);
     });
-    return unsubscribe;
+
+    return () => {
+      mounted = false;
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
   return (

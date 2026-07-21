@@ -4,6 +4,40 @@ from decimal import Decimal
 from pydantic import BaseModel, ConfigDict
 
 
+class CharValueOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    gnl_char_val_id: int
+    value: str
+
+
+class CharacteristicOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    gnl_char_id: int
+    name: str
+    description: str | None = None
+    values: list[CharValueOut] = []
+
+
+class CharacteristicCreateIn(BaseModel):
+    name: str
+    description: str | None = None
+
+
+class CharValueCreateIn(BaseModel):
+    value: str
+
+
+class ProductCharacteristicOut(BaseModel):
+    """Bir ürüne atanmış tek bir karakteristik+değer çifti (prod_char_val satırı)."""
+
+    gnl_char_id: int
+    char_name: str
+    gnl_char_val_id: int
+    value: str
+
+
 class ProductOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -16,6 +50,7 @@ class ProductOut(BaseModel):
     prod_spec_id: int
     seller_id: int | None = None
     seller_name: str | None = None
+    characteristics: list[ProductCharacteristicOut] = []
 
 
 class SellerOut(BaseModel):
@@ -41,6 +76,9 @@ class ProductCreateIn(BaseModel):
     stock: int = 0
     gnl_st_id: int
     prod_spec_id: int
+    # Admin'in gnl_char_val tablosunda tanımladığı değerlerden satıcının seçtikleri.
+    # Boş bırakılırsa ürüne hiç karakteristik atanmaz.
+    char_value_ids: list[int] = []
 
 
 class ProductUpdateIn(BaseModel):
@@ -50,6 +88,8 @@ class ProductUpdateIn(BaseModel):
     stock: int | None = None
     gnl_st_id: int | None = None
     prod_spec_id: int | None = None
+    # None = karakteristikler değiştirilmesin; [] = tümünü kaldır; dolu liste = değiştir
+    char_value_ids: list[int] | None = None
 
 
 class ProductOfferOut(BaseModel):

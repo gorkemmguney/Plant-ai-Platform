@@ -1,12 +1,26 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func, select
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.security import get_user_roles, require_role
 from app.db.session import get_db
-from app.models.catalog import Prod, ProdSpec
+from app.models.catalog import GnlChar, GnlCharVal, Prod, ProdCharVal, ProdSpec
 from app.models.user import AppUser
 from app.rbac.roles import RoleName
-from app.schemas.catalog import ProdSpecOut, ProductCreateIn, ProductOut, ProductUpdateIn, SellerOut
+from app.schemas.catalog import (
+    CharacteristicCreateIn,
+    CharacteristicOut,
+    CharValueCreateIn,
+    CharValueOut,
+    ProdSpecOut,
+    ProductCharacteristicOut,
+    ProductCreateIn,
+    ProductOut,
+    ProductUpdateIn,
+    SellerOut,
+)
 
 router = APIRouter(prefix="/catalog", tags=["catalog"])
 
@@ -20,7 +34,13 @@ def _display_name(store_name: str | None, first: str | None, last: str | None) -
     return store_name or _full_name(first, last)
 
 
-def _product_out(prod: Prod, store_name: str | None, first: str | None, last: str | None) -> ProductOut:
+def _product_out(
+    prod: Prod,
+    store_name: str | None,
+    first: str | None,
+    last: str | None,
+    characteristics: list[ProductCharacteristicOut] | None = None,
+) -> ProductOut:
     return ProductOut(
         prod_id=prod.prod_id,
         name=prod.name,
@@ -31,6 +51,7 @@ def _product_out(prod: Prod, store_name: str | None, first: str | None, last: st
         prod_spec_id=prod.prod_spec_id,
         seller_id=prod.seller_id,
         seller_name=_display_name(store_name, first, last),
+        characteristics=characteristics or [],
     )
 
 
@@ -52,9 +73,155 @@ async def _ensure_owner_or_admin(product: Prod, user: AppUser, db: AsyncSession)
         raise HTTPException(status_code=403, detail="Bu ürün üzerinde işlem yapma yetkiniz yok")
 
 
-@router.get("/products", response_model=list[ProductOut])
-async def list_products(db: AsyncSession = Depends(get_db)):
+async def _characteristics_for_products(db: AsyncSession, prod_ids: list[int]) -> dict[int, list[ProductCharacteristicOut]]:
+    """Birden fazla ürünün karakteristiklerini TEK sorguda toplu olarak çeker."""
+    if not prod_ids:
+        return {}
     result = await db.execute(
+        select(
+            ProdCharVal.prod_id,
+            GnlChar.gnl_char_id,
+            GnlChar.name,
+            GnlCharVal.gnl_char_val_id,
+            GnlCharVal.value,
+        )
+        .join(GnlChar, GnlChar.gnl_char_id == ProdCharVal.gnl_char_id)
+        .join(GnlCharVal, GnlCharVal.gnl_char_val_id == ProdCharVal.gnl_char_val_id)
+        .where(ProdCharVal.prod_id.in_(prod_ids))
+    )
+    mapping: dict[int, list[ProductCharacteristicOut]] = {}
+    for prod_id, gnl_char_id, char_name, gnl_char_val_id, value in result.all():
+        mapping.setdefault(prod_id, []).append(
+            ProductCharacteristicOut(
+                gnl_char_id=gnl_char_id, char_name=char_name, gnl_char_val_id=gnl_char_val_id, value=value
+            )
+        )
+    return mapping
+
+
+async def _sync_product_characteristics(db: AsyncSession, prod: Prod, char_value_ids: list[int]) -> None:
+    """Ürünün karakteristik atamalarını verilen gnl_char_val_id listesiyle değiştirir (tamamen yeniden yazar)."""
+    await db.execute(delete(ProdCharVal).where(ProdCharVal.prod_id == prod.prod_id))
+    if not char_value_ids:
+        return
+
+    result = await db.execute(select(GnlCharVal).where(GnlCharVal.gnl_char_val_id.in_(char_value_ids)))
+    valid_values = {v.gnl_char_val_id: v for v in result.scalars().all()}
+    missing = set(char_value_ids) - set(valid_values.keys())
+    if missing:
+        raise HTTPException(status_code=400, detail=f"Geçersiz karakteristik değeri id'leri: {sorted(missing)}")
+
+    for val_id in char_value_ids:
+        gval = valid_values[val_id]
+        db.add(
+            ProdCharVal(
+                prod_id=prod.prod_id,
+                prod_spec_id=prod.prod_spec_id,
+                gnl_char_id=gval.gnl_char_id,
+                gnl_char_val_id=gval.gnl_char_val_id,
+            )
+        )
+
+
+# Karakteristikler (gnl_char / gnl_char_val) - herkese acik okuma, admin yazma
+
+
+@router.get("/characteristics", response_model=list[CharacteristicOut])
+async def list_characteristics(db: AsyncSession = Depends(get_db)):
+    """Satıcının ürün formunda seçebileceği, müşterinin filtrede kullanabileceği tam liste."""
+    result = await db.execute(select(GnlChar).order_by(GnlChar.name))
+    chars = result.scalars().all()
+
+    out: list[CharacteristicOut] = []
+    for c in chars:
+        vals_result = await db.execute(
+            select(GnlCharVal).where(GnlCharVal.gnl_char_id == c.gnl_char_id).order_by(GnlCharVal.value)
+        )
+        vals = vals_result.scalars().all()
+        out.append(
+            CharacteristicOut(
+                gnl_char_id=c.gnl_char_id,
+                name=c.name,
+                description=c.description,
+                values=[CharValueOut(gnl_char_val_id=v.gnl_char_val_id, value=v.value) for v in vals],
+            )
+        )
+    return out
+
+
+@router.post("/characteristics", response_model=CharacteristicOut)
+async def create_characteristic(
+    payload: CharacteristicCreateIn,
+    db: AsyncSession = Depends(get_db),
+    _: AppUser = Depends(require_role(RoleName.ADMIN)),
+):
+    char = GnlChar(name=payload.name, description=payload.description)
+    db.add(char)
+    await db.commit()
+    await db.refresh(char)
+    return CharacteristicOut(gnl_char_id=char.gnl_char_id, name=char.name, description=char.description, values=[])
+
+
+@router.delete("/characteristics/{gnl_char_id}")
+async def delete_characteristic(
+    gnl_char_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: AppUser = Depends(require_role(RoleName.ADMIN)),
+):
+    result = await db.execute(select(GnlChar).where(GnlChar.gnl_char_id == gnl_char_id))
+    if result.scalar_one_or_none() is None:
+        raise HTTPException(status_code=404, detail="Karakteristik bulunamadı")
+    await db.execute(delete(ProdCharVal).where(ProdCharVal.gnl_char_id == gnl_char_id))
+    await db.execute(delete(GnlCharVal).where(GnlCharVal.gnl_char_id == gnl_char_id))
+    await db.execute(delete(GnlChar).where(GnlChar.gnl_char_id == gnl_char_id))
+    await db.commit()
+    return {"detail": "Karakteristik ve bağlı değerler silindi"}
+
+
+@router.post("/characteristics/{gnl_char_id}/values", response_model=CharValueOut)
+async def create_characteristic_value(
+    gnl_char_id: int,
+    payload: CharValueCreateIn,
+    db: AsyncSession = Depends(get_db),
+    _: AppUser = Depends(require_role(RoleName.ADMIN)),
+):
+    char_result = await db.execute(select(GnlChar).where(GnlChar.gnl_char_id == gnl_char_id))
+    if char_result.scalar_one_or_none() is None:
+        raise HTTPException(status_code=404, detail="Karakteristik bulunamadı")
+
+    val = GnlCharVal(gnl_char_id=gnl_char_id, value=payload.value)
+    db.add(val)
+    await db.commit()
+    await db.refresh(val)
+    return CharValueOut(gnl_char_val_id=val.gnl_char_val_id, value=val.value)
+
+
+@router.delete("/characteristics/values/{gnl_char_val_id}")
+async def delete_characteristic_value(
+    gnl_char_val_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: AppUser = Depends(require_role(RoleName.ADMIN)),
+):
+    result = await db.execute(select(GnlCharVal).where(GnlCharVal.gnl_char_val_id == gnl_char_val_id))
+    if result.scalar_one_or_none() is None:
+        raise HTTPException(status_code=404, detail="Değer bulunamadı")
+    await db.execute(delete(ProdCharVal).where(ProdCharVal.gnl_char_val_id == gnl_char_val_id))
+    await db.execute(delete(GnlCharVal).where(GnlCharVal.gnl_char_val_id == gnl_char_val_id))
+    await db.commit()
+    return {"detail": "Değer silindi"}
+
+
+# Urunler
+
+
+@router.get("/products", response_model=list[ProductOut])
+async def list_products(
+    char_value_ids: str | None = Query(
+        default=None, description="Virgülle ayrılmış gnl_char_val_id listesi (AND mantığı), ör: 3,7"
+    ),
+    db: AsyncSession = Depends(get_db),
+):
+    query = (
         select(Prod, AppUser.store_name, AppUser.first_name, AppUser.last_name)
         .outerjoin(AppUser, AppUser.user_id == Prod.seller_id)
         .where(
@@ -64,7 +231,29 @@ async def list_products(db: AsyncSession = Depends(get_db)):
             AppUser.is_active.is_(True),
         )
     )
-    return [_product_out(prod, store_name, first, last) for (prod, store_name, first, last) in result.all()]
+
+    if char_value_ids:
+        try:
+            ids = [int(x) for x in char_value_ids.split(",") if x.strip()]
+        except ValueError:
+            raise HTTPException(status_code=400, detail="char_value_ids sayısal id listesi olmalı, ör: 3,7")
+        if ids:
+            query = query.where(
+                Prod.prod_id.in_(
+                    select(ProdCharVal.prod_id)
+                    .where(ProdCharVal.gnl_char_val_id.in_(ids))
+                    .group_by(ProdCharVal.prod_id)
+                    .having(func.count(func.distinct(ProdCharVal.gnl_char_val_id)) == len(ids))
+                )
+            )
+
+    result = await db.execute(query)
+    rows = result.all()
+    char_map = await _characteristics_for_products(db, [prod.prod_id for (prod, *_r) in rows])
+    return [
+        _product_out(prod, store_name, first, last, char_map.get(prod.prod_id, []))
+        for (prod, store_name, first, last) in rows
+    ]
 
 
 @router.get("/sellers", response_model=list[SellerOut])
@@ -103,9 +292,13 @@ async def list_my_products(
     db: AsyncSession = Depends(get_db),
     user: AppUser = Depends(require_role(RoleName.SELLER, RoleName.ADMIN)),
 ):
-    # Satıcı kendi ürünlerini (pasif olanlar dahil) görebilsin diye burada is_active filtrelemiyoruz.
     result = await db.execute(select(Prod).where(Prod.seller_id == user.user_id))
-    return result.scalars().all()
+    products = result.scalars().all()
+    char_map = await _characteristics_for_products(db, [p.prod_id for p in products])
+    return [
+        _product_out(p, user.store_name, user.first_name, user.last_name, char_map.get(p.prod_id, []))
+        for p in products
+    ]
 
 
 @router.get("/products/{prod_id}", response_model=ProductOut)
@@ -117,7 +310,8 @@ async def get_product(prod_id: int, db: AsyncSession = Depends(get_db)):
     if product is None:
         raise HTTPException(status_code=404, detail="Ürün bulunamadı")
     store_name, first, last = await _seller_name(db, product.seller_id)
-    return _product_out(product, store_name, first, last)
+    char_map = await _characteristics_for_products(db, [product.prod_id])
+    return _product_out(product, store_name, first, last, char_map.get(product.prod_id, []))
 
 
 @router.post("/products", response_model=ProductOut)
@@ -126,11 +320,17 @@ async def create_product(
     db: AsyncSession = Depends(get_db),
     user: AppUser = Depends(require_role(RoleName.SELLER, RoleName.ADMIN)),
 ):
-    product = Prod(**payload.model_dump(), seller_id=user.user_id)
+    data = payload.model_dump(exclude={"char_value_ids"})
+    product = Prod(**data, seller_id=user.user_id)
     db.add(product)
+    await db.flush()
+
+    await _sync_product_characteristics(db, product, payload.char_value_ids)
+
     await db.commit()
     await db.refresh(product)
-    return _product_out(product, user.store_name, user.first_name, user.last_name)
+    char_map = await _characteristics_for_products(db, [product.prod_id])
+    return _product_out(product, user.store_name, user.first_name, user.last_name, char_map.get(product.prod_id, []))
 
 
 @router.patch("/products/{prod_id}", response_model=ProductOut)
@@ -147,12 +347,17 @@ async def update_product(
 
     await _ensure_owner_or_admin(product, user, db)
 
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    for field, value in payload.model_dump(exclude_unset=True, exclude={"char_value_ids"}).items():
         setattr(product, field, value)
+
+    if payload.char_value_ids is not None:
+        await _sync_product_characteristics(db, product, payload.char_value_ids)
+
     await db.commit()
     await db.refresh(product)
     store_name, first, last = await _seller_name(db, product.seller_id)
-    return _product_out(product, store_name, first, last)
+    char_map = await _characteristics_for_products(db, [product.prod_id])
+    return _product_out(product, store_name, first, last, char_map.get(product.prod_id, []))
 
 
 @router.delete("/products/{prod_id}")
@@ -168,9 +373,7 @@ async def delete_product(
 
     await _ensure_owner_or_admin(product, user, db)
 
-    # Soft delete: sipariş geçmişindeki referanslar bozulmasın diye fiziksel silme yapmıyoruz.
     product.is_active = False
-    from datetime import datetime, timezone
     product.deleted_at = datetime.now(timezone.utc)
     await db.commit()
     return {"detail": "Ürün pasifleştirildi"}

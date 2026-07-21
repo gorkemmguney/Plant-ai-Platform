@@ -40,10 +40,12 @@ def do_run_migrations(connection):
 
 
 async def run_migrations_online() -> None:
+    connect_args = {"ssl": "require"} if "supabase.co" in settings.DB_HOST else {}
     connectable = async_engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args=connect_args,
     )
 
     async with connectable.connect() as connection:

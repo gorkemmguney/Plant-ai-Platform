@@ -58,18 +58,23 @@ async def list_all_orders(
     db: AsyncSession = Depends(get_db),
     user: AppUser = Depends(require_role(RoleName.SELLER, RoleName.ADMIN)),
 ):
-    roles = await get_user_roles(user, db)
-    query = select(CustOrd).options(selectinload(CustOrd.items)).order_by(CustOrd.order_date.desc())
-
-    if RoleName.ADMIN not in roles:
-        # Satıcı sadece kendi ürünlerini içeren siparişleri görebilir
-        query = query.where(
+    # NOT: Bu endpoint "satıcının kendi mağaza siparişleri" ekranını besler.
+    # Admin rolü olsa bile burada HER ZAMAN sadece kullanıcının kendi
+    # ürünlerini içeren siparişler döner — admin'in platform genelinde tüm
+    # siparişleri görebileceği ayrı bir endpoint şu an mevcut değil,
+    # istenirse /admin altına ayrıca eklenebilir.
+    query = (
+        select(CustOrd)
+        .options(selectinload(CustOrd.items))
+        .where(
             CustOrd.cust_ord_id.in_(
                 select(CustOrdItem.cust_ord_id)
                 .join(Prod, Prod.prod_id == CustOrdItem.prod_id)
                 .where(Prod.seller_id == user.user_id)
             )
         )
+        .order_by(CustOrd.order_date.desc())
+    )
 
     result = await db.execute(query)
     return result.scalars().all()

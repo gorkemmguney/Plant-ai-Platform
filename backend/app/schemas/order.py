@@ -7,11 +7,26 @@ from pydantic import BaseModel, ConfigDict
 class OrderItemIn(BaseModel):
     prod_id: int
     quantity: int
+    # Müşterinin bu ürün için seçtiği varyant değerleri (gnl_char_val_id listesi).
+    # Her karakteristik için en fazla bir değer seçilebilir (ör. Renk'ten sadece biri).
+    selected_char_value_ids: list[int] = []
 
 
 class OrderCreateIn(BaseModel):
     sale_cnl_id: int
     items: list[OrderItemIn]
+
+
+class OrderItemCharOut(BaseModel):
+    """Sipariş anında seçilen karakteristik değerinin ANLIK KOPYASI (snapshot).
+    char_name burada YOK — ürün/karakteristik silinse bile bozulmasın diye
+    sadece gnl_char_id + seçilen değerin metni saklanıyor. İsim eşlemesi için
+    mobil taraf GET /catalog/characteristics listesini kullanabilir."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    gnl_char_id: int
+    value: str
 
 
 class OrderItemOut(BaseModel):
@@ -22,6 +37,7 @@ class OrderItemOut(BaseModel):
     prod_name: str
     quantity: int
     unit_price: Decimal
+    char_values: list[OrderItemCharOut] = []
 
 
 class OrderOut(BaseModel):

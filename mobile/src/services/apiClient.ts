@@ -1,20 +1,19 @@
 import axios from 'axios';
-import { firebaseAuth } from '../firebase/firebaseConfig';
+import { supabase } from '../lib/supabaseClient';
 
-
-const BASE_URL = 'http://192.168.1.102:8000';
+const BASE_URL = 'http://192.168.1.225:8000';
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,
   timeout: 60000,
 });
 
-
 apiClient.interceptors.request.use(async (config) => {
-  const currentUser = firebaseAuth.currentUser;
-  if (currentUser) {
-    const token = await currentUser.getIdToken();
-    config.headers.Authorization = `Bearer ${token}`;
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (session?.access_token) {
+    config.headers.Authorization = `Bearer ${session.access_token}`;
   }
   return config;
 });
@@ -22,10 +21,10 @@ apiClient.interceptors.request.use(async (config) => {
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response?.status === 401 && firebaseAuth.currentUser) {
-      const freshToken = await firebaseAuth.currentUser?.getIdToken(true);
-      if (freshToken && error.config) {
-        error.config.headers.Authorization = `Bearer ${freshToken}`;
+    if (error.response?.status === 401) {
+      const { data, error: refreshError } = await supabase.auth.refreshSession();
+      if (!refreshError && data.session?.access_token && error.config) {
+        error.config.headers.Authorization = `Bearer ${data.session.access_token}`;
         return apiClient.request(error.config);
       }
     }

@@ -16,7 +16,7 @@ import { colors, fonts, radius, shadow, spacing } from '../../theme/theme';
 const SALE_CHANNEL_ID = 1;
 
 export default function CartScreen({ navigation }: any) {
-  const { items, total, changeQty, removeFromCart, clearCart } = useCart();
+  const { items, total, changeQty, clearCart } = useCart();
   const [placing, setPlacing] = useState(false);
 
   // Sipariş için müşteri profili gerekli; yoksa otomatik oluştur (bireysel)
@@ -39,7 +39,11 @@ export default function CartScreen({ navigation }: any) {
       await ensureCustomerProfile();
       await apiClient.post('/orders', {
         sale_cnl_id: SALE_CHANNEL_ID,
-        items: items.map((i) => ({ prod_id: i.product.prod_id, quantity: i.quantity })),
+        items: items.map((i) => ({
+          prod_id: i.product.prod_id,
+          quantity: i.quantity,
+          selected_char_value_ids: i.selectedCharacteristics.map((c) => c.gnl_char_val_id),
+        })),
       });
       clearCart();
       Alert.alert('Sipariş alındı 🎉', 'Siparişin oluşturuldu.', [
@@ -53,35 +57,41 @@ export default function CartScreen({ navigation }: any) {
     }
   };
 
-  const renderItem = ({ item }: { item: (typeof items)[number] }) => (
-    <View style={styles.card}>
-      <View style={styles.thumb}>
-        <Text style={styles.thumbEmoji}>🪴</Text>
+  const renderItem = ({ item }: { item: (typeof items)[number] }) => {
+    const variantLabel = item.selectedCharacteristics.map((c) => `${c.char_name}: ${c.value}`).join(' · ');
+    return (
+      <View style={styles.card}>
+        <View style={styles.thumb}>
+          <Text style={styles.thumbEmoji}>🪴</Text>
+        </View>
+        <View style={styles.info}>
+          <Text style={styles.name} numberOfLines={1}>{item.product.name}</Text>
+          {variantLabel ? (
+            <Text style={styles.variant} numberOfLines={1}>{variantLabel}</Text>
+          ) : null}
+          <Text style={styles.price}>₺{Number(item.product.price).toFixed(2)}</Text>
+        </View>
+        <View style={styles.qtyBox}>
+          <TouchableOpacity
+            style={styles.qtyBtn}
+            onPress={() => changeQty(item.lineKey, -1)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.qtyBtnText}>−</Text>
+          </TouchableOpacity>
+          <Text style={styles.qtyText}>{item.quantity}</Text>
+          <TouchableOpacity
+            style={styles.qtyBtn}
+            onPress={() => changeQty(item.lineKey, 1)}
+            activeOpacity={0.7}
+            disabled={item.quantity >= item.product.stock}
+          >
+            <Text style={styles.qtyBtnText}>+</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-      <View style={styles.info}>
-        <Text style={styles.name} numberOfLines={1}>{item.product.name}</Text>
-        <Text style={styles.price}>₺{Number(item.product.price).toFixed(2)}</Text>
-      </View>
-      <View style={styles.qtyBox}>
-        <TouchableOpacity
-          style={styles.qtyBtn}
-          onPress={() => changeQty(item.product.prod_id, -1)}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.qtyBtnText}>−</Text>
-        </TouchableOpacity>
-        <Text style={styles.qtyText}>{item.quantity}</Text>
-        <TouchableOpacity
-          style={styles.qtyBtn}
-          onPress={() => changeQty(item.product.prod_id, 1)}
-          activeOpacity={0.7}
-          disabled={item.quantity >= item.product.stock}
-        >
-          <Text style={styles.qtyBtnText}>+</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+    );
+  };
 
   if (items.length === 0) {
     return (
@@ -105,7 +115,7 @@ export default function CartScreen({ navigation }: any) {
     <View style={styles.screen}>
       <FlatList
         data={items}
-        keyExtractor={(item) => String(item.product.prod_id)}
+        keyExtractor={(item) => item.lineKey}
         contentContainerStyle={styles.list}
         renderItem={renderItem}
       />
@@ -168,6 +178,7 @@ const styles = StyleSheet.create({
   thumbEmoji: { fontSize: 24 },
   info: { flex: 1 },
   name: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.ink },
+  variant: { fontFamily: fonts.sansMedium, fontSize: 11, color: colors.muted, marginTop: 2 },
   price: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.primaryDeep, marginTop: 2 },
   qtyBox: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   qtyBtn: {

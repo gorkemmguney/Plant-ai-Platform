@@ -1,9 +1,8 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { signOut } from 'firebase/auth';
+import { supabase } from '../lib/supabaseClient';
 import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../context/AuthContext';
-import { firebaseAuth } from '../firebase/firebaseConfig';
 import { badgeColors, colors, fonts, gradients, radius, shadow, spacing } from '../theme/theme';
 
 const roleLabels: Record<string, string> = {
@@ -53,7 +52,7 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        <TouchableOpacity style={styles.logoutButton} onPress={() => signOut(firebaseAuth)} activeOpacity={0.85}>
+        <TouchableOpacity style={styles.logoutButton} onPress={() => supabase.auth.signOut()} activeOpacity={0.85}>
           <Text style={styles.logoutButtonText}>Çıkış Yap</Text>
         </TouchableOpacity>
       </ScrollView>

@@ -1,4 +1,4 @@
-import { signOut } from 'firebase/auth';
+import { supabase } from '../../lib/supabaseClient';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -14,7 +14,6 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
-import { firebaseAuth } from '../../firebase/firebaseConfig';
 import { apiClient } from '../../services/apiClient';
 import { badgeColors, colors, fonts, radius, shadow, spacing } from '../../theme/theme';
 
@@ -123,7 +122,7 @@ export default function AdminSettingsScreen() {
           </TouchableOpacity>
         )}
 
-        <TouchableOpacity style={styles.logoutButton} onPress={() => signOut(firebaseAuth)} activeOpacity={0.85}>
+        <TouchableOpacity style={styles.logoutButton} onPress={() => supabase.auth.signOut()} activeOpacity={0.85}>
           <Text style={styles.logoutButtonText}>Çıkış Yap</Text>
         </TouchableOpacity>
       </ScrollView>

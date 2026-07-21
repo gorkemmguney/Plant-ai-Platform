@@ -1,9 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import { signOut } from 'firebase/auth';
+import { supabase } from '../../lib/supabaseClient';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
-import { firebaseAuth } from '../../firebase/firebaseConfig';
 import { colors, fonts, radius, shadow, spacing } from '../../theme/theme';
 
 type Role = 'admin' | 'seller' | 'customer';
@@ -48,7 +47,7 @@ export default function RoleSelectScreen() {
         })}
       </View>
 
-      <TouchableOpacity style={styles.logoutLink} onPress={() => signOut(firebaseAuth)} activeOpacity={0.7}>
+      <TouchableOpacity style={styles.logoutLink} onPress={() => supabase.auth.signOut()} activeOpacity={0.7}>
         <Text style={styles.logoutText}>Çıkış Yap</Text>
       </TouchableOpacity>
     </View>

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.firebase import set_role_claim
+from app.core.supabase_auth import set_role_claim
 from app.core.security import get_user_roles, require_role
 from app.db.session import get_db
 from app.models.user import AppUser, Role, UserRole

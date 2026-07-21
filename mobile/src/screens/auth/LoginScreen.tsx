@@ -1,5 +1,4 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { signInWithEmailAndPassword } from 'firebase/auth';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -14,7 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { firebaseAuth } from '../../firebase/firebaseConfig';
+import { supabase } from '../../lib/supabaseClient';
 import { colors, fonts, radius, spacing } from '../../theme/theme';
 
 const { height } = Dimensions.get('window');
@@ -27,7 +26,8 @@ export default function LoginScreen({ navigation }: any) {
   const handleLogin = async () => {
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(firebaseAuth, email.trim(), password);
+      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      if (error) throw error;
     } catch (err: any) {
       Alert.alert('Giriş başarısız', err.message);
     } finally {

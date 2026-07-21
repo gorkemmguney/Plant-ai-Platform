@@ -7,18 +7,34 @@ export interface CartProduct {
   stock: number;
 }
 
+export interface SelectedCharacteristic {
+  gnl_char_id: number;
+  char_name: string;
+  gnl_char_val_id: number;
+  value: string;
+}
+
 interface CartItem {
+  // Aynı ürünün farklı varyantları (ör. Yeşil vs Kırmızı Çiçekli) ayrı sepet
+  // satırları olsun diye prod_id + seçilen değerlerin birleşiminden üretilir.
+  lineKey: string;
   product: CartProduct;
   quantity: number;
+  selectedCharacteristics: SelectedCharacteristic[];
+}
+
+function buildLineKey(prodId: number, chars: SelectedCharacteristic[]): string {
+  const ids = chars.map((c) => c.gnl_char_val_id).sort((a, b) => a - b);
+  return `${prodId}::${ids.join(',')}`;
 }
 
 interface CartContextValue {
   items: CartItem[];
   count: number;
   total: number;
-  addToCart: (product: CartProduct, quantity?: number) => void;
-  removeFromCart: (prodId: number) => void;
-  changeQty: (prodId: number, delta: number) => void;
+  addToCart: (product: CartProduct, quantity?: number, selectedCharacteristics?: SelectedCharacteristic[]) => void;
+  removeFromCart: (lineKey: string) => void;
+  changeQty: (lineKey: string, delta: number) => void;
   clearCart: () => void;
 }
 
@@ -35,27 +51,28 @@ const CartContext = createContext<CartContextValue>({
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [items, setItems] = useState<CartItem[]>([]);
 
-  const addToCart = (product: CartProduct, quantity: number = 1) => {
+  const addToCart = (
+    product: CartProduct,
+    quantity: number = 1,
+    selectedCharacteristics: SelectedCharacteristic[] = []
+  ) => {
+    const lineKey = buildLineKey(product.prod_id, selectedCharacteristics);
     setItems((prev) => {
-      const existing = prev.find((i) => i.product.prod_id === product.prod_id);
+      const existing = prev.find((i) => i.lineKey === lineKey);
       if (existing) {
-        return prev.map((i) =>
-          i.product.prod_id === product.prod_id ? { ...i, quantity: i.quantity + quantity } : i
-        );
+        return prev.map((i) => (i.lineKey === lineKey ? { ...i, quantity: i.quantity + quantity } : i));
       }
-      return [...prev, { product, quantity }];
+      return [...prev, { lineKey, product, quantity, selectedCharacteristics }];
     });
   };
 
-  const removeFromCart = (prodId: number) => {
-    setItems((prev) => prev.filter((i) => i.product.prod_id !== prodId));
+  const removeFromCart = (lineKey: string) => {
+    setItems((prev) => prev.filter((i) => i.lineKey !== lineKey));
   };
 
-  const changeQty = (prodId: number, delta: number) => {
+  const changeQty = (lineKey: string, delta: number) => {
     setItems((prev) =>
-      prev
-        .map((i) => (i.product.prod_id === prodId ? { ...i, quantity: i.quantity + delta } : i))
-        .filter((i) => i.quantity > 0)
+      prev.map((i) => (i.lineKey === lineKey ? { ...i, quantity: i.quantity + delta } : i)).filter((i) => i.quantity > 0)
     );
   };
 
