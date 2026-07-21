@@ -1,3 +1,4 @@
+import random
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -306,6 +307,13 @@ async def related_products(
     if target.category == "plant":
         await _extend(Prod.category == "supply")
     await _extend(Prod.prod_spec_id == target.prod_spec_id)
+
+    # Gerçekten birlikte alınanları başta tut; gerisini karıştır ki her seferinde
+    # farklı ürünler önerelim (hep aynı sırayla gelmesin)
+    fixed = list(co_rows)
+    rest = [pid for pid in ordered_ids if pid not in fixed]
+    random.shuffle(rest)
+    ordered_ids = fixed + rest
 
     if not ordered_ids:
         return []
