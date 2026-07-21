@@ -17,8 +17,14 @@ interface Seller {
   product_count: number;
 }
 
+interface Rating {
+  average: number;
+  count: number;
+}
+
 export default function StoresScreen({ navigation }: any) {
   const [sellers, setSellers] = useState<Seller[]>([]);
+  const [ratings, setRatings] = useState<Record<number, Rating>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,6 +34,22 @@ export default function StoresScreen({ navigation }: any) {
       setError(null);
       const { data } = await apiClient.get<Seller[]>('/catalog/sellers');
       setSellers(data);
+      // Her mağazanın ortalama puanını çek (az sayıda mağaza olduğu için sorun değil)
+      const entries = await Promise.all(
+        data.map(async (s) => {
+          try {
+            const res = await apiClient.get<Rating>(`/reviews/store/${s.seller_id}`);
+            return [s.seller_id, res.data] as const;
+          } catch {
+            return [s.seller_id, { average: 0, count: 0 }] as const;
+          }
+        })
+      );
+      const map: Record<number, Rating> = {};
+      entries.forEach(([id, r]) => {
+        map[id] = r;
+      });
+      setRatings(map);
     } catch (err: any) {
       setError(err?.response?.data?.detail ?? 'Satıcılar yüklenemedi.');
     } finally {
@@ -53,7 +75,14 @@ export default function StoresScreen({ navigation }: any) {
       </View>
       <View style={styles.info}>
         <Text style={styles.name} numberOfLines={1}>{item.seller_name}</Text>
-        <Text style={styles.count}>{item.product_count} ürün</Text>
+        <View style={styles.metaRow}>
+          <Text style={styles.count}>{item.product_count} ürün</Text>
+          {ratings[item.seller_id]?.count > 0 && (
+            <Text style={styles.rating}>
+              ⭐ {ratings[item.seller_id].average.toFixed(1)} ({ratings[item.seller_id].count})
+            </Text>
+          )}
+        </View>
       </View>
       <Text style={styles.arrow}>›</Text>
     </TouchableOpacity>
@@ -62,7 +91,7 @@ export default function StoresScreen({ navigation }: any) {
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Satıcılar</Text>
+        <Text style={styles.headerTitle}>Mağazalar</Text>
         <Text style={styles.headerSub}>Mağazaları gez, ürünlerini incele</Text>
       </View>
 
@@ -128,7 +157,9 @@ const styles = StyleSheet.create({
   avatarText: { fontFamily: fonts.display, fontSize: 20, color: colors.primaryDeep },
   info: { flex: 1 },
   name: { fontFamily: fonts.sansBold, fontSize: 15, color: colors.ink },
-  count: { fontFamily: fonts.sans, fontSize: 12.5, color: colors.muted, marginTop: 2 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: 2 },
+  count: { fontFamily: fonts.sans, fontSize: 12.5, color: colors.muted },
+  rating: { fontFamily: fonts.sansBold, fontSize: 12.5, color: '#b3711a' },
   arrow: { fontFamily: fonts.sans, fontSize: 22, color: colors.muted2 },
   errorText: { fontFamily: fonts.sans, fontSize: 13.5, color: colors.muted, textAlign: 'center', lineHeight: 20 },
   retryButton: {

@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import get_user_roles, require_role
 from app.db.session import get_db
+from app.models.campaign import UserCoupon
 from app.models.catalog import Prod
 from app.models.customer import Cust
 from app.models.order import CustOrd, CustOrdItem
@@ -38,6 +39,48 @@ async def create_new_order(
     # Sepet birden fazla satıcının ürününü içeriyorsa, burada satıcı başına
     # ayrı bir sipariş oluşur — bu yüzden dönüş değeri her zaman bir listedir.
     orders = await create_order(db, cust_id, payload)
+
+    # Kupon seçildiyse: sadece kuponun ait olduğu mağazanın siparişine indirim uygula
+    if payload.coupon_id is not None:
+        coupon = (
+            await db.execute(
+                select(UserCoupon).where(
+                    UserCoupon.coupon_id == payload.coupon_id,
+                    UserCoupon.user_id == user.user_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if coupon is None or coupon.is_used:
+            raise HTTPException(status_code=400, detail="Kupon geçersiz veya zaten kullanılmış")
+
+        # Her sipariş tek bir satıcıya ait — kuponun mağazasına ait olanı bul
+        target = None
+        for o in orders:
+            prod_ids = [it.prod_id for it in o.items if it.prod_id is not None]
+            if not prod_ids:
+                continue
+            seller_id = (
+                await db.execute(select(Prod.seller_id).where(Prod.prod_id == prod_ids[0]))
+            ).scalar_one_or_none()
+            if seller_id == coupon.seller_id:
+                target = o
+                break
+        if target is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Bu kupon sadece kendi mağazasında geçerli; sepette o mağazadan ürün yok",
+            )
+
+        discount = float(coupon.discount_amount)
+        target.total_price = max(0.0, float(target.total_price) - discount)
+        coupon.is_used = True
+        await db.commit()
+
+    # Oyunlaştırma: harcanan her ₺ için 1 puan kazandır (indirim sonrası tutar üzerinden)
+    earned = int(sum(float(o.total_price) for o in orders))
+    if earned > 0:
+        user.points = (user.points or 0) + earned
+        await db.commit()
     return orders
 
 
@@ -131,6 +174,9 @@ async def cancel_my_order(
             prod.stock += item.quantity
 
     order.gnl_st_id = CANCELLED_STATUS
+    # Sipariş için kazanılan puanı geri al (0'ın altına düşürme)
+    refunded_points = int(float(order.total_price))
+    user.points = max(0, (user.points or 0) - refunded_points)
     await db.commit()
     await db.refresh(order)
     return order

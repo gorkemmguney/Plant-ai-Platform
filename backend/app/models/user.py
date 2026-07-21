@@ -22,6 +22,8 @@ class AppUser(Base):
     seller_status: Mapped[str] = mapped_column(String(20), server_default="none", nullable=False)
     # Satıcının mağaza/marka adı — sadece seller rolündeki kullanıcılar için anlamlı, NULL olabilir
     store_name: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    # Oyunlaştırma puanı — alışverişte kazanılır, kampanyalarda harcanır
+    points: Mapped[int] = mapped_column(Integer, server_default="0", nullable=False)
 
     roles: Mapped[list["UserRole"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 

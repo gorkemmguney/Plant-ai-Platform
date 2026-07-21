@@ -19,6 +19,7 @@ interface AuthContextValue {
   sellerStatus: SellerStatus;
   firstName: string;
   lastName: string;
+  points: number;
   loading: boolean;
   refreshProfile: () => Promise<void>;
   chooseRole: (role: Role | null) => void;
@@ -31,6 +32,7 @@ const AuthContext = createContext<AuthContextValue>({
   sellerStatus: 'none',
   firstName: '',
   lastName: '',
+  points: 0,
   loading: true,
   refreshProfile: async () => {},
   chooseRole: () => {},
@@ -43,6 +45,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [sellerStatus, setSellerStatus] = useState<SellerStatus>('none');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [points, setPoints] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const chooseRole = (role: Role | null) => {
@@ -100,6 +103,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSellerStatus(data.seller_status ?? 'none');
       setFirstName(data.first_name ?? '');
       setLastName(data.last_name ?? '');
+      setPoints(data.points ?? 0);
 
       setActiveRole((current) => (current && !nextRoles.includes(current) ? null : current));
       if (nextRoles.length === 1) {
@@ -156,6 +160,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         sellerStatus,
         firstName,
         lastName,
+        points,
         loading,
         refreshProfile,
         chooseRole,

@@ -13,6 +13,8 @@ import StoreProductsScreen from '../screens/customer/StoreProductsScreen';
 import StoresScreen from '../screens/customer/StoresScreen';
 import ImageAnalysisScreen from '../screens/customer/ImageAnalysisScreen';
 import AnalysisResultScreen from '../screens/customer/AnalysisResultScreen';
+import MyReviewsScreen from '../screens/customer/MyReviewsScreen';
+import CampaignsScreen from '../screens/customer/CampaignsScreen';
 import CustomTabBar from './CustomTabBar';
 
 export type CustomerTabParamList = {
@@ -29,6 +31,8 @@ export type CustomerStackParamList = {
   Orders: undefined;
   Notifications: undefined;
   StoreProducts: { sellerId: number; sellerName: string };
+  MyReviews: undefined;
+  Campaigns: undefined;
   ImageAnalysis: undefined;
   ChatScreen: undefined;
   AnalysisResult: {
@@ -54,8 +58,8 @@ const icons: Record<keyof CustomerTabParamList, { active: any; inactive: any }> 
 
 const labels: Record<keyof CustomerTabParamList, string> = {
   Home: 'Ana Sayfa',
-  Marketplace: 'Mağaza',
-  Stores: 'Satıcılar',
+  Marketplace: 'Ürünler',
+  Stores: 'Mağazalar',
   AIChat: 'AI Chat',
   Settings: 'Ayarlar',
 };
@@ -97,6 +101,8 @@ export default function CustomerStack() {
         <Stack.Screen name="Orders" component={OrdersScreen} options={{ title: 'Siparişlerim' }} />
         <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Bildirimler' }} />
         <Stack.Screen name="StoreProducts" component={StoreProductsScreen} options={{ title: 'Mağaza' }} />
+        <Stack.Screen name="MyReviews" component={MyReviewsScreen} options={{ title: 'Değerlendirmelerim' }} />
+        <Stack.Screen name="Campaigns" component={CampaignsScreen} options={{ title: 'Kampanyalar' }} />
         <Stack.Screen name="ImageAnalysis" component={ImageAnalysisScreen} options={{ headerShown: false }} />
         <Stack.Screen name="ChatScreen" component={AIChatScreen} options={{ headerShown: false }} />
         <Stack.Screen name="AnalysisResult" component={AnalysisResultScreen} options={{ headerShown: false }} />

@@ -4,12 +4,14 @@ import React from 'react';
 import { Platform } from 'react-native';
 import OrdersScreen from '../screens/seller/OrdersScreen';
 import ProductsScreen from '../screens/seller/ProductsScreen';
+import SellerReviewsScreen from '../screens/seller/SellerReviewsScreen';
 import SettingsScreen from '../screens/seller/SettingsScreen';
 import { colors, fonts } from '../theme/theme';
 
 export type SellerTabParamList = {
   Products: undefined;
   Orders: undefined;
+  Reviews: undefined;
   Settings: undefined;
 };
 
@@ -18,12 +20,14 @@ const Tab = createBottomTabNavigator<SellerTabParamList>();
 const icons: Record<keyof SellerTabParamList, { active: any; inactive: any }> = {
   Products: { active: 'pricetags', inactive: 'pricetags-outline' },
   Orders: { active: 'receipt', inactive: 'receipt-outline' },
+  Reviews: { active: 'star', inactive: 'star-outline' },
   Settings: { active: 'settings', inactive: 'settings-outline' },
 };
 
 const labels: Record<keyof SellerTabParamList, string> = {
   Products: 'Ürünler',
   Orders: 'Siparişler',
+  Reviews: 'Yorumlar',
   Settings: 'Ayarlar',
 };
 
@@ -51,6 +55,7 @@ export default function SellerStack() {
     >
       <Tab.Screen name="Products" component={ProductsScreen} options={{ title: labels.Products }} />
       <Tab.Screen name="Orders" component={OrdersScreen} options={{ title: labels.Orders }} />
+      <Tab.Screen name="Reviews" component={SellerReviewsScreen} options={{ title: labels.Reviews }} />
       <Tab.Screen name="Settings" component={SettingsScreen} options={{ title: labels.Settings }} />
     </Tab.Navigator>
   );
