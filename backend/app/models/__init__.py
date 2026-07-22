@@ -7,6 +7,8 @@ from app.models.order import CustOrd, CustOrdCharVal, CustOrdItem, CustOrdItemCh
 from app.models.bundle import Bundle, BundleItem
 from app.models.campaign import Campaign, UserCoupon
 from app.models.review import Review
+from app.models.location import Il, Ilce, Mahalle
+from app.models.address import CustomerAddress
 from app.models.user import AppUser, Role, UserRole
 
 __all__ = [
@@ -17,4 +19,5 @@ __all__ = [
     "AiChat", "AiMessage", "AiImageAnalysis", "AiRecommendation", "AiFeedback",
     "Notification", "BsnInter", "BsnInterSpec", "SchJob", "UserPreference",
     "Complaint", "Review", "Campaign", "UserCoupon", "Bundle", "BundleItem",
+    "Il", "Ilce", "Mahalle", "CustomerAddress",
 ]

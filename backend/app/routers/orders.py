@@ -178,5 +178,12 @@ async def cancel_my_order(
     refunded_points = int(float(order.total_price))
     user.points = max(0, (user.points or 0) - refunded_points)
     await db.commit()
-    await db.refresh(order)
-    return order
+
+    # NOT: commit sonrası db.refresh(order) sadece siparişin kendi kolonlarını
+    # tazeler — item.char_values gibi iç içe ilişkiler "expired" kalır ve
+    # response serileştirilirken senkron/greenlet dışı erişim hatası verir
+    # (MissingGreenlet). Bunun yerine tam ağacı eager-load ile yeniden çekiyoruz.
+    result = await db.execute(
+        select(CustOrd).options(selectinload(CustOrd.items)).where(CustOrd.cust_ord_id == cust_ord_id)
+    )
+    return result.scalar_one()

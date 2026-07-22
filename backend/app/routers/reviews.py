@@ -14,12 +14,16 @@ from app.schemas.review import RatingSummaryOut, ReviewCreateIn, ReviewOut, Revi
 
 router = APIRouter(prefix="/reviews", tags=["reviews"])
 
+# order_service.py ile aynı durum kodları — sadece TESLİM EDİLMİŞ siparişler puanlanabilir
+DELIVERED_STATUS_ID = 8
+
 
 def _review_out(review: Review, first: str | None, last: str | None) -> ReviewOut:
     name = f"{first or ''} {last or ''}".strip() or None
     return ReviewOut(
         review_id=review.review_id,
         prod_id=review.prod_id,
+        cust_ord_item_id=review.cust_ord_item_id,
         rating=review.rating,
         comment=review.comment,
         seller_reply=review.seller_reply,
@@ -39,37 +43,48 @@ async def create_review(
     if cust is None:
         raise HTTPException(status_code=400, detail="Müşteri profili bulunamadı")
 
-    # Sadece SATIN ALINAN ürün puanlanabilir (sipariş geçmişinde olmalı)
-    ordered = (
+    # Bu sipariş kalemi gerçekten bu müşteriye mi ait, TESLİM EDİLMİŞ bir
+    # siparişte mi, ve gerçekten bu ürüne mi ait — doğrula
+    item_check = (
         await db.execute(
             select(CustOrdItem.cust_ord_item_id)
             .join(CustOrd, CustOrd.cust_ord_id == CustOrdItem.cust_ord_id)
-            .where(CustOrd.cust_id == cust.cust_id, CustOrdItem.prod_id == payload.prod_id)
+            .where(
+                CustOrdItem.cust_ord_item_id == payload.cust_ord_item_id,
+                CustOrdItem.prod_id == payload.prod_id,
+                CustOrd.cust_id == cust.cust_id,
+                CustOrd.gnl_st_id == DELIVERED_STATUS_ID,
+            )
             .limit(1)
         )
     ).first()
-    if ordered is None:
-        raise HTTPException(status_code=400, detail="Sadece satın aldığın ürünleri puanlayabilirsin")
+    if item_check is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Bu ürünü değerlendirebilmek için siparişinin teslim edilmiş olması gerekiyor",
+        )
 
-    # Aynı ürüne tek yorum: varsa güncelle, yoksa oluştur
+    # Bu SİPARİŞ KALEMİ zaten değerlendirilmiş mi? (aynı ürün farklı bir
+    # siparişte tekrar teslim alınırsa yeniden değerlendirilebilir)
     existing = (
         await db.execute(
-            select(Review).where(Review.user_id == user.user_id, Review.prod_id == payload.prod_id)
+            select(Review).where(
+                Review.user_id == user.user_id, Review.cust_ord_item_id == payload.cust_ord_item_id
+            )
         )
     ).scalar_one_or_none()
 
     if existing is not None:
-        existing.rating = payload.rating
-        existing.comment = payload.comment
-        review = existing
-    else:
-        review = Review(
-            prod_id=payload.prod_id,
-            user_id=user.user_id,
-            rating=payload.rating,
-            comment=payload.comment,
-        )
-        db.add(review)
+        raise HTTPException(status_code=400, detail="Bu siparişi zaten değerlendirdin")
+
+    review = Review(
+        prod_id=payload.prod_id,
+        cust_ord_item_id=payload.cust_ord_item_id,
+        user_id=user.user_id,
+        rating=payload.rating,
+        comment=payload.comment,
+    )
+    db.add(review)
 
     await db.commit()
     await db.refresh(review)

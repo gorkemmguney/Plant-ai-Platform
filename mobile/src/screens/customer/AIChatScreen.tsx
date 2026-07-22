@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -23,6 +23,12 @@ interface ChatMessage {
   message: string;
 }
 
+const WELCOME_MESSAGE: ChatMessage = {
+  id: 'welcome',
+  role: 'assistant',
+  message: 'Merhaba! Ben senin AI bitki asistanınım. Bitkinle ilgili merak ettiğin her şeyi sorabilirsin.',
+};
+
 const SUGGESTIONS = [
   'Bitkim neden sarardı?',
   'Ne sıklıkla sulamalıyım?',
@@ -30,19 +36,41 @@ const SUGGESTIONS = [
   'İç mekan için hangi bitki uygun?',
 ];
 
-export default function AIChatScreen({ navigation }: any) {
+export default function AIChatScreen({ navigation, route }: any) {
   const insets = useSafeAreaInsets();
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: 'welcome',
-      role: 'assistant',
-      message: 'Merhaba! Ben senin AI bitki asistanınım. Bitkinle ilgili merak ettiğin her şeyi sorabilirsin.',
-    },
-  ]);
+  const resumeChatId: number | undefined = route?.params?.chatId;
+
+  const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
-  const chatIdRef = useRef<number | null>(null);
+  const [loadingHistory, setLoadingHistory] = useState(!!resumeChatId);
+  const chatIdRef = useRef<number | null>(resumeChatId ?? null);
   const listRef = useRef<FlatList>(null);
+
+  useEffect(() => {
+    if (!resumeChatId) return;
+    (async () => {
+      try {
+        const { data } = await apiClient.get(`/ai/chats/${resumeChatId}/messages`);
+        setMessages(
+          data.map((m: any) => ({
+            id: `${m.role[0]}-${m.ai_message_id}`,
+            role: m.role === 'user' ? 'user' : 'assistant',
+            message: m.message,
+          }))
+        );
+      } catch {
+        Alert.alert('Sohbet yüklenemedi', 'Bu sohbet geçmişi açılamadı, yeni bir sohbet başlatabilirsin.');
+      } finally {
+        setLoadingHistory(false);
+      }
+    })();
+  }, [resumeChatId]);
+
+  const startNewChat = () => {
+    chatIdRef.current = null;
+    setMessages([WELCOME_MESSAGE]);
+  };
 
   const sendMessage = async (text: string) => {
     if (!text || sending) return;
@@ -91,36 +119,51 @@ export default function AIChatScreen({ navigation }: any) {
         <View style={styles.headerAvatar}>
           <Ionicons name="sparkles" size={20} color={colors.primary} />
         </View>
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={styles.headerTitle}>AI Bitki Asistanı</Text>
           <Text style={styles.headerSub}>Sorularını sor, öneriler al</Text>
         </View>
+        <TouchableOpacity style={styles.backButton} onPress={startNewChat} activeOpacity={0.7}>
+          <Ionicons name="add" size={20} color={colors.white} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.navigate('AIChatHistory')}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="time-outline" size={19} color={colors.white} />
+        </TouchableOpacity>
       </LinearGradient>
 
-      <FlatList
-        ref={listRef}
-        data={messages}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.messageList}
-        onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
-        renderItem={({ item }) => (
-          <View
-            style={[
-              styles.bubbleRow,
-              item.role === 'user' ? styles.bubbleRowUser : styles.bubbleRowAssistant,
-            ]}
-          >
-            {item.role === 'assistant' && (
-              <View style={styles.bubbleAvatar}>
-                <Ionicons name="leaf" size={13} color={colors.primaryDeep} />
+      {loadingHistory ? (
+        <View style={styles.historyLoading}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      ) : (
+        <FlatList
+          ref={listRef}
+          data={messages}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.messageList}
+          onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
+          renderItem={({ item }) => (
+            <View
+              style={[
+                styles.bubbleRow,
+                item.role === 'user' ? styles.bubbleRowUser : styles.bubbleRowAssistant,
+              ]}
+            >
+              {item.role === 'assistant' && (
+                <View style={styles.bubbleAvatar}>
+                  <Ionicons name="leaf" size={13} color={colors.primaryDeep} />
+                </View>
+              )}
+              <View style={[styles.bubble, item.role === 'user' ? styles.bubbleUser : styles.bubbleAssistant]}>
+                <Text style={[styles.bubbleText, item.role === 'user' && styles.bubbleTextUser]}>
+                  {item.message}
+                </Text>
               </View>
-            )}
-            <View style={[styles.bubble, item.role === 'user' ? styles.bubbleUser : styles.bubbleAssistant]}>
-              <Text style={[styles.bubbleText, item.role === 'user' && styles.bubbleTextUser]}>
-                {item.message}
-              </Text>
             </View>
-          </View>
         )}
         ListFooterComponent={
           showSuggestions ? (
@@ -139,6 +182,7 @@ export default function AIChatScreen({ navigation }: any) {
           ) : null
         }
       />
+      )}
 
       {sending && (
         <View style={styles.typingRow}>
@@ -202,6 +246,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontFamily: fonts.sansBold, fontSize: 16, color: colors.white },
   headerSub: { fontFamily: fonts.sans, fontSize: 12, color: '#c9c9d6' },
+  historyLoading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   messageList: { padding: spacing.lg, gap: spacing.sm },
   bubbleRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.xs, marginBottom: spacing.sm },
   bubbleRowUser: { justifyContent: 'flex-end' },

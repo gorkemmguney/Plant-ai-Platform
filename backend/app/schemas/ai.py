@@ -19,6 +19,16 @@ class ChatMessageOut(BaseModel):
     created_at: datetime
 
 
+class ChatSessionOut(BaseModel):
+    """Geçmiş sohbet oturumlarını listelemek için — her satır bir 'ai_chat' kaydı."""
+
+    ai_chat_id: int
+    created_at: datetime
+    last_message_at: datetime | None = None
+    preview: str | None = None  # ilk kullanıcı mesajının kısa özeti
+    message_count: int = 0
+
+
 class ImageAnalysisOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -1,11 +1,12 @@
 import random
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import get_user_roles, require_role
+from app.core.storage import upload_image
 from app.db.session import get_db
 from app.models.catalog import GnlChar, GnlCharVal, Prod, ProdCharVal, ProdSpec
 from app.models.order import CustOrdItem
@@ -52,6 +53,7 @@ def _product_out(
         gnl_st_id=prod.gnl_st_id,
         prod_spec_id=prod.prod_spec_id,
         category=prod.category,
+        image_url=prod.image_url,
         seller_id=prod.seller_id,
         seller_name=_display_name(store_name, first, last),
         characteristics=characteristics or [],
@@ -436,6 +438,32 @@ async def update_product(
 
     if payload.char_value_ids is not None:
         await _sync_product_characteristics(db, product, payload.char_value_ids)
+
+    await db.commit()
+    await db.refresh(product)
+    store_name, first, last = await _seller_name(db, product.seller_id)
+    char_map = await _characteristics_for_products(db, [product.prod_id])
+    return _product_out(product, store_name, first, last, char_map.get(product.prod_id, []))
+
+
+@router.post("/products/{prod_id}/image", response_model=ProductOut)
+async def upload_product_image(
+    prod_id: int,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    user: AppUser = Depends(require_role(RoleName.SELLER, RoleName.ADMIN)),
+):
+    """Satıcının ürüne fotoğraf yükleyip/güncelleyebilmesi için — Supabase Storage'a yükler."""
+    result = await db.execute(select(Prod).where(Prod.prod_id == prod_id))
+    product = result.scalar_one_or_none()
+    if product is None:
+        raise HTTPException(status_code=404, detail="Ürün bulunamadı")
+
+    await _ensure_owner_or_admin(product, user, db)
+
+    image_bytes = await file.read()
+    image_url = upload_image(image_bytes, file.content_type or "image/jpeg", folder="products")
+    product.image_url = image_url
 
     await db.commit()
     await db.refresh(product)

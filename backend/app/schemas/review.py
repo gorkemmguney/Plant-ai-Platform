@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class ReviewCreateIn(BaseModel):
     prod_id: int
+    cust_ord_item_id: int
     rating: int = Field(ge=1, le=5)  # 1-5 yıldız
     comment: str | None = None
 
@@ -18,6 +19,7 @@ class ReviewOut(BaseModel):
 
     review_id: int
     prod_id: int
+    cust_ord_item_id: int
     rating: int
     comment: str | None = None
     seller_reply: str | None = None

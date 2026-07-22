@@ -135,6 +135,14 @@ export default function SettingsScreen({ navigation }: any) {
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.muted2} />
           </TouchableOpacity>
+          <View style={styles.menuDivider} />
+          <TouchableOpacity style={styles.menuRow} onPress={() => navigation.navigate('AddressScreen')} activeOpacity={0.7}>
+            <View style={styles.menuLeft}>
+              <Ionicons name="location-outline" size={18} color={colors.ink} />
+              <Text style={styles.menuText}>Adreslerim</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.muted2} />
+          </TouchableOpacity>
         </View>
 
         {roles.length > 1 && (
