@@ -21,6 +21,9 @@ class CustOrd(Base):
     cust_ord_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     cust_id: Mapped[int] = mapped_column(ForeignKey("cust.cust_id"), nullable=False)
     sale_cnl_id: Mapped[int] = mapped_column(ForeignKey("sale_cnl.sale_cnl_id"), nullable=False)
+    address_id: Mapped[int | None] = mapped_column(
+        ForeignKey("customer_address.address_id", ondelete="SET NULL"), nullable=True
+    )
     total_price: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     order_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     gnl_st_id: Mapped[int] = mapped_column(ForeignKey("gnl_st.gnl_st_id"), nullable=False)

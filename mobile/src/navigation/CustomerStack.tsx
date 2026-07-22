@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React from 'react';
 import { CartProvider } from '../context/CartContext';
 import AIChatScreen from '../screens/customer/AIChatScreen';
+import AIChatHistoryScreen from '../screens/customer/AIChatHistoryScreen';
 import CartScreen from '../screens/customer/CartScreen';
 import HomeScreen from '../screens/customer/HomeScreen';
 import MarketplaceScreen from '../screens/customer/MarketplaceScreen';
@@ -18,6 +19,8 @@ import CampaignsScreen from '../screens/customer/CampaignsScreen';
 import CommunityFeedScreen from '../screens/customer/CommunityFeedScreen';
 import PostDetailScreen from '../screens/customer/PostDetailScreen';
 import CreatePostScreen from '../screens/customer/CreatePostScreen';
+import AddressScreen from '../screens/customer/AddressScreen';
+import CheckoutScreen from '../screens/customer/CheckoutScreen';
 import CustomTabBar from './CustomTabBar';
 
 export type CustomerTabParamList = {
@@ -36,8 +39,11 @@ export type CustomerStackParamList = {
   StoreProducts: { sellerId: number; sellerName: string };
   MyReviews: undefined;
   Campaigns: undefined;
+  AddressScreen: undefined;
+  Checkout: { couponId?: number | null; discount?: number } | undefined;
   ImageAnalysis: undefined;
-  ChatScreen: undefined;
+  ChatScreen: { chatId?: number } | undefined;
+  AIChatHistory: undefined;
   AnalysisResult: {
     analysisId: number;
     imageUrl: string;
@@ -106,8 +112,11 @@ export default function CustomerStack() {
         <Stack.Screen name="StoreProducts" component={StoreProductsScreen} options={{ title: 'Mağaza' }} />
         <Stack.Screen name="MyReviews" component={MyReviewsScreen} options={{ title: 'Değerlendirmelerim' }} />
         <Stack.Screen name="Campaigns" component={CampaignsScreen} options={{ title: 'Kampanyalar' }} />
+        <Stack.Screen name="AddressScreen" component={AddressScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="Checkout" component={CheckoutScreen} options={{ headerShown: false }} />
         <Stack.Screen name="ImageAnalysis" component={ImageAnalysisScreen} options={{ headerShown: false }} />
         <Stack.Screen name="ChatScreen" component={AIChatScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="AIChatHistory" component={AIChatHistoryScreen} options={{ headerShown: false }} />
         <Stack.Screen name="AnalysisResult" component={AnalysisResultScreen} options={{ headerShown: false }} />
         <Stack.Screen name="CommunityFeed" component={CommunityFeedScreen} options={{ headerShown: false }} />
         <Stack.Screen name="PostDetail" component={PostDetailScreen} options={{ headerShown: false }} />

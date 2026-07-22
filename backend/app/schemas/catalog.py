@@ -49,6 +49,7 @@ class ProductOut(BaseModel):
     gnl_st_id: int
     prod_spec_id: int
     category: str = "plant"
+    image_url: str | None = None
     seller_id: int | None = None
     seller_name: str | None = None
     characteristics: list[ProductCharacteristicOut] = []

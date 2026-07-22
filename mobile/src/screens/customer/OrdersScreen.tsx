@@ -18,7 +18,6 @@ import { useCart } from '../../context/CartContext';
 import { apiClient } from '../../services/apiClient';
 import { badgeColors, colors, fonts, radius, shadow, spacing } from '../../theme/theme';
 
-// Katalogdaki güncel ürün (fiyat/stok/mağaza) — tekrar sipariş için gerekli
 interface CatalogProduct {
   prod_id: number;
   name: string;
@@ -28,16 +27,14 @@ interface CatalogProduct {
   seller_name: string | null;
 }
 
-// İptal edilen siparişi sola kaydırınca "Gizle" butonu açılır (ek paket gerekmez)
 const HIDE_BTN_W = 92;
 
 function SwipeToHide({ children, onHide }: { children: React.ReactNode; onHide: () => void }) {
   const translateX = useRef(new Animated.Value(0)).current;
-  const offset = useRef(0); // mevcut dinlenme konumu: 0 (kapalı) veya -HIDE_BTN_W (açık)
+  const offset = useRef(0);
 
   const pan = useRef(
     PanResponder.create({
-      // Her iki yöndeki yatay hareketi yakala (açmak sola, kapatmak sağa)
       onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 8 && Math.abs(g.dx) > Math.abs(g.dy),
       onPanResponderMove: (_, g) => {
         const next = Math.min(0, Math.max(-HIDE_BTN_W, offset.current + g.dx));
@@ -86,7 +83,6 @@ interface Order {
   items: OrderItem[];
 }
 
-// Sipariş durumları (backend order_service ile aynı id'ler)
 const statusLabels: Record<number, string> = {
   5: 'Alındı',
   6: 'Hazırlanıyor',
@@ -95,10 +91,8 @@ const statusLabels: Record<number, string> = {
   9: 'İptal edildi',
 };
 
-// Sadece erken aşamada iptal edilebilir (Alındı, Hazırlanıyor)
 const CANCELLABLE = [5, 6];
 
-// Gizlenen sipariş id'leri cihazda saklanır — ekran yenilense/uygulama kapansa da kalıcı
 const HIDDEN_ORDERS_KEY = 'hidden_order_ids';
 
 export default function OrdersScreen({ navigation }: any) {
@@ -112,14 +106,24 @@ export default function OrdersScreen({ navigation }: any) {
   const [reorderingId, setReorderingId] = useState<number | null>(null);
   const [hiddenIds, setHiddenIds] = useState<number[]>([]);
 
-  // Değerlendirme (yıldız + yorum) modalı
-  const [reviewItem, setReviewItem] = useState<{ prod_id: number; prod_name: string } | null>(null);
+  // Değerlendirme (yıldız + yorum) modalı — sipariş KALEMİ bazında tek seferlik
+  const [reviewItem, setReviewItem] = useState<{ prod_id: number; prod_name: string; cust_ord_item_id: number } | null>(null);
   const [stars, setStars] = useState(0);
   const [comment, setComment] = useState('');
   const [savingReview, setSavingReview] = useState(false);
+  const [reviewedItemIds, setReviewedItemIds] = useState<Set<number>>(new Set());
 
-  const openReview = (prod_id: number, prod_name: string) => {
-    setReviewItem({ prod_id, prod_name });
+  const loadReviewedItems = useCallback(async () => {
+    try {
+      const { data } = await apiClient.get('/reviews/mine');
+      setReviewedItemIds(new Set(data.map((r: any) => r.cust_ord_item_id)));
+    } catch {
+      // sessizce yoksay
+    }
+  }, []);
+
+  const openReview = (prod_id: number, prod_name: string, cust_ord_item_id: number) => {
+    setReviewItem({ prod_id, prod_name, cust_ord_item_id });
     setStars(0);
     setComment('');
   };
@@ -133,9 +137,11 @@ export default function OrdersScreen({ navigation }: any) {
     try {
       await apiClient.post('/reviews', {
         prod_id: reviewItem.prod_id,
+        cust_ord_item_id: reviewItem.cust_ord_item_id,
         rating: stars,
         comment: comment.trim() || null,
       });
+      setReviewedItemIds((prev) => new Set(prev).add(reviewItem.cust_ord_item_id));
       setReviewItem(null);
       Alert.alert('Teşekkürler 🌿', 'Değerlendirmen kaydedildi.');
     } catch (err: any) {
@@ -148,9 +154,6 @@ export default function OrdersScreen({ navigation }: any) {
   const load = useCallback(async () => {
     try {
       setError(null);
-      // Ürün adı artık her sipariş kaleminde anlık kopya (prod_name) olarak
-      // geliyor — ayrıca katalog sorgusuna gerek yok, ürün silinse/adı
-      // değişse bile geçmiş sipariş burada bozulmadan görünür.
       const { data } = await apiClient.get<Order[]>('/orders');
       setOrders(data);
     } catch (err: any) {
@@ -163,9 +166,9 @@ export default function OrdersScreen({ navigation }: any) {
 
   useEffect(() => {
     load();
-  }, [load]);
+    loadReviewedItems();
+  }, [load, loadReviewedItems]);
 
-  // Cihazda saklı gizlenmiş sipariş id'lerini bir kez yükle
   useEffect(() => {
     (async () => {
       try {
@@ -185,7 +188,6 @@ export default function OrdersScreen({ navigation }: any) {
     });
   };
 
-  // Tekrar sipariş: siparişteki ürünleri güncel fiyat/stokla sepete ekler
   const handleReorder = async (order: Order) => {
     setReorderingId(order.cust_ord_id);
     try {
@@ -288,21 +290,22 @@ export default function OrdersScreen({ navigation }: any) {
           <Text style={styles.detailHint}>{expanded ? 'Gizle ▲' : 'Detay ▼'}</Text>
         </View>
 
-        {/* Değerlendir — durum satırının hemen altında, her zaman görünür */}
-        <View style={styles.rateSection}>
-          {item.items
-            .filter((it) => it.prod_id != null)
-            .map((it) => (
-              <TouchableOpacity
-                key={`rate-${it.cust_ord_item_id}`}
-                style={styles.rateRowBtn}
-                onPress={() => openReview(it.prod_id as number, it.prod_name)}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.rateRowText} numberOfLines={1}>⭐ Değerlendir — {it.prod_name}</Text>
-              </TouchableOpacity>
-            ))}
-        </View>
+        {item.gnl_st_id === 8 && (
+          <View style={styles.rateSection}>
+            {item.items
+              .filter((it) => it.prod_id != null && !reviewedItemIds.has(it.cust_ord_item_id))
+              .map((it) => (
+                <TouchableOpacity
+                  key={`rate-${it.cust_ord_item_id}`}
+                  style={styles.rateRowBtn}
+                  onPress={() => openReview(it.prod_id as number, it.prod_name, it.cust_ord_item_id)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.rateRowText} numberOfLines={1}>⭐ Değerlendir — {it.prod_name}</Text>
+                </TouchableOpacity>
+              ))}
+          </View>
+        )}
 
         {expanded && (
           <View style={styles.itemsBox}>
@@ -357,7 +360,6 @@ export default function OrdersScreen({ navigation }: any) {
       </TouchableOpacity>
     );
 
-    // İptal edilen siparişler sola kaydırılıp "Gizle" ile listeden gizlenebilir
     if (item.gnl_st_id === 9) {
       return (
         <SwipeToHide onHide={() => hideOrder(item.cust_ord_id)}>
@@ -409,7 +411,7 @@ export default function OrdersScreen({ navigation }: any) {
         <View style={styles.modalWrap}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle} numberOfLines={2}>{reviewItem?.prod_name}</Text>
-            <Text style={styles.modalSub}>Bu ürünü değerlendir</Text>
+            <Text style={styles.modalSub}>Bu ürünü değerlendir — bu işlem sonradan değiştirilemez</Text>
 
             <View style={styles.starsRow}>
               {[1, 2, 3, 4, 5].map((n) => (

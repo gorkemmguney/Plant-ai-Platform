@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   Modal,
   Pressable,
   RefreshControl,
@@ -32,6 +33,7 @@ interface Product {
   price: string | number;
   stock: number;
   category: string;
+  image_url: string | null;
   seller_id: number | null;
   seller_name: string | null;
   characteristics: ProductCharacteristic[];
@@ -127,6 +129,9 @@ export default function MarketplaceScreen({ navigation }: any) {
     count: 0,
     reviews: [],
   });
+
+  // Tam ekran görsel büyütme
+  const [zoomImageUrl, setZoomImageUrl] = useState<string | null>(null);
 
   const openAddModal = (product: Product) => {
     const initial: Record<number, number> = {};
@@ -294,9 +299,13 @@ export default function MarketplaceScreen({ navigation }: any) {
     const cheapest = info && info.count > 1 && Number(item.price) === info.min;
     return (
       <TouchableOpacity style={styles.card} activeOpacity={0.9} onPress={() => openAddModal(item)}>
-        <View style={styles.thumb}>
-          <Text style={styles.thumbEmoji}>🪴</Text>
-        </View>
+        {item.image_url ? (
+          <Image source={{ uri: item.image_url }} style={styles.thumb} />
+        ) : (
+          <View style={styles.thumb}>
+            <Text style={styles.thumbEmoji}>🪴</Text>
+          </View>
+        )}
         <View style={styles.info}>
           <View style={styles.nameRow}>
             <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
@@ -483,6 +492,19 @@ export default function MarketplaceScreen({ navigation }: any) {
         <View style={styles.modalWrap}>
           <View style={styles.modalCard}>
             <ScrollView showsVerticalScrollIndicator={false} bounces={false} overScrollMode="never">
+              {selected?.image_url ? (
+                <TouchableOpacity activeOpacity={0.9} onPress={() => setZoomImageUrl(selected.image_url)}>
+                  <Image source={{ uri: selected.image_url }} style={styles.modalImage} />
+                  <View style={styles.zoomHint}>
+                    <Ionicons name="expand-outline" size={14} color={colors.white} />
+                  </View>
+                </TouchableOpacity>
+              ) : (
+                <View style={[styles.modalImage, styles.modalImagePlaceholder]}>
+                  <Text style={{ fontSize: 40 }}>🪴</Text>
+                </View>
+              )}
+
               <Text style={styles.modalTitle} numberOfLines={2}>{selected?.name}</Text>
               <Text style={styles.modalPrice}>₺{Number(selected?.price ?? 0).toFixed(2)}</Text>
               <Text style={styles.modalStock}>Stok: {selected?.stock ?? 0}</Text>
@@ -701,6 +723,31 @@ export default function MarketplaceScreen({ navigation }: any) {
               </TouchableOpacity>
             ))}
           </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Tam ekran görsel büyütme */}
+      <Modal
+        visible={zoomImageUrl !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setZoomImageUrl(null)}
+      >
+        <TouchableOpacity
+          style={styles.fullscreenImageWrap}
+          activeOpacity={1}
+          onPress={() => setZoomImageUrl(null)}
+        >
+          {zoomImageUrl && (
+            <Image source={{ uri: zoomImageUrl }} style={styles.fullscreenImage} resizeMode="contain" />
+          )}
+          <TouchableOpacity
+            style={styles.fullscreenCloseBtn}
+            onPress={() => setZoomImageUrl(null)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="close" size={22} color={colors.white} />
+          </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
     </View>
@@ -1030,4 +1077,44 @@ const styles = StyleSheet.create({
   },
   sortOptionText: { fontFamily: fonts.sansMedium, fontSize: 14.5, color: colors.ink },
   sortOptionTextActive: { color: colors.primaryDeep, fontFamily: fonts.sansBold },
+  modalImage: {
+    width: '100%',
+    height: 180,
+    borderRadius: radius.md,
+    marginBottom: spacing.md,
+  },
+  modalImagePlaceholder: {
+    backgroundColor: colors.bgAlt,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  zoomHint: {
+    position: 'absolute',
+    bottom: spacing.md + 8,
+    right: spacing.sm + 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fullscreenImageWrap: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.92)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fullscreenImage: { width: '100%', height: '80%' },
+  fullscreenCloseBtn: {
+    position: 'absolute',
+    top: 56,
+    right: spacing.lg,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

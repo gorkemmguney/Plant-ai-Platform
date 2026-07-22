@@ -7,6 +7,8 @@ from app.models.order import CustOrd, CustOrdCharVal, CustOrdItem, CustOrdItemCh
 from app.models.bundle import Bundle, BundleItem
 from app.models.campaign import Campaign, UserCoupon
 from app.models.review import Review
+from app.models.location import Il, Ilce, Mahalle
+from app.models.address import CustomerAddress
 from app.models.user import AppUser, Role, UserRole
 from app.models.community import CommunityPost, CommunityLike, CommunityComment
 
@@ -19,4 +21,5 @@ __all__ = [
     "Notification", "BsnInter", "BsnInterSpec", "SchJob", "UserPreference",
     "Complaint", "Review", "Campaign", "UserCoupon", "Bundle", "BundleItem",
     "CommunityPost", "CommunityLike", "CommunityComment",
+    "Il", "Ilce", "Mahalle", "CustomerAddress",
 ]

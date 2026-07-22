@@ -30,6 +30,7 @@ class Prod(Base):
     )
     prod_spec_id: Mapped[int] = mapped_column(ForeignKey("prod_spec.prod_spec_id"), nullable=False)
     category: Mapped[str] = mapped_column(String(20), server_default="plant", nullable=False)  # 'plant' (çiçek) | 'supply' (malzeme)
+    image_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

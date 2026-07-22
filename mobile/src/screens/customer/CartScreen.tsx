@@ -1,7 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
   FlatList,
   ScrollView,
   StyleSheet,
@@ -12,9 +10,6 @@ import {
 import { useCart } from '../../context/CartContext';
 import { apiClient } from '../../services/apiClient';
 import { colors, fonts, radius, shadow, spacing } from '../../theme/theme';
-
-// Seed ile eklenen varsayılan satış kanalı (sale_cnl_id = 1: "Mobil Uygulama")
-const SALE_CHANNEL_ID = 1;
 
 interface Coupon {
   coupon_id: number;
@@ -34,9 +29,7 @@ interface Suggestion {
 }
 
 export default function CartScreen({ navigation }: any) {
-  const { items, total, addToCart, changeQty, clearCart } = useCart();
-  const [placing, setPlacing] = useState(false);
-
+  const { items, total, addToCart, changeQty } = useCart();
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [selectedCouponId, setSelectedCouponId] = useState<number | null>(null);
 
@@ -80,45 +73,9 @@ export default function CartScreen({ navigation }: any) {
     : 0;
   const finalTotal = Math.max(0, total - discount);
 
-  // Sipariş için müşteri profili gerekli; yoksa otomatik oluştur (bireysel)
-  const ensureCustomerProfile = async () => {
-    try {
-      await apiClient.get('/customers/me');
-    } catch (err: any) {
-      if (err?.response?.status === 404) {
-        await apiClient.post('/customers/me', { customer_type: 'IND', individual: {} });
-      } else {
-        throw err;
-      }
-    }
-  };
-
-  const handleCheckout = async () => {
+  const handleCheckout = () => {
     if (items.length === 0) return;
-    setPlacing(true);
-    try {
-      await ensureCustomerProfile();
-      await apiClient.post('/orders', {
-        sale_cnl_id: SALE_CHANNEL_ID,
-        coupon_id: selectedCouponId,
-        items: items.map((i) => ({
-          prod_id: i.product.prod_id,
-          quantity: i.quantity,
-          selected_char_value_ids: i.selectedCharacteristics.map((c) => c.gnl_char_val_id),
-        })),
-      });
-      clearCart();
-      setSelectedCouponId(null);
-      loadCoupons();
-      Alert.alert('Sipariş alındı 🎉', 'Siparişin oluşturuldu.', [
-        { text: 'Siparişlerim', onPress: () => navigation.navigate('Orders') },
-        { text: 'Tamam' },
-      ]);
-    } catch (err: any) {
-      Alert.alert('Sipariş verilemedi', err?.response?.data?.detail ?? 'Sipariş oluşturulamadı.');
-    } finally {
-      setPlacing(false);
-    }
+    navigation.navigate('Checkout', { couponId: selectedCouponId, discount });
   };
 
   const renderItem = ({ item }: { item: (typeof items)[number] }) => {
@@ -268,16 +225,11 @@ export default function CartScreen({ navigation }: any) {
           <Text style={styles.totalValue}>₺{finalTotal.toFixed(2)}</Text>
         </View>
         <TouchableOpacity
-          style={[styles.checkoutButton, placing && styles.checkoutDisabled]}
+          style={styles.checkoutButton}
           onPress={handleCheckout}
-          disabled={placing}
           activeOpacity={0.85}
         >
-          {placing ? (
-            <ActivityIndicator size="small" color={colors.buttonPrimaryText} />
-          ) : (
-            <Text style={styles.checkoutText}>Sipariş Ver</Text>
-          )}
+          <Text style={styles.checkoutText}>Sipariş Ver</Text>
         </TouchableOpacity>
       </View>
     </View>

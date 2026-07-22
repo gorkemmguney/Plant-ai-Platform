@@ -9,6 +9,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.catalog import GnlCharVal, Prod, ProdCharVal
+from app.models.address import CustomerAddress
 from app.models.order import CustOrd, CustOrdItem, CustOrdItemCharVal
 from app.schemas.order import OrderCreateIn
 
@@ -41,8 +42,15 @@ async def update_order_status(db: AsyncSession, cust_ord_id: int, gnl_st_id: int
         await create_notification(db, cust.user_id, "Sipariş Güncellemesi", message)
 
     await db.commit()
-    await db.refresh(order)
-    return order
+
+    # NOT: db.refresh(order) sadece siparişin kendi kolonlarını tazeler,
+    # item.char_values gibi iç içe ilişkiler "expired" kalıp response
+    # serileştirilirken MissingGreenlet hatasına yol açar — tam ağacı
+    # eager-load ile yeniden çekiyoruz.
+    result = await db.execute(
+        select(CustOrd).options(selectinload(CustOrd.items)).where(CustOrd.cust_ord_id == cust_ord_id)
+    )
+    return result.scalar_one()
 
 
 async def _valid_char_values_for_product(db: AsyncSession, prod_id: int) -> dict[int, tuple[int, str]]:
@@ -61,7 +69,17 @@ async def create_order(db: AsyncSession, cust_id: int, payload: OrderCreateIn) -
     if not payload.items:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Sepet boş olamaz")
 
-    
+    # Teslimat adresi bu müşteriye mi ait, gerçekten kayıtlı mı doğrula
+    address = (
+        await db.execute(
+            select(CustomerAddress).where(
+                CustomerAddress.address_id == payload.address_id, CustomerAddress.cust_id == cust_id
+            )
+        )
+    ).scalar_one_or_none()
+    if address is None:
+        raise HTTPException(status_code=400, detail="Geçersiz teslimat adresi")
+
     items_by_seller: dict[int | None, list[CustOrdItem]] = {}
     totals_by_seller: dict[int | None, Decimal] = {}
    
@@ -117,6 +135,7 @@ async def create_order(db: AsyncSession, cust_id: int, payload: OrderCreateIn) -
         order = CustOrd(
             cust_id=cust_id,
             sale_cnl_id=payload.sale_cnl_id,
+            address_id=payload.address_id,
             total_price=totals_by_seller[seller_key],
             gnl_st_id=DEFAULT_ORDER_STATUS_ID,
             items=order_items,

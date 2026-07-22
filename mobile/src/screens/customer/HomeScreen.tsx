@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import React, { useCallback, useEffect, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 import { apiClient } from '../../services/apiClient';
@@ -24,6 +24,7 @@ interface Product {
   description: string | null;
   price: string | number;
   stock: number;
+  image_url: string | null;
   characteristics: ProductCharacteristic[];
 }
 
@@ -221,9 +222,13 @@ export default function HomeScreen({ navigation }: any) {
                     setQty(1);
                   }}
                 >
-                  <View style={styles.cardImage}>
-                    <Ionicons name="leaf" size={34} color={colors.primaryDeep} />
-                  </View>
+                  {item.image_url ? (
+                    <Image source={{ uri: item.image_url }} style={styles.cardImage} />
+                  ) : (
+                    <View style={styles.cardImage}>
+                      <Ionicons name="leaf" size={34} color={colors.primaryDeep} />
+                    </View>
+                  )}
                   <View style={styles.cardContent}>
                     <Text style={styles.cardTitle} numberOfLines={1}>{item.name}</Text>
                     <View style={[styles.statusPill, !inStock && styles.statusPillOut]}>

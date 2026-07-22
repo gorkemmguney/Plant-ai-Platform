@@ -1,8 +1,10 @@
+import * as ImagePicker from 'expo-image-picker';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -25,6 +27,8 @@ interface Product {
   stock: number;
   gnl_st_id: number;
   prod_spec_id: number;
+  category: string;
+  image_url: string | null;
 }
 
 interface ProductSpec {
@@ -40,9 +44,18 @@ interface FormState {
   stock: string;
   gnl_st_id: string;
   prod_spec_id: number | null;
+  category: 'plant' | 'supply';
 }
 
-const EMPTY_FORM: FormState = { name: '', description: '', price: '', stock: '0', gnl_st_id: '1', prod_spec_id: null };
+const EMPTY_FORM: FormState = {
+  name: '',
+  description: '',
+  price: '',
+  stock: '0',
+  gnl_st_id: '1',
+  prod_spec_id: null,
+  category: 'plant',
+};
 
 export default function ProductsScreen() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -55,6 +68,8 @@ export default function ProductsScreen() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [pendingImageUri, setPendingImageUri] = useState<string | null>(null);
+  const [existingImageUrl, setExistingImageUrl] = useState<string | null>(null);
 
   const loadProducts = useCallback(async () => {
     try {
@@ -87,6 +102,8 @@ export default function ProductsScreen() {
   const openCreate = () => {
     setEditingId(null);
     setForm({ ...EMPTY_FORM, prod_spec_id: specs[0]?.prod_spec_id ?? null });
+    setPendingImageUri(null);
+    setExistingImageUrl(null);
     setModalOpen(true);
   };
 
@@ -99,8 +116,45 @@ export default function ProductsScreen() {
       stock: String(product.stock),
       gnl_st_id: String(product.gnl_st_id),
       prod_spec_id: product.prod_spec_id,
+      category: (product.category as 'plant' | 'supply') ?? 'plant',
     });
+    setPendingImageUri(null);
+    setExistingImageUrl(product.image_url ?? null);
     setModalOpen(true);
+  };
+
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('İzin Gerekli', 'Fotoğraf seçebilmek için galeri izni vermeniz gerekiyor.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      setPendingImageUri(result.assets[0].uri);
+    }
+  };
+
+  const uploadPendingImage = async (prodId: number) => {
+    if (!pendingImageUri) return;
+    const uriParts = pendingImageUri.split('/');
+    const fileName = uriParts[uriParts.length - 1] || 'product.jpg';
+    const fileType = fileName.split('.').pop() === 'png' ? 'image/png' : 'image/jpeg';
+
+    const formData = new FormData();
+    formData.append('file', { uri: pendingImageUri, name: fileName, type: fileType } as any);
+
+    try {
+      await apiClient.post(`/catalog/products/${prodId}/image`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+    } catch (err: any) {
+      Alert.alert('Görsel yüklenemedi', err?.response?.data?.detail ?? 'Ürün kaydedildi ama görsel yüklenemedi.');
+    }
   };
 
   const handleSave = async () => {
@@ -125,12 +179,18 @@ export default function ProductsScreen() {
       stock: Number(form.stock) || 0,
       gnl_st_id: Number(form.gnl_st_id) || 1,
       prod_spec_id: form.prod_spec_id,
+      category: form.category,
     };
     try {
+      let prodId = editingId;
       if (editingId == null) {
-        await apiClient.post('/catalog/products', payload);
+        const { data } = await apiClient.post('/catalog/products', payload);
+        prodId = data.prod_id;
       } else {
         await apiClient.patch(`/catalog/products/${editingId}`, payload);
+      }
+      if (pendingImageUri && prodId != null) {
+        await uploadPendingImage(prodId);
       }
       setModalOpen(false);
       await loadProducts();
@@ -162,6 +222,13 @@ export default function ProductsScreen() {
   const renderProduct = ({ item }: { item: Product }) => (
     <View style={styles.card}>
       <View style={styles.cardTop}>
+        {item.image_url ? (
+          <Image source={{ uri: item.image_url }} style={styles.thumb} />
+        ) : (
+          <View style={[styles.thumb, styles.thumbPlaceholder]}>
+            <Text style={styles.thumbPlaceholderText}>🌿</Text>
+          </View>
+        )}
         <View style={{ flex: 1 }}>
           <Text style={styles.name}>{item.name}</Text>
           {!!item.description && (
@@ -233,6 +300,41 @@ export default function ProductsScreen() {
           <View style={styles.modalCard}>
             <ScrollView keyboardShouldPersistTaps="handled">
               <Text style={styles.modalTitle}>{editingId == null ? 'Yeni Ürün' : 'Ürünü Düzenle'}</Text>
+
+              <Text style={styles.label}>Ürün Fotoğrafı</Text>
+              <TouchableOpacity style={styles.imagePicker} onPress={pickImage} activeOpacity={0.85}>
+                {pendingImageUri || existingImageUrl ? (
+                  <Image source={{ uri: pendingImageUri ?? existingImageUrl ?? '' }} style={styles.imagePreview} />
+                ) : (
+                  <View style={styles.imagePlaceholder}>
+                    <Text style={styles.imagePlaceholderText}>📷 Fotoğraf Ekle</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+
+              <Text style={styles.label}>Ürün Türü</Text>
+              <View style={styles.specRow}>
+                {(
+                  [
+                    { key: 'plant', label: '🌸 Çiçek / Bitki' },
+                    { key: 'supply', label: '🪴 Malzeme (Saksı, Toprak vb.)' },
+                  ] as { key: 'plant' | 'supply'; label: string }[]
+                ).map((opt) => {
+                  const active = form.category === opt.key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.key}
+                      style={[styles.specChip, active ? styles.specChipActive : styles.specChipInactive]}
+                      onPress={() => setForm((f) => ({ ...f, category: opt.key }))}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={[styles.specChipText, active ? styles.specChipTextActive : styles.specChipTextInactive]}>
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
 
               <Text style={styles.label}>Ürün adı</Text>
               <TextInput
@@ -444,4 +546,34 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   saveText: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.buttonPrimaryText },
+  thumb: {
+    width: 52,
+    height: 52,
+    borderRadius: radius.sm,
+    marginRight: spacing.sm,
+  },
+  thumbPlaceholder: {
+    backgroundColor: colors.bgAlt,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  thumbPlaceholderText: { fontSize: 22 },
+  imagePicker: { marginBottom: spacing.md },
+  imagePreview: {
+    width: '100%',
+    height: 160,
+    borderRadius: radius.md,
+  },
+  imagePlaceholder: {
+    width: '100%',
+    height: 120,
+    borderRadius: radius.md,
+    backgroundColor: colors.bgAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imagePlaceholderText: { fontFamily: fonts.sansSemi, fontSize: 13.5, color: colors.muted },
 });

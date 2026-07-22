@@ -14,6 +14,7 @@ class OrderItemIn(BaseModel):
 
 class OrderCreateIn(BaseModel):
     sale_cnl_id: int
+    address_id: int  # teslimat adresi — zorunlu
     items: list[OrderItemIn]
     coupon_id: int | None = None  # sepette seçilen indirim kuponu (opsiyonel)
 
@@ -46,6 +47,7 @@ class OrderOut(BaseModel):
 
     cust_ord_id: int
     cust_id: int
+    address_id: int | None = None
     total_price: Decimal
     order_date: datetime
     gnl_st_id: int
