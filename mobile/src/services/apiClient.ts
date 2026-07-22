@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { supabase } from '../lib/supabaseClient';
 
-const BASE_URL = 'http://192.168.1.225:8000';
+const BASE_URL = 'http://192.168.8.150:8000';
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,

@@ -38,6 +38,7 @@ interface QuickTile {
 const QUICK_TILES: QuickTile[] = [
   { key: 'analyze', label: 'AI Teşhis', icon: 'camera', onPress: (nav) => nav.navigate('ImageAnalysis') },
   { key: 'chat', label: 'AI Sohbet', icon: 'chatbubble-ellipses', onPress: (nav) => nav.navigate('ChatScreen') },
+  { key: 'community', label: 'Topluluk', icon: 'people', onPress: (nav) => nav.navigate('CommunityFeed') },
   { key: 'shop', label: 'Mağaza', icon: 'storefront', onPress: (nav) => nav.navigate('Tabs', { screen: 'Marketplace' }) },
   { key: 'stores', label: 'Satıcılar', icon: 'business', onPress: (nav) => nav.navigate('Tabs', { screen: 'Stores' }) },
 ];

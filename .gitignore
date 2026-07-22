@@ -9,3 +9,6 @@ firebase-service-account.json
 
 # OS
 .DS_Store
+
+# Local batch runners
+*.bat

@@ -16,6 +16,9 @@ import ImageAnalysisScreen from '../screens/customer/ImageAnalysisScreen';
 import AnalysisResultScreen from '../screens/customer/AnalysisResultScreen';
 import MyReviewsScreen from '../screens/customer/MyReviewsScreen';
 import CampaignsScreen from '../screens/customer/CampaignsScreen';
+import CommunityFeedScreen from '../screens/customer/CommunityFeedScreen';
+import PostDetailScreen from '../screens/customer/PostDetailScreen';
+import CreatePostScreen from '../screens/customer/CreatePostScreen';
 import AddressScreen from '../screens/customer/AddressScreen';
 import CheckoutScreen from '../screens/customer/CheckoutScreen';
 import CustomTabBar from './CustomTabBar';
@@ -49,6 +52,9 @@ export type CustomerStackParamList = {
     createdAt: string;
     recommendedProducts?: any[];
   };
+  CommunityFeed: undefined;
+  PostDetail: { postId: number };
+  CreatePost: undefined;
 };
 
 const Tab = createBottomTabNavigator<CustomerTabParamList>();
@@ -85,9 +91,6 @@ function CustomerTabNavigator() {
         options={{ title: labels.AIChat }}
         listeners={({ navigation }) => ({
           tabPress: (e) => {
-            // AI sekmesi bir "tab içeriği" olarak açılmaz — dış Stack'teki
-            // ChatScreen'i tam ekran açar (alt bar kaybolur), geri dönünce
-            // hangi sekmedeysek oraya (alt bar tekrar görünür şekilde) döner.
             e.preventDefault();
             navigation.getParent()?.navigate('ChatScreen');
           },
@@ -115,6 +118,9 @@ export default function CustomerStack() {
         <Stack.Screen name="ChatScreen" component={AIChatScreen} options={{ headerShown: false }} />
         <Stack.Screen name="AIChatHistory" component={AIChatHistoryScreen} options={{ headerShown: false }} />
         <Stack.Screen name="AnalysisResult" component={AnalysisResultScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="CommunityFeed" component={CommunityFeedScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="PostDetail" component={PostDetailScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="CreatePost" component={CreatePostScreen} options={{ headerShown: false }} />
       </Stack.Navigator>
     </CartProvider>
   );
