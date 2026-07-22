@@ -17,12 +17,12 @@ import { badgeColors, colors, fonts, radius, shadow, spacing } from '../../theme
 interface Post {
   post_id: number;
   user_id: number;
-  author_name: str;
+  author_name: string;
   title: string;
   content: string;
   image_url: string | null;
   tag: string;
-  ask_ai: bool;
+  ask_ai: boolean;
   like_count: number;
   comment_count: number;
   is_liked_by_me: boolean;
