@@ -5,10 +5,12 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import get_user_roles, require_role
+from app.core.security import get_current_user, get_user_roles, require_role
 from app.core.storage import upload_image
 from app.db.session import get_db
 from app.models.catalog import GnlChar, GnlCharVal, Prod, ProdCharVal, ProdSpec
+from app.models.customer import Cust
+from app.models.customer_product import CustProd
 from app.models.order import CustOrdItem
 from app.models.user import AppUser
 from app.rbac.roles import RoleName
@@ -321,6 +323,72 @@ async def related_products(
         return []
 
     # Geçerli (stokta + aktif) ürünleri çek, aday sırasına göre diz, limitle
+    rows = (
+        await db.execute(
+            select(Prod, AppUser.store_name, AppUser.first_name, AppUser.last_name)
+            .outerjoin(AppUser, AppUser.user_id == Prod.seller_id)
+            .where(Prod.prod_id.in_(ordered_ids), Prod.stock > 0, Prod.is_active.is_(True))
+        )
+    ).all()
+    by_id = {prod.prod_id: (prod, store_name, first, last) for (prod, store_name, first, last) in rows}
+
+    result: list[ProductOut] = []
+    for pid in ordered_ids:
+        entry = by_id.get(pid)
+        if entry is None:
+            continue
+        prod, store_name, first, last = entry
+        result.append(_product_out(prod, store_name, first, last, []))
+        if len(result) >= limit:
+            break
+    return result
+
+
+@router.get("/products/recommended", response_model=list[ProductOut])
+async def recommended_products(
+    limit: int = Query(default=6, ge=1, le=20),
+    db: AsyncSession = Depends(get_db),
+    user: AppUser = Depends(get_current_user),
+):
+    """Kullanıcının 'Akıllı Bahçem'indeki bitki türlerine göre kişiselleştirilmiş
+    ürün önerileri. Bahçe boşsa/az ürün varsa genel bitkilerle tamamlanır."""
+    # Kullanıcının bahçesindeki bitki türleri (en çok sahip olduğu tür önce)
+    spec_ids: list[int] = []
+    cust = (await db.execute(select(Cust).where(Cust.user_id == user.user_id))).scalar_one_or_none()
+    if cust is not None:
+        spec_rows = (
+            await db.execute(
+                select(CustProd.prod_spec_id)
+                .where(CustProd.cust_id == cust.cust_id)
+                .group_by(CustProd.prod_spec_id)
+                .order_by(func.count().desc())
+            )
+        ).scalars().all()
+        spec_ids = list(spec_rows)
+
+    ordered_ids: list[int] = []
+
+    async def _extend(condition):
+        rows = (
+            await db.execute(
+                select(Prod.prod_id).where(
+                    condition, Prod.stock > 0, Prod.is_active.is_(True), Prod.category == "plant"
+                )
+            )
+        ).scalars().all()
+        pool = [pid for pid in rows if pid not in ordered_ids]
+        random.shuffle(pool)  # aynı tür içinde çeşitlilik
+        ordered_ids.extend(pool)
+
+    # Önce bahçedeki türlerle eşleşen bitkiler (tür önceliği sırasıyla)
+    for sid in spec_ids:
+        await _extend(Prod.prod_spec_id == sid)
+    # Yetmezse diğer bitkilerle tamamla
+    await _extend(Prod.prod_id.isnot(None))
+
+    if not ordered_ids:
+        return []
+
     rows = (
         await db.execute(
             select(Prod, AppUser.store_name, AppUser.first_name, AppUser.last_name)
