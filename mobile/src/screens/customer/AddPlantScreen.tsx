@@ -25,6 +25,24 @@ interface SpecOption {
 
 const FORM_LOCATIONS = ['Salon', 'Mutfak', 'Yatak Odası', 'Balkon', 'Ofis', 'Bahçe'];
 
+// Bitki türüne göre önerilen bakım aralıkları (gün) — türün adındaki anahtar kelimeyle eşleşir
+const CARE_BY_TYPE: { match: string; water: number; fertilize: number; repot: number }[] = [
+  { match: 'kaktüs', water: 21, fertilize: 60, repot: 730 },
+  { match: 'sukulent', water: 14, fertilize: 45, repot: 540 },
+  { match: 'çiçek', water: 5, fertilize: 14, repot: 365 },
+  { match: 'palmiye', water: 7, fertilize: 30, repot: 730 },
+  { match: 'yaprak', water: 7, fertilize: 30, repot: 365 },
+  { match: 'dış', water: 4, fertilize: 30, repot: 365 },
+  { match: 'fidan', water: 4, fertilize: 30, repot: 365 },
+];
+const DEFAULT_CARE = { water: 7, fertilize: 30, repot: 365 };
+
+function careForSpecName(name: string | undefined) {
+  if (!name) return DEFAULT_CARE;
+  const n = name.toLowerCase();
+  return CARE_BY_TYPE.find((c) => n.includes(c.match)) ?? DEFAULT_CARE;
+}
+
 export default function AddPlantScreen({ route, navigation }: any) {
   const { prefilledData } = route.params || {};
 
@@ -48,24 +66,18 @@ export default function AddPlantScreen({ route, navigation }: any) {
     (async () => {
       try {
         const { data } = await apiClient.get<SpecOption[]>('/catalog/product-specs');
-        setSpecs(data);
+        // Malzemeler (saksı/toprak vb.) bahçeye bitki olarak eklenmez — tür listesinden çıkar
+        const plantSpecs = data.filter((s) => !s.name.toLowerCase().includes('malzeme'));
+        setSpecs(plantSpecs);
 
-        // Try to match prefilled species to a spec_id
-        if (prefilledData?.species && data.length > 0) {
-          const match = data.find(
+        // AI analizinden gelen tür varsa eşleştir; yoksa seçimi boş bırak (kullanıcı seçsin)
+        if (prefilledData?.species && plantSpecs.length > 0) {
+          const match = plantSpecs.find(
             (s) =>
               s.name.toLowerCase().includes(prefilledData.species.toLowerCase()) ||
               prefilledData.species.toLowerCase().includes(s.name.toLowerCase())
           );
-          if (match) {
-            setSelectedSpecId(match.prod_spec_id);
-          } else {
-            // Find "Bilinmeyen Bitki" or "Diğer" or default to first
-            const fallback = data.find((s) => s.name.includes('Bilinmeyen') || s.name.includes('Diğer'));
-            setSelectedSpecId(fallback ? fallback.prod_spec_id : data[0].prod_spec_id);
-          }
-        } else if (data.length > 0) {
-          setSelectedSpecId(data[0].prod_spec_id);
+          if (match) setSelectedSpecId(match.prod_spec_id);
         }
       } catch (err) {
         Alert.alert('Hata', 'Bitki türleri yüklenemedi.');
@@ -74,6 +86,16 @@ export default function AddPlantScreen({ route, navigation }: any) {
       }
     })();
   }, [prefilledData]);
+
+  // Bitki türü seçilince bakım aralıklarını türe göre otomatik ayarla
+  useEffect(() => {
+    if (selectedSpecId == null) return;
+    const spec = specs.find((s) => s.prod_spec_id === selectedSpecId);
+    const care = careForSpecName(spec?.name);
+    setWateringInterval(String(care.water));
+    setFertilizingInterval(String(care.fertilize));
+    setRepottingInterval(String(care.repot));
+  }, [selectedSpecId, specs]);
 
   const handlePickImage = async () => {
     try {
@@ -300,47 +322,29 @@ export default function AddPlantScreen({ route, navigation }: any) {
             </View>
           )}
 
-          {/* Watering Interval */}
-          <Text style={styles.label}>Sulama Aralığı (Gün) *</Text>
-          <View style={styles.wateringRow}>
-            <TextInput
-              style={[styles.input, { width: 80, textAlign: 'center', marginBottom: 0 }]}
-              keyboardType="number-pad"
-              maxLength={3}
-              value={wateringInterval}
-              onChangeText={setWateringInterval}
-              editable={!submitting}
-            />
-            <Text style={styles.wateringSuffix}>günde bir sulanmalı.</Text>
-          </View>
-
-          {/* Fertilizing Interval */}
-          <Text style={styles.label}>Gübreleme Aralığı (Gün)</Text>
-          <View style={styles.wateringRow}>
-            <TextInput
-              style={[styles.input, { width: 80, textAlign: 'center', marginBottom: 0 }]}
-              keyboardType="number-pad"
-              maxLength={3}
-              value={fertilizingInterval}
-              onChangeText={setFertilizingInterval}
-              editable={!submitting}
-            />
-            <Text style={styles.wateringSuffix}>günde bir gübrelenmeli.</Text>
-          </View>
-
-          {/* Repotting Interval */}
-          <Text style={styles.label}>Saksı Değişim Aralığı (Gün)</Text>
-          <View style={styles.wateringRow}>
-            <TextInput
-              style={[styles.input, { width: 80, textAlign: 'center', marginBottom: 0 }]}
-              keyboardType="number-pad"
-              maxLength={4}
-              value={repottingInterval}
-              onChangeText={setRepottingInterval}
-              editable={!submitting}
-            />
-            <Text style={styles.wateringSuffix}>günde bir saksı değişmeli.</Text>
-          </View>
+          {/* Bakım programı — yalnızca bir bitki türü seçilince, türe göre otomatik */}
+          <Text style={styles.label}>Bakım Programı</Text>
+          {selectedSpecId == null ? (
+            <View style={styles.careHint}>
+              <Text style={styles.careHintText}>Bakım programı için önce bir bitki türü seç.</Text>
+            </View>
+          ) : (
+            <View style={styles.careCard}>
+              <View style={styles.careRow}>
+                <Text style={styles.careIcon}>💧</Text>
+                <Text style={styles.careText}>Sulama: <Text style={styles.careDays}>{wateringInterval}</Text> günde bir</Text>
+              </View>
+              <View style={styles.careRow}>
+                <Text style={styles.careIcon}>🌿</Text>
+                <Text style={styles.careText}>Gübreleme: <Text style={styles.careDays}>{fertilizingInterval}</Text> günde bir</Text>
+              </View>
+              <View style={styles.careRow}>
+                <Text style={styles.careIcon}>🪴</Text>
+                <Text style={styles.careText}>Saksı değişimi: <Text style={styles.careDays}>{repottingInterval}</Text> günde bir</Text>
+              </View>
+              <Text style={styles.careNote}>Seçtiğin bitki türüne göre otomatik ayarlandı.</Text>
+            </View>
+          )}
 
           {/* Description / Notes */}
           <Text style={styles.label}>Özel Bakım Notları / Açıklama</Text>
@@ -465,6 +469,25 @@ const styles = StyleSheet.create({
   specChipTextSelected: { color: colors.white, fontFamily: fonts.sansBold },
   wateringRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.xs },
   wateringSuffix: { fontFamily: fonts.sansMedium, fontSize: 14, color: colors.ink },
+  careCard: {
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  careRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  careIcon: { fontSize: 16 },
+  careText: { fontFamily: fonts.sansMedium, fontSize: 13.5, color: colors.ink },
+  careDays: { fontFamily: fonts.sansBold, color: colors.primaryDeep },
+  careNote: { fontFamily: fonts.sans, fontSize: 11.5, color: colors.muted, marginTop: 2 },
+  careHint: {
+    backgroundColor: colors.bgAlt,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  careHintText: { fontFamily: fonts.sansMedium, fontSize: 12.5, color: colors.muted, textAlign: 'center' },
   saveBtn: {
     backgroundColor: colors.primary,
     paddingVertical: 14,

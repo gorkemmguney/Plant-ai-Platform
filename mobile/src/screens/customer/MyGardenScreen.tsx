@@ -14,8 +14,19 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useCart } from '../../context/CartContext';
 import { apiClient } from '../../services/apiClient';
 import { colors, fonts, gradients, radius, shadow, spacing, badgeColors } from '../../theme/theme';
+
+interface RecProduct {
+  prod_id: number;
+  name: string;
+  price: string | number;
+  stock: number;
+  image_url: string | null;
+  seller_id: number | null;
+  seller_name: string | null;
+}
 
 interface CustProd {
   cust_prod_id: number;
@@ -44,7 +55,9 @@ const LOCATIONS = [
 ];
 
 export default function MyGardenScreen({ navigation }: any) {
+  const { addToCart } = useCart();
   const [plants, setPlants] = useState<CustProd[]>([]);
+  const [recs, setRecs] = useState<RecProduct[]>([]);
   const [selectedLocation, setSelectedLocation] = useState('all');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -61,7 +74,21 @@ export default function MyGardenScreen({ navigation }: any) {
       setLoading(false);
       setRefreshing(false);
     }
+    // Bahçedeki bitki türlerine göre kişisel öneriler
+    apiClient
+      .get<RecProduct[]>('/catalog/products/recommended?limit=6')
+      .then(({ data }) => setRecs(data))
+      .catch(() => setRecs([]));
   }, []);
+
+  const handleAddRec = (p: RecProduct) => {
+    addToCart(
+      { prod_id: p.prod_id, name: p.name, price: p.price, stock: p.stock, seller_id: p.seller_id, seller_name: p.seller_name },
+      1,
+      []
+    );
+    Alert.alert('Sepete eklendi 🛒', `${p.name} sepete eklendi.`);
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -270,6 +297,33 @@ export default function MyGardenScreen({ navigation }: any) {
           renderItem={renderItem}
           contentContainerStyle={styles.list}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+          ListFooterComponent={
+            plants.length > 0 && recs.length > 0 ? (
+              <View style={styles.recSection}>
+                <Text style={styles.recTitle}>🌱 Bahçene Göre Öneriler</Text>
+                <Text style={styles.recSub}>Sahip olduğun bitki türlerine benzer ürünler</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recRow}>
+                  {recs.map((p) => (
+                    <View key={p.prod_id} style={styles.recCard}>
+                      {p.image_url ? (
+                        <Image source={{ uri: p.image_url }} style={styles.recImage} />
+                      ) : (
+                        <View style={styles.recImagePlaceholder}>
+                          <Ionicons name="leaf" size={28} color={colors.primaryDeep} />
+                        </View>
+                      )}
+                      <Text style={styles.recName} numberOfLines={1}>{p.name}</Text>
+                      {!!p.seller_name && <Text style={styles.recSeller} numberOfLines={1}>{p.seller_name}</Text>}
+                      <Text style={styles.recPrice}>₺{Number(p.price).toFixed(2)}</Text>
+                      <TouchableOpacity style={styles.recAddBtn} onPress={() => handleAddRec(p)} activeOpacity={0.85}>
+                        <Text style={styles.recAddText}>+ Sepete Ekle</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </ScrollView>
+              </View>
+            ) : null
+          }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <View style={styles.emptyIcon}>
@@ -412,6 +466,41 @@ const styles = StyleSheet.create({
     fontFamily: fonts.sansBold,
   },
 
+  // Bahçene göre öneriler
+  recSection: { marginTop: spacing.xl, gap: 2 },
+  recTitle: { fontFamily: fonts.sansBold, fontSize: 16, color: colors.ink },
+  recSub: { fontFamily: fonts.sans, fontSize: 12, color: colors.muted, marginBottom: spacing.sm },
+  recRow: { gap: spacing.md, paddingVertical: 2, paddingRight: spacing.lg },
+  recCard: {
+    width: 150,
+    backgroundColor: colors.card,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.sm,
+    gap: 4,
+    ...shadow.sm,
+  },
+  recImage: { width: '100%', height: 90, borderRadius: radius.sm, resizeMode: 'cover' },
+  recImagePlaceholder: {
+    width: '100%',
+    height: 90,
+    borderRadius: radius.sm,
+    backgroundColor: colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recName: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.ink, marginTop: 4 },
+  recSeller: { fontFamily: fonts.sans, fontSize: 11, color: colors.muted2 },
+  recPrice: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.primaryDeep },
+  recAddBtn: {
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.full,
+    paddingVertical: 7,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  recAddText: { fontFamily: fonts.sansBold, fontSize: 11.5, color: colors.primaryDeep },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',

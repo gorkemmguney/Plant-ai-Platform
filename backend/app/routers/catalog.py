@@ -380,11 +380,9 @@ async def recommended_products(
         random.shuffle(pool)  # aynı tür içinde çeşitlilik
         ordered_ids.extend(pool)
 
-    # Önce bahçedeki türlerle eşleşen bitkiler (tür önceliği sırasıyla)
+    # Yalnızca bahçedeki bitki türleriyle eşleşen ürünler (alakasız rastgele öneri yok)
     for sid in spec_ids:
         await _extend(Prod.prod_spec_id == sid)
-    # Yetmezse diğer bitkilerle tamamla
-    await _extend(Prod.prod_id.isnot(None))
 
     if not ordered_ids:
         return []
