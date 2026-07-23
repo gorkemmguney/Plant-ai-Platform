@@ -14,6 +14,8 @@ import {
 } from 'react-native';
 import { apiClient } from '../../services/apiClient';
 import { colors, fonts, radius, shadow, spacing } from '../../theme/theme';
+import { useAuth } from '../../context/AuthContext';
+import { Alert } from 'react-native';
 
 interface Comment {
   comment_id: number;
@@ -42,12 +44,36 @@ interface Post {
 
 export default function PostDetailScreen({ route, navigation }: any) {
   const { postId } = route.params;
+  const { userId, roles } = useAuth();
 
   const [post, setPost] = useState<Post | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [commentText, setCommentText] = useState('');
   const [sending, setSending] = useState(false);
+
+  const handleDeletePost = () => {
+    Alert.alert(
+      'Gönderiyi Sil',
+      'Bu gönderiyi topluluktan tamamen silmek istediğinize emin misiniz?',
+      [
+        { text: 'Vazgeç', style: 'cancel' },
+        {
+          text: 'Sil',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await apiClient.delete(`/community/posts/${postId}`);
+              Alert.alert('Silindi', 'Gönderiniz başarıyla silindi.');
+              navigation.goBack();
+            } catch (err) {
+              Alert.alert('Hata', 'Gönderi silinirken bir hata oluştu.');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const loadData = useCallback(async () => {
     try {
@@ -141,6 +167,11 @@ export default function PostDetailScreen({ route, navigation }: any) {
         <Text style={styles.headerTitle} numberOfLines={1}>
           {post.title}
         </Text>
+        {!!userId && (post.user_id === userId || roles?.includes('admin')) && (
+          <TouchableOpacity style={styles.deleteButton} onPress={handleDeletePost} activeOpacity={0.7}>
+            <Ionicons name="trash-outline" size={20} color={colors.red} />
+          </TouchableOpacity>
+        )}
       </View>
 
       <FlatList
@@ -282,6 +313,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: { flex: 1, fontFamily: fonts.displaySemi, fontSize: 16, color: colors.ink },
+  deleteButton: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fbe4e8',
+  },
   listContent: { padding: spacing.lg, paddingBottom: 20 },
   postCard: {
     backgroundColor: colors.card,

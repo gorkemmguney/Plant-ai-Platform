@@ -25,12 +25,14 @@ const TAG_OPTIONS = [
   { key: 'swap', label: '🔄 Bitki Takası' },
 ];
 
-export default function CreatePostScreen({ navigation }: any) {
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
-  const [selectedTag, setSelectedTag] = useState('general');
+export default function CreatePostScreen({ route, navigation }: any) {
+  const { prefilledTitle, prefilledContent, prefilledImageUrl, prefilledTag } = route.params || {};
+
+  const [title, setTitle] = useState(prefilledTitle || '');
+  const [content, setContent] = useState(prefilledContent || '');
+  const [selectedTag, setSelectedTag] = useState(prefilledTag || 'general');
   const [askAi, setAskAi] = useState(false);
-  const [imageUri, setImageUri] = useState<string | null>(null);
+  const [imageUri, setImageUri] = useState<string | null>(prefilledImageUrl || null);
   const [submitting, setSubmitting] = useState(false);
 
   const handlePickImage = async () => {
@@ -91,14 +93,18 @@ export default function CreatePostScreen({ navigation }: any) {
       formData.append('ask_ai', askAi ? 'true' : 'false');
 
       if (imageUri) {
-        const filename = imageUri.split('/').pop() || 'photo.jpg';
-        const match = /\.(\w+)$/.exec(filename);
-        const type = match ? `image/${match[1]}` : 'image/jpeg';
-        formData.append('file', {
-          uri: Platform.OS === 'ios' ? imageUri.replace('file://', '') : imageUri,
-          name: filename,
-          type,
-        } as any);
+        if (imageUri.startsWith('http://') || imageUri.startsWith('https://')) {
+          formData.append('image_url', imageUri);
+        } else {
+          const filename = imageUri.split('/').pop() || 'photo.jpg';
+          const match = /\.(\w+)$/.exec(filename);
+          const type = match ? `image/${match[1]}` : 'image/jpeg';
+          formData.append('file', {
+            uri: Platform.OS === 'ios' ? imageUri.replace('file://', '') : imageUri,
+            name: filename,
+            type,
+          } as any);
+        }
       }
 
       await apiClient.post('/community/posts', formData, {
