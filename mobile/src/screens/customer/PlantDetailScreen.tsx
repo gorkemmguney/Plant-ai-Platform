@@ -16,6 +16,7 @@ import {
   View,
 } from 'react-native';
 import { apiClient } from '../../services/apiClient';
+import { isPetToxic } from '../../utils/petToxic';
 import { colors, fonts, radius, shadow, spacing, badgeColors } from '../../theme/theme';
 
 interface CareLog {
@@ -516,6 +517,18 @@ export default function PlantDetailScreen({ route, navigation }: any) {
             </View>
           )}
         </View>
+
+        {isPetToxic(plant) && (
+          <View style={styles.petWarnBanner}>
+            <Text style={styles.petWarnBannerIcon}>⚠️</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.petWarnBannerTitle}>Evcil hayvana zararlı</Text>
+              <Text style={styles.petWarnBannerText}>
+                Bu bitki kedi/köpekler için toksik olabilir. Evcil dostunun erişemeyeceği bir yerde tut.
+              </Text>
+            </View>
+          </View>
+        )}
 
         {isEditing ? (
           /* EDIT MODE FORM */
@@ -1089,6 +1102,19 @@ const styles = StyleSheet.create({
 
   // Edit Mode form styles
   form: { padding: spacing.lg, gap: spacing.sm },
+  petWarnBanner: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    alignItems: 'flex-start',
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    backgroundColor: badgeColors.red.bg,
+    borderRadius: radius.md,
+    padding: spacing.md,
+  },
+  petWarnBannerIcon: { fontSize: 18 },
+  petWarnBannerTitle: { fontFamily: fonts.sansBold, fontSize: 13, color: badgeColors.red.text },
+  petWarnBannerText: { fontFamily: fonts.sansMedium, fontSize: 12, color: badgeColors.red.text, marginTop: 2, lineHeight: 17 },
   label: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.ink, marginTop: spacing.md },
   input: {
     borderWidth: 1,

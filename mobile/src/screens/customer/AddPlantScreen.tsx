@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -43,12 +43,66 @@ function careForSpecName(name: string | undefined) {
   return CARE_BY_TYPE.find((c) => n.includes(c.match)) ?? DEFAULT_CARE;
 }
 
+// Bitki türü içindeki yaygın cinsler + evcil hayvana (kedi/köpek) zararlı mı
+const SPECIES_BY_TYPE: { match: string; species: { name: string; toxic: boolean }[] }[] = [
+  { match: 'yaprak', species: [
+    { name: 'Monstera', toxic: true },
+    { name: 'Zamioculcas (ZZ)', toxic: true },
+    { name: 'Ficus / Kauçuk', toxic: true },
+    { name: 'Difenbahya', toxic: true },
+    { name: 'Pothos (Salon Sarmaşığı)', toxic: true },
+    { name: 'Calathea', toxic: false },
+  ]},
+  { match: 'çiçek', species: [
+    { name: 'Orkide', toxic: false },
+    { name: 'Gerbera', toxic: false },
+    { name: 'Gül', toxic: false },
+    { name: 'Menekşe', toxic: false },
+    { name: 'Zambak', toxic: true },
+    { name: 'Lavanta', toxic: true },
+  ]},
+  { match: 'kaktüs', species: [
+    { name: 'Echinocactus', toxic: false },
+    { name: 'Mammillaria', toxic: false },
+    { name: 'Mini Kaktüs', toxic: false },
+  ]},
+  { match: 'sukulent', species: [
+    { name: 'Echeveria', toxic: false },
+    { name: 'Haworthia', toxic: false },
+    { name: 'Aloe Vera', toxic: true },
+    { name: 'Kalanchoe', toxic: true },
+    { name: 'Jade (Para Ağacı)', toxic: true },
+  ]},
+  { match: 'palmiye', species: [
+    { name: 'Areka Palmiyesi', toxic: false },
+    { name: 'Kentia Palmiyesi', toxic: false },
+    { name: 'Sagu Palmiyesi', toxic: true },
+  ]},
+  { match: 'dış', species: [
+    { name: 'Gül Fidanı', toxic: false },
+    { name: 'Lavanta', toxic: true },
+    { name: 'Zakkum', toxic: true },
+    { name: 'Ortanca', toxic: true },
+  ]},
+  { match: 'fidan', species: [
+    { name: 'Gül Fidanı', toxic: false },
+    { name: 'Zakkum', toxic: true },
+  ]},
+];
+
+function speciesForSpecName(name: string | undefined) {
+  if (!name) return [];
+  const n = name.toLowerCase();
+  return SPECIES_BY_TYPE.find((s) => n.includes(s.match))?.species ?? [];
+}
+
 export default function AddPlantScreen({ route, navigation }: any) {
   const { prefilledData } = route.params || {};
 
   const [name, setName] = useState('');
   const [specs, setSpecs] = useState<SpecOption[]>([]);
   const [selectedSpecId, setSelectedSpecId] = useState<number | null>(null);
+  const [selectedSpecies, setSelectedSpecies] = useState<string | null>(null);
   const [location, setLocation] = useState<string | null>(null);
   const [wateringInterval, setWateringInterval] = useState('7');
   const [fertilizingInterval, setFertilizingInterval] = useState('30');
@@ -87,8 +141,9 @@ export default function AddPlantScreen({ route, navigation }: any) {
     })();
   }, [prefilledData]);
 
-  // Bitki türü seçilince bakım aralıklarını türe göre otomatik ayarla
+  // Bitki türü seçilince bakım aralıklarını türe göre otomatik ayarla + cins seçimini sıfırla
   useEffect(() => {
+    setSelectedSpecies(null);
     if (selectedSpecId == null) return;
     const spec = specs.find((s) => s.prod_spec_id === selectedSpecId);
     const care = careForSpecName(spec?.name);
@@ -96,6 +151,17 @@ export default function AddPlantScreen({ route, navigation }: any) {
     setFertilizingInterval(String(care.fertilize));
     setRepottingInterval(String(care.repot));
   }, [selectedSpecId, specs]);
+
+  // Seçili türe ait cinsler
+  const speciesOptions = useMemo(() => {
+    const spec = specs.find((s) => s.prod_spec_id === selectedSpecId);
+    return speciesForSpecName(spec?.name);
+  }, [selectedSpecId, specs]);
+
+  const pickSpecies = (sp: { name: string; toxic: boolean }) => {
+    setSelectedSpecies(sp.name);
+    setName(sp.name); // bitki adını cinse göre doldur (kullanıcı sonra kişiselleştirebilir)
+  };
 
   const handlePickImage = async () => {
     try {
@@ -273,6 +339,9 @@ export default function AddPlantScreen({ route, navigation }: any) {
             onChangeText={setName}
             editable={!submitting}
           />
+          <Text style={styles.fieldHint}>
+            İpucu: Bitkinizin ismini kişiselleştirebilirsiniz.
+          </Text>
 
           {/* Plant Location Selection */}
           <Text style={styles.label}>Bitki Konumu / Odası</Text>
@@ -320,6 +389,40 @@ export default function AddPlantScreen({ route, navigation }: any) {
                 })}
               </ScrollView>
             </View>
+          )}
+
+          {/* Bitki Cinsi — tür seçilince o türe ait yaygın cinsler */}
+          {speciesOptions.length > 0 && (
+            <>
+              <Text style={styles.label}>Bitki Cinsi</Text>
+              <View style={styles.specsContainer}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.specsScroll}>
+                  {speciesOptions.map((sp) => {
+                    const isSelected = selectedSpecies === sp.name;
+                    return (
+                      <TouchableOpacity
+                        key={sp.name}
+                        style={[styles.specChip, isSelected && styles.specChipSelected]}
+                        onPress={() => pickSpecies(sp)}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={[styles.specChipText, isSelected && styles.specChipTextSelected]}>
+                          {sp.toxic ? '⚠️ ' : ''}{sp.name}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+              {selectedSpecies != null &&
+                speciesOptions.find((s) => s.name === selectedSpecies)?.toxic && (
+                  <View style={styles.speciesWarn}>
+                    <Text style={styles.speciesWarnText}>
+                      ⚠️ {selectedSpecies} evcil hayvanlar (kedi/köpek) için zararlı olabilir.
+                    </Text>
+                  </View>
+                )}
+            </>
           )}
 
           {/* Bakım programı — yalnızca bir bitki türü seçilince, türe göre otomatik */}
@@ -488,6 +591,16 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   careHintText: { fontFamily: fonts.sansMedium, fontSize: 12.5, color: colors.muted, textAlign: 'center' },
+  fieldHint: { fontFamily: fonts.sans, fontSize: 11.5, color: colors.muted, marginTop: -spacing.xs, marginBottom: spacing.md, lineHeight: 16 },
+  speciesWarn: {
+    backgroundColor: '#fbe4e8',
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginTop: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  speciesWarnText: { fontFamily: fonts.sansMedium, fontSize: 12, color: '#c23434', lineHeight: 17 },
   saveBtn: {
     backgroundColor: colors.primary,
     paddingVertical: 14,

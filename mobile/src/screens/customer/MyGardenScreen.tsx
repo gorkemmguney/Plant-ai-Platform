@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { useCart } from '../../context/CartContext';
 import { apiClient } from '../../services/apiClient';
+import { isPetToxic } from '../../utils/petToxic';
 import { colors, fonts, gradients, radius, shadow, spacing, badgeColors } from '../../theme/theme';
 
 interface RecProduct {
@@ -155,6 +156,8 @@ export default function MyGardenScreen({ navigation }: any) {
     (p) => selectedLocation === 'all' || p.location === selectedLocation
   );
 
+  const toxicCount = plants.filter(isPetToxic).length;
+
   // Bitkileri türe (species_name) göre grupla — SectionList için
   const sections = useMemo(() => {
     const map = new Map<string, CustProd[]>();
@@ -223,6 +226,12 @@ export default function MyGardenScreen({ navigation }: any) {
             </View>
             
             <Text style={styles.speciesName} numberOfLines={1}>{item.species_name}</Text>
+
+            {isPetToxic(item) && (
+              <View style={styles.petWarnPill}>
+                <Text style={styles.petWarnText}>⚠️ Evcil hayvana zararlı</Text>
+              </View>
+            )}
 
             {/* Moisture Progress Bar */}
             <View style={styles.moistureSection}>
@@ -315,6 +324,15 @@ export default function MyGardenScreen({ navigation }: any) {
               );
             })}
           </ScrollView>
+        </View>
+      )}
+
+      {!loading && toxicCount > 0 && (
+        <View style={styles.petBanner}>
+          <Text style={styles.petBannerIcon}>🐾</Text>
+          <Text style={styles.petBannerText}>
+            Bahçende evcil hayvana zararlı {toxicCount} bitki var. Kedi/köpeğin varsa erişemeyeceği yerde tut.
+          </Text>
         </View>
       )}
 
@@ -517,6 +535,29 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontFamily: fonts.sansBold,
   },
+
+  // Evcil hayvan uyarısı
+  petWarnPill: {
+    alignSelf: 'flex-start',
+    backgroundColor: badgeColors.red.bg,
+    borderRadius: radius.full,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginBottom: 4,
+  },
+  petWarnText: { fontFamily: fonts.sansBold, fontSize: 10, color: badgeColors.red.text },
+  petBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    backgroundColor: badgeColors.amber.bg,
+    borderRadius: radius.md,
+    padding: spacing.md,
+  },
+  petBannerIcon: { fontSize: 18 },
+  petBannerText: { flex: 1, fontFamily: fonts.sansMedium, fontSize: 12.5, color: badgeColors.amber.text, lineHeight: 18 },
 
   // Tür grubu başlığı + toplu sula
   sectionHeader: {
