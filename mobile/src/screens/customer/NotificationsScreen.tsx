@@ -79,11 +79,6 @@ export default function NotificationsScreen() {
 
   return (
     <View style={styles.screen}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Bildirimler</Text>
-        <Text style={styles.headerSub}>Okumak için dokun</Text>
-      </View>
-
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={colors.buttonPrimary} />
@@ -119,9 +114,6 @@ export default function NotificationsScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  header: { paddingTop: 56, paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
-  headerTitle: { fontFamily: fonts.display, fontSize: 24, color: colors.ink },
-  headerSub: { fontFamily: fonts.sans, fontSize: 12.5, color: colors.muted, marginTop: 2 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.md },
   list: { padding: spacing.lg, gap: spacing.md },
   card: {

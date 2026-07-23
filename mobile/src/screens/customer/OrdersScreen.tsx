@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -25,6 +26,7 @@ interface CatalogProduct {
   stock: number;
   seller_id: number | null;
   seller_name: string | null;
+  image_url: string | null;
 }
 
 const HIDE_BTN_W = 92;
@@ -210,6 +212,7 @@ export default function OrdersScreen({ navigation }: any) {
             stock: p.stock,
             seller_id: p.seller_id,
             seller_name: p.seller_name,
+            image_url: p.image_url,
           },
           qty,
           []
@@ -278,9 +281,11 @@ export default function OrdersScreen({ navigation }: any) {
         </Text>
         <View style={styles.badgeRow}>
           {(() => {
-            const sb = item.gnl_st_id === 9 ? badgeColors.red : badgeColors.secondary;
+            const delivered = item.gnl_st_id === 8;
+            const sb = item.gnl_st_id === 9 ? badgeColors.red : delivered ? badgeColors.green : badgeColors.secondary;
             return (
-              <View style={[styles.badge, { backgroundColor: sb.bg }]}>
+              <View style={[styles.badge, styles.badgeWithIcon, { backgroundColor: sb.bg }]}>
+                {delivered && <Ionicons name="checkmark-circle" size={13} color={sb.text} />}
                 <Text style={[styles.badgeText, { color: sb.text }]}>
                   {statusLabels[item.gnl_st_id] ?? 'Durum bilinmiyor'}
                 </Text>
@@ -482,6 +487,7 @@ const styles = StyleSheet.create({
   total: { fontFamily: fonts.display, fontSize: 16, color: colors.primaryDeep },
   meta: { fontFamily: fonts.sans, fontSize: 12, color: colors.muted, marginTop: 3, marginBottom: spacing.md },
   badgeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  badgeWithIcon: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   badge: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.full },
   badgeText: { fontFamily: fonts.sansBold, fontSize: 11 },
   detailHint: { fontFamily: fonts.sansSemi, fontSize: 12, color: colors.muted },

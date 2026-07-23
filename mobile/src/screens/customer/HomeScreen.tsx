@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import React, { useCallback, useEffect, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { ActivityIndicator, Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, ImageBackground, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 import { apiClient } from '../../services/apiClient';
@@ -40,8 +40,6 @@ const QUICK_TILES: QuickTile[] = [
   { key: 'garden', label: 'Bahçem', icon: 'leaf', onPress: (nav) => nav.navigate('MyGarden') },
   { key: 'chat', label: 'AI Sohbet', icon: 'chatbubble-ellipses', onPress: (nav) => nav.navigate('ChatScreen') },
   { key: 'community', label: 'Topluluk', icon: 'people', onPress: (nav) => nav.navigate('CommunityFeed') },
-  { key: 'shop', label: 'Mağaza', icon: 'storefront', onPress: (nav) => nav.navigate('Tabs', { screen: 'Marketplace' }) },
-  { key: 'stores', label: 'Satıcılar', icon: 'business', onPress: (nav) => nav.navigate('Tabs', { screen: 'Stores' }) },
 ];
 
 const FALLBACK_COORDS = { latitude: 41.0082, longitude: 28.9784 };
@@ -61,6 +59,7 @@ export default function HomeScreen({ navigation }: any) {
 
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(true);
+  const [locationName, setLocationName] = useState<string | null>(null);
 
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [qty, setQty] = useState(1);
@@ -80,6 +79,19 @@ export default function HomeScreen({ navigation }: any) {
       }
       const data = await fetchWeather(coords.latitude, coords.longitude);
       setWeather(data);
+
+      // Koordinati sehir/ilce adina cevir (expo-location ters cografi kodlama)
+      try {
+        const places = await Location.reverseGeocodeAsync({
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+        });
+        const place = places?.[0];
+        const name = place?.district || place?.subregion || place?.city || place?.region || null;
+        setLocationName(name);
+      } catch {
+        setLocationName(null);
+      }
     } catch {
       setWeather(null);
     } finally {
@@ -110,7 +122,7 @@ export default function HomeScreen({ navigation }: any) {
 
   const displayName = firstName || firebaseUser?.email?.split('@')[0] || 'Bitki Sever';
   const featured = products.slice(0, 6);
-  const weatherInfo = weather ? describeWeatherCode(weather.weatherCode) : null;
+  const weatherInfo = weather ? describeWeatherCode(weather.weatherCode, weather.isDay) : null;
 
   return (
     <LinearGradient colors={gradients.screenBg} locations={[0, 0.45, 1]} style={styles.screen}>
@@ -149,39 +161,66 @@ export default function HomeScreen({ navigation }: any) {
             </View>
           </View>
 
-          {/* Arama çubuğu — Mağaza'ya götürür */}
-          <TouchableOpacity
-            style={styles.search}
-            activeOpacity={0.8}
-            onPress={() => navigation.navigate('Tabs', { screen: 'Marketplace' })}
-          >
-            <Ionicons name="search" size={17} color={colors.muted2} />
-            <Text style={styles.searchText}>Bitki ara...</Text>
-          </TouchableOpacity>
         </View>
 
-        {/* Hava durumu — kompakt cam kart */}
+        {/* Hava durumu — koşula göre değişen gökyüzü sahnesi */}
         <View style={styles.weatherRow}>
-          <BlurView intensity={40} tint="light" style={styles.weatherCard}>
-            {weatherLoading ? (
+          {weatherLoading ? (
+            <View style={[styles.weatherCard, styles.weatherLoadingCard]}>
               <ActivityIndicator color={colors.primaryDeep} />
-            ) : weather && weatherInfo ? (
-              <>
-                <Ionicons name={weatherInfo.iconName as any} size={26} color={colors.primaryDeep} />
-                <Text style={styles.weatherTemp}>{weather.temperature}°C</Text>
-                <Text style={styles.weatherLabel}>{weatherInfo.label}</Text>
-              </>
-            ) : (
+            </View>
+          ) : weather && weatherInfo ? (
+            <ImageBackground
+              source={weatherInfo.image}
+              style={styles.weatherCard}
+              imageStyle={styles.weatherCardImage}
+              resizeMode="cover"
+            >
+              <View style={styles.weatherScrim} />
+              <View style={styles.weatherLeft}>
+                <Text style={[styles.weatherTemp, { color: weatherInfo.onColor }]}>
+                  {weather.temperature}°C
+                </Text>
+                <Text style={[styles.weatherLabel, { color: weatherInfo.onColor }]}>
+                  {weatherInfo.label}
+                </Text>
+                {!!locationName && (
+                  <View style={styles.weatherLocRow}>
+                    <Ionicons name="location" size={12} color={weatherInfo.onColor} />
+                    <Text style={[styles.weatherLoc, { color: weatherInfo.onColor }]} numberOfLines={1}>
+                      {locationName}
+                    </Text>
+                  </View>
+                )}
+                {!!weatherInfo.tip && (
+                  <Text style={[styles.weatherTip, { color: weatherInfo.onColor }]} numberOfLines={2}>
+                    {weatherInfo.tip}
+                  </Text>
+                )}
+              </View>
+            </ImageBackground>
+          ) : (
+            <View style={[styles.weatherCard, styles.weatherLoadingCard]}>
               <Text style={styles.weatherErrorText}>Hava durumu şu an alınamıyor</Text>
-            )}
-          </BlurView>
+            </View>
+          )}
         </View>
+
+        {/* Arama çubuğu — Mağaza'ya götürür */}
+        <TouchableOpacity
+          style={styles.searchStandalone}
+          activeOpacity={0.8}
+          onPress={() => navigation.navigate('Tabs', { screen: 'Marketplace' })}
+        >
+          <Ionicons name="search" size={17} color={colors.muted2} />
+          <Text style={styles.searchText}>Bitki ara...</Text>
+        </TouchableOpacity>
 
         {/* Hızlı erişim — cam daireler */}
         <View style={styles.sectionHeader}>
           <Text style={styles.h2}>Hızlı Erişim</Text>
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categories}>
+        <View style={styles.categories}>
           {QUICK_TILES.map((tile) => (
             <TouchableOpacity
               key={tile.key}
@@ -195,7 +234,7 @@ export default function HomeScreen({ navigation }: any) {
               <Text style={styles.circleLabel}>{tile.label}</Text>
             </TouchableOpacity>
           ))}
-        </ScrollView>
+        </View>
 
         {/* Öne çıkan ilanlar */}
         <View style={styles.sectionHeader}>
@@ -381,21 +420,66 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   searchText: { fontFamily: fonts.sans, fontSize: 15, color: colors.muted2 },
-  weatherRow: { paddingHorizontal: 25 },
+  weatherRow: { paddingHorizontal: 25, marginTop: spacing.md },
+  searchStandalone: {
+    marginTop: spacing.md,
+    marginHorizontal: 25,
+    height: 54,
+    backgroundColor: colors.white,
+    borderRadius: 27,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 18,
+    elevation: 3,
+  },
   weatherCard: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: spacing.md,
     borderRadius: 25,
     padding: spacing.lg,
-    minHeight: 64,
+    minHeight: 118,
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+    elevation: 4,
+  },
+  weatherLoadingCard: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.glass,
     borderWidth: 1,
     borderColor: colors.glassBorder,
-    backgroundColor: colors.glass,
   },
-  weatherTemp: { fontFamily: fonts.display, fontSize: 20, color: colors.ink },
-  weatherLabel: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.muted, flex: 1 },
+  weatherCardImage: { borderRadius: 25 },
+  weatherScrim: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.32)',
+  },
+  weatherLeft: { flex: 1 },
+  weatherLocRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3 },
+  weatherLoc: {
+    fontFamily: fonts.sansSemi,
+    fontSize: 12,
+    textShadowColor: 'rgba(0,0,0,0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  weatherTemp: { fontFamily: fonts.display, fontSize: 32, textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+  weatherLabel: { fontFamily: fonts.sansBold, fontSize: 14, marginTop: 2, textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+  weatherTip: { fontFamily: fonts.sans, fontSize: 11.5, marginTop: 6, opacity: 0.85, lineHeight: 16 },
   weatherErrorText: { fontFamily: fonts.sans, fontSize: 12.5, color: colors.muted },
   sectionHeader: {
     flexDirection: 'row',
@@ -406,9 +490,10 @@ const styles = StyleSheet.create({
   },
   h2: { fontFamily: fonts.sansBold, fontSize: 20, color: colors.ink },
   sectionLink: { fontFamily: fonts.sansSemi, fontSize: 14, color: colors.muted },
-  categories: { gap: 18, paddingHorizontal: 25, paddingVertical: 20 },
+  categories: { flexDirection: 'row', gap: 10, paddingHorizontal: 25, paddingVertical: 20 },
   circle: {
-    minWidth: 90,
+    flex: 1,
+    minWidth: 0,
     height: 120,
     backgroundColor: colors.glass,
     borderRadius: 30,

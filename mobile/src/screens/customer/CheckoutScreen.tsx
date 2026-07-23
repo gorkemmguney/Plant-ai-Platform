@@ -43,7 +43,7 @@ function formatExpiry(v: string) {
 }
 
 export default function CheckoutScreen({ navigation, route }: any) {
-  const { items, total } = useCart();
+  const { items, total, clearCart } = useCart();
   const couponId: number | null = route?.params?.couponId ?? null;
   const discount: number = route?.params?.discount ?? 0;
   const finalTotal = Math.max(0, total - discount);
@@ -140,6 +140,7 @@ export default function CheckoutScreen({ navigation, route }: any) {
           selected_char_value_ids: i.selectedCharacteristics.map((c) => c.gnl_char_val_id),
         })),
       });
+      clearCart();
       Alert.alert('Sipariş alındı 🎉', 'Siparişin oluşturuldu.', [
         {
           text: 'Siparişlerim',
