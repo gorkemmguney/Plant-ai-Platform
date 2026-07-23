@@ -1,14 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   Image,
   RefreshControl,
   ScrollView,
+  SectionList,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -62,6 +62,7 @@ export default function MyGardenScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [wateringId, setWateringId] = useState<number | null>(null);
+  const [bulkGroup, setBulkGroup] = useState<string | null>(null);
 
   const loadPlants = useCallback(async () => {
     try {
@@ -153,6 +154,37 @@ export default function MyGardenScreen({ navigation }: any) {
   const filteredPlants = plants.filter(
     (p) => selectedLocation === 'all' || p.location === selectedLocation
   );
+
+  // Bitkileri türe (species_name) göre grupla — SectionList için
+  const sections = useMemo(() => {
+    const map = new Map<string, CustProd[]>();
+    filteredPlants.forEach((p) => {
+      const key = p.species_name || 'Diğer';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(p);
+    });
+    return Array.from(map.entries()).map(([title, data]) => ({ title, data }));
+  }, [filteredPlants]);
+
+  // Bir gruptaki tüm bitkileri toplu sula
+  const handleWaterGroup = async (title: string, groupPlants: CustProd[]) => {
+    setBulkGroup(title);
+    try {
+      const results = await Promise.all(
+        groupPlants.map((p) =>
+          apiClient
+            .post<CustProd>(`/customer-products/${p.cust_prod_id}/water`)
+            .then((r) => r.data)
+            .catch(() => null)
+        )
+      );
+      const updated = results.filter((r): r is CustProd => r !== null);
+      setPlants((prev) => prev.map((p) => updated.find((u) => u.cust_prod_id === p.cust_prod_id) ?? p));
+      Alert.alert('Sulandı 💧', `${title} grubundaki ${updated.length} bitki sulandı.`);
+    } finally {
+      setBulkGroup(null);
+    }
+  };
 
   const renderItem = ({ item }: { item: CustProd }) => {
     const moisturePct = calculateWateringPercentage(item.last_watered_at, item.watering_interval_days);
@@ -291,10 +323,30 @@ export default function MyGardenScreen({ navigation }: any) {
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
-        <FlatList
-          data={filteredPlants}
+        <SectionList
+          sections={sections}
           keyExtractor={(item) => String(item.cust_prod_id)}
           renderItem={renderItem}
+          stickySectionHeadersEnabled={false}
+          renderSectionHeader={({ section }) => (
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>
+                {section.title} · {section.data.length}
+              </Text>
+              <TouchableOpacity
+                style={[styles.groupWaterBtn, bulkGroup === section.title && styles.waterButtonDisabled]}
+                onPress={() => handleWaterGroup(section.title, section.data)}
+                disabled={bulkGroup === section.title}
+                activeOpacity={0.8}
+              >
+                {bulkGroup === section.title ? (
+                  <ActivityIndicator size="small" color={colors.white} />
+                ) : (
+                  <Text style={styles.groupWaterText}>💧 Hepsini Sula</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
           contentContainerStyle={styles.list}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
           ListFooterComponent={
@@ -465,6 +517,25 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontFamily: fonts.sansBold,
   },
+
+  // Tür grubu başlığı + toplu sula
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
+  },
+  sectionTitle: { fontFamily: fonts.sansBold, fontSize: 15, color: colors.ink },
+  groupWaterBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: radius.full,
+  },
+  groupWaterText: { fontFamily: fonts.sansBold, fontSize: 11.5, color: colors.white },
 
   // Bahçene göre öneriler
   recSection: { marginTop: spacing.xl, gap: 2 },
