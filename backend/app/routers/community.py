@@ -109,11 +109,11 @@ async def create_post(
     content: str = Form(...),
     tag: str = Form("general"),
     ask_ai: bool = Form(False),
+    image_url: Optional[str] = Form(None),
     file: Optional[UploadFile] = File(None),
     db: AsyncSession = Depends(get_db),
     current_user: AppUser = Depends(get_current_user),
 ):
-    image_url = None
     file_bytes = None
     mime_type = None
 
@@ -172,6 +172,35 @@ async def create_post(
         created_at=fetched.created_at,
         updated_at=fetched.updated_at,
     )
+
+
+@router.delete("/posts/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_post(
+    post_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: AppUser = Depends(get_current_user),
+):
+    res = await db.execute(select(CommunityPost).where(CommunityPost.post_id == post_id))
+    post = res.scalar_one_or_none()
+    if not post:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Gönderi bulunamadı")
+
+    from app.core.security import get_user_roles
+    from app.rbac.roles import RoleName
+    roles = await get_user_roles(current_user, db)
+    is_admin = RoleName.ADMIN in roles
+
+    print(f"[DEBUG DELETE] Post ID: {post_id} | Post Author ID: {post.user_id} | Request User ID: {current_user.user_id} | User Roles: {roles} | Is Admin: {is_admin}")
+
+    if post.user_id != current_user.user_id and not is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bu gönderiyi silme yetkiniz yok"
+        )
+
+    await db.delete(post)
+    await db.commit()
+    return
 
 
 @router.post("/posts/{post_id}/like")

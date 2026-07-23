@@ -21,6 +21,9 @@ import PostDetailScreen from '../screens/customer/PostDetailScreen';
 import CreatePostScreen from '../screens/customer/CreatePostScreen';
 import AddressScreen from '../screens/customer/AddressScreen';
 import CheckoutScreen from '../screens/customer/CheckoutScreen';
+import MyGardenScreen from '../screens/customer/MyGardenScreen';
+import AddPlantScreen from '../screens/customer/AddPlantScreen';
+import PlantDetailScreen from '../screens/customer/PlantDetailScreen';
 import CustomTabBar from './CustomTabBar';
 
 export type CustomerTabParamList = {
@@ -55,6 +58,9 @@ export type CustomerStackParamList = {
   CommunityFeed: undefined;
   PostDetail: { postId: number };
   CreatePost: undefined;
+  MyGarden: undefined;
+  AddPlant: { prefilledData?: { prodSpecId: number; species: string; healthStatus: string; imageUrl?: string } };
+  PlantDetail: { custProdId: number };
 };
 
 const Tab = createBottomTabNavigator<CustomerTabParamList>();
@@ -121,6 +127,9 @@ export default function CustomerStack() {
         <Stack.Screen name="CommunityFeed" component={CommunityFeedScreen} options={{ headerShown: false }} />
         <Stack.Screen name="PostDetail" component={PostDetailScreen} options={{ headerShown: false }} />
         <Stack.Screen name="CreatePost" component={CreatePostScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="MyGarden" component={MyGardenScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="AddPlant" component={AddPlantScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="PlantDetail" component={PlantDetailScreen} options={{ headerShown: false }} />
       </Stack.Navigator>
     </CartProvider>
   );

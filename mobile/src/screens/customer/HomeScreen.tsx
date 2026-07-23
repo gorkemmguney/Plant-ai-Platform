@@ -9,7 +9,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 import { apiClient } from '../../services/apiClient';
 import { describeWeatherCode, fetchWeather, WeatherData } from '../../services/weather';
-import { colors, fonts, gradients, spacing } from '../../theme/theme';
+import { colors, fonts, gradients, radius, shadow, spacing } from '../../theme/theme';
 
 interface ProductCharacteristic {
   gnl_char_id: number;
@@ -37,6 +37,7 @@ interface QuickTile {
 
 const QUICK_TILES: QuickTile[] = [
   { key: 'analyze', label: 'AI Teşhis', icon: 'camera', onPress: (nav) => nav.navigate('ImageAnalysis') },
+  { key: 'garden', label: 'Bahçem', icon: 'leaf', onPress: (nav) => nav.navigate('MyGarden') },
   { key: 'chat', label: 'AI Sohbet', icon: 'chatbubble-ellipses', onPress: (nav) => nav.navigate('ChatScreen') },
   { key: 'community', label: 'Topluluk', icon: 'people', onPress: (nav) => nav.navigate('CommunityFeed') },
   { key: 'shop', label: 'Mağaza', icon: 'storefront', onPress: (nav) => nav.navigate('Tabs', { screen: 'Marketplace' }) },

@@ -9,6 +9,14 @@ class ChatMessageIn(BaseModel):
     message: str
 
 
+class ProductMinOut(BaseModel):
+    prod_id: int
+    name: str
+    price: Decimal
+    image_url: str | None = None
+    stock: int
+
+
 class ChatMessageOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -17,6 +25,8 @@ class ChatMessageOut(BaseModel):
     role: str
     message: str
     created_at: datetime
+    recommended_products: list[ProductMinOut] = []
+    action_performed: dict | None = None
 
 
 class ChatSessionOut(BaseModel):

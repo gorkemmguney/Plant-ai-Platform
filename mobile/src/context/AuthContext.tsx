@@ -11,9 +11,8 @@ export type SellerStatus = 'none' | 'pending' | 'verified' | 'rejected';
 const ACTIVE_ROLE_KEY = 'plantai:activeRole';
 
 interface AuthContextValue {
-  // NOT: alan adı tarihsel nedenlerle "firebaseUser" kaldı (Firebase -> Supabase
-  // geçişinde diğer ekranları değiştirmemek için) — artık Supabase User taşıyor.
   firebaseUser: User | null;
+  userId: number | null;
   roles: Role[];
   activeRole: Role | null;
   sellerStatus: SellerStatus;
@@ -27,6 +26,7 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue>({
   firebaseUser: null,
+  userId: null,
   roles: [],
   activeRole: null,
   sellerStatus: 'none',
@@ -40,6 +40,7 @@ const AuthContext = createContext<AuthContextValue>({
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
+  const [userId, setUserId] = useState<number | null>(null);
   const [roles, setRoles] = useState<Role[]>([]);
   const [activeRole, setActiveRole] = useState<Role | null>(null);
   const [sellerStatus, setSellerStatus] = useState<SellerStatus>('none');
@@ -99,6 +100,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       const nextRoles: Role[] = data.roles ?? [];
+      setUserId(data.user_id ?? null);
       setRoles(nextRoles);
       setSellerStatus(data.seller_status ?? 'none');
       setFirstName(data.first_name ?? '');
@@ -111,6 +113,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (err: any) {
       console.log('[AuthContext] /auth/me başarısız:', err?.message ?? err);
+      setUserId(null);
       setRoles([]);
       setSellerStatus('none');
       setFirstName('');
@@ -130,6 +133,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (savedRole) setActiveRole(savedRole);
         await refreshProfile();
       } else {
+        setUserId(null);
         setRoles([]);
         setActiveRole(null);
         setSellerStatus('none');
@@ -155,6 +159,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <AuthContext.Provider
       value={{
         firebaseUser,
+        userId,
         roles,
         activeRole,
         sellerStatus,

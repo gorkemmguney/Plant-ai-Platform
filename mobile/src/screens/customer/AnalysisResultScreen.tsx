@@ -220,6 +220,25 @@ export default function AnalysisResultScreen({ route, navigation }: any) {
             </Text>
           )}
         </View>
+        
+        <View style={{ paddingHorizontal: spacing.lg, marginBottom: spacing.lg }}>
+          <TouchableOpacity
+            style={styles.addToGardenBtn}
+            onPress={() => {
+              navigation.navigate('AddPlant', {
+                prefilledData: {
+                  species: species,
+                  healthStatus: healthStatus,
+                  imageUrl: imageUrl,
+                }
+              });
+            }}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="leaf-outline" size={20} color={colors.white} style={{ marginRight: 8 }} />
+            <Text style={styles.addToGardenBtnText}>Bu Bitkiyi Bahçeme Ekle</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </View>
   );
@@ -373,5 +392,19 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: colors.primaryDeep,
     textDecorationLine: 'underline',
+  },
+  addToGardenBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    ...shadow.md,
+  },
+  addToGardenBtnText: {
+    fontFamily: fonts.sansBold,
+    fontSize: 15,
+    color: colors.white,
   },
 });

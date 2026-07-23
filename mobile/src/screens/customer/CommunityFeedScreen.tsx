@@ -12,7 +12,9 @@ import {
   View,
 } from 'react-native';
 import { apiClient } from '../../services/apiClient';
-import { badgeColors, colors, fonts, radius, shadow, spacing } from '../../theme/theme';
+import { colors, fonts, radius, shadow, spacing, badgeColors } from '../../theme/theme';
+import { useAuth } from '../../context/AuthContext';
+import { Alert } from 'react-native';
 
 interface Post {
   post_id: number;
@@ -46,10 +48,34 @@ const TAG_LABELS: Record<string, { label: string; bg: string; text: string }> = 
 };
 
 export default function CommunityFeedScreen({ navigation }: any) {
+  const { userId, roles } = useAuth();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedTag, setSelectedTag] = useState('all');
+
+  const handleDeletePost = (postId: number) => {
+    Alert.alert(
+      'Gönderiyi Sil',
+      'Bu gönderiyi topluluktan tamamen silmek istediğinize emin misiniz?',
+      [
+        { text: 'Vazgeç', style: 'cancel' },
+        {
+          text: 'Sil',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await apiClient.delete(`/community/posts/${postId}`);
+              setPosts((prev) => prev.filter((p) => p.post_id !== postId));
+              Alert.alert('Silindi', 'Gönderiniz başarıyla silindi.');
+            } catch (err) {
+              Alert.alert('Hata', 'Gönderi silinirken bir hata oluştu.');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const loadPosts = useCallback(async (tag = selectedTag) => {
     try {
@@ -178,6 +204,20 @@ export default function CommunityFeedScreen({ navigation }: any) {
             <Ionicons name="chatbubble-outline" size={19} color={colors.muted} />
             <Text style={styles.actionText}>{item.comment_count}</Text>
           </TouchableOpacity>
+
+          {(() => {
+            console.log(`[CommunityFeed] Post ID: ${item.post_id} | Post Author ID: ${item.user_id} (${typeof item.user_id}) | Active User ID: ${userId} (${typeof userId}) | Roles: ${JSON.stringify(roles)}`);
+            return !!userId && (item.user_id === userId || roles?.includes('admin'));
+          })() && (
+            <TouchableOpacity
+              style={[styles.actionBtn, { marginLeft: 'auto' }]}
+              onPress={() => handleDeletePost(item.post_id)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="trash-outline" size={18} color={colors.red} />
+              <Text style={[styles.actionText, { color: colors.red }]}>Sil</Text>
+            </TouchableOpacity>
+          )}
 
           <View style={{ flex: 1 }} />
           <Ionicons name="chevron-forward" size={18} color={colors.muted2} />

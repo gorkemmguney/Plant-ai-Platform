@@ -9,7 +9,13 @@ from app.db.session import get_db
 from app.models.ai import AiChat, AiFeedback, AiImageAnalysis, AiMessage
 from app.models.user import AppUser
 from app.schemas.ai import ChatMessageIn, ChatMessageOut, ChatSessionOut, FeedbackIn, ImageAnalysisOut
-from app.services.ai_service import analyze_plant_image, chat_reply
+from app.services.ai_service import (
+    analyze_plant_image,
+    build_user_ai_context,
+    chat_reply,
+    find_recommended_products,
+    process_user_action_intent,
+)
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -168,13 +174,32 @@ async def send_chat_message(
     db.add(AiMessage(ai_chat_id=chat.ai_chat_id, role="user", message=payload.message))
     await db.flush()
 
-    reply_text = await chat_reply(history, payload.message)
+    # Check if user message indicates an action (e.g. "Salon Monsteramı suladım")
+    action_performed = await process_user_action_intent(db, user, payload.message)
+
+    user_context = await build_user_ai_context(db, user)
+    if action_performed:
+        user_context += f"\n\n[SİSTEM UYARISI]: Kullanıcının '{action_performed['plant_name']}' bitkisi için {action_performed['care_label']} eylemi veritabanında başarıyla güncellendi ve günlüğe kaydedildi. Yanıtında kullanıcıyı tebrik et ve işlemin kaydedildiğini teyit et."
+
+    reply_text = await chat_reply(history, payload.message, user_context=user_context)
+
+    # Search for matching marketplace products if relevant
+    recommended_products = await find_recommended_products(db, payload.message, reply_text)
 
     assistant_message = AiMessage(ai_chat_id=chat.ai_chat_id, role="assistant", message=reply_text)
     db.add(assistant_message)
     await db.commit()
     await db.refresh(assistant_message)
-    return assistant_message
+
+    return {
+        "ai_chat_id": assistant_message.ai_chat_id,
+        "ai_message_id": assistant_message.ai_message_id,
+        "role": assistant_message.role,
+        "message": assistant_message.message,
+        "created_at": assistant_message.created_at,
+        "recommended_products": recommended_products,
+        "action_performed": action_performed,
+    }
 
 
 @router.post("/feedback")

@@ -32,9 +32,13 @@ _VISION_RESPONSE_SCHEMA = {
     "required": ["species", "health_status", "confidence", "care_recommendation"],
 }
 
-_CHAT_SYSTEM_PROMPT = """Sen bir bitki bakım asistanısın. Kullanıcıların bitki
-alım-satım platformunda bitkilerle ilgili sorularını (bakım, sulama, ışık,
-hastalık, saksı/toprak seçimi vb.) kısa, net ve Türkçe olarak yanıtla."""
+_CHAT_SYSTEM_PROMPT = """Sen Plant AI platformunun akıllı ve uzlaşmacı kişisel bahçe asistanısın. 
+Kullanıcıların genel bitki bakımı (sulama, ışık, hastalıklar vb.) sorularına yanıt verirken aynı zamanda oturum açan kullanıcının hesabındaki veritabanı bilgilerini (bahçesindeki bitkileri, son sipariş durumlarını, puanlarını, kuponlarını vb.) de takip eden bir asistansın.
+
+ÖNEMLİ BİÇİMLENDİRME KURALI: Yanıtlarında asla yıldız (**kalın**, * italik) veya diyez (# başlık) gibi markdown sembolleri KULLANMA. Mobil ekranlar için metinleri temiz, okunabilir paragraflar ve renkli emojiler kullanarak düz metin olarak sun.
+
+Eğer sana sağlanan veritabanı bağlamında kullanıcının siparişleri, bitkileri, puanları veya kuponları yer alıyorsa, kullanıcının bu konulardaki sorularına net, nazik, doğru ve Türkçe cevap ver.
+Eğer kullanıcı genel bir bitki sorusu sorarsa genel uzmanlık bilginle yardımcı ol."""
 
 _FALLBACK_ANALYSIS = {
     "species": "unknown",
@@ -44,6 +48,119 @@ _FALLBACK_ANALYSIS = {
     "issues_detected": [],
     "recommended_products": [],
 }
+
+
+async def build_user_ai_context(db, user) -> str:
+    """Builds a structured markdown text summary of the user's database records for Gemini AI context."""
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
+    from app.models.customer import Cust
+    from app.models.customer_product import CustProd
+    from app.models.order import CustOrd
+    from app.models.campaign import UserCoupon
+    from app.models.address import CustomerAddress
+
+    full_name = f"{user.first_name or ''} {user.last_name or ''}".strip() or "Değerli Kullanıcı"
+    context_lines = [
+        "=== OTURUM AÇAN KULLANICI KİŞİSEL VERİTABANI BAĞLAMI ===",
+        f"- Kullanıcı Adı: {full_name}",
+        f"- E-posta: {user.email}",
+        f"- Birikmiş Puan Bakiyesi: {user.points} Puan",
+    ]
+    if user.store_name:
+        context_lines.append(f"- Mağaza Adı: {user.store_name}")
+
+    # Customer record lookup
+    cust_res = await db.execute(select(Cust).where(Cust.user_id == user.user_id))
+    cust = cust_res.scalar_one_or_none()
+
+    if cust:
+        # Addresses
+        addr_res = await db.execute(
+            select(CustomerAddress).where(CustomerAddress.cust_id == cust.cust_id)
+        )
+        addresses = addr_res.scalars().all()
+        if addresses:
+            addr_str = "; ".join([f"{a.title}: {a.address_line}" for a in addresses])
+            context_lines.append(f"- Kayıtlı Adresler: {addr_str}")
+
+        # Bahçemdeki Bitkiler
+        plants_res = await db.execute(
+            select(CustProd)
+            .options(selectinload(CustProd.specification))
+            .where(CustProd.cust_id == cust.cust_id)
+            .order_by(CustProd.created_at.desc())
+        )
+        plants = plants_res.scalars().all()
+        if plants:
+            context_lines.append("\n[KULLANICININ BAHÇESİNDEKİ BİTKİLER (BAHÇEM)]")
+            for p in plants:
+                spec_name = p.specification.name if p.specification else "Genel Tür"
+                loc = f" (Konum: {p.location})" if p.location else ""
+                health_map = {
+                    "healthy": "Sağlıklı 🌿",
+                    "diseased": "Hasta 🩺",
+                    "pest_damage": "Zararlı Tehdidi Var 🐛"
+                }
+                h_text = health_map.get(p.health_status, p.health_status)
+                
+                last_w = p.last_watered_at.strftime("%d.%m.%Y") if p.last_watered_at else "Henüz sulanmadı"
+                last_f = p.last_fertilized_at.strftime("%d.%m.%Y") if p.last_fertilized_at else "Gübrelenmedi"
+                
+                context_lines.append(
+                    f"• '{p.name}' [Tür: {spec_name}]{loc} | Sağlık: {h_text} | Sulama: Periyot {p.watering_interval_days} gün (Son Sulama: {last_w}) | Son Gübreleme: {last_f}"
+                )
+        else:
+            context_lines.append("\n[KULLANICININ BAHÇESİNDEKİ BİTKİLER]")
+            context_lines.append("Kullanıcının bahçesinde henüz kayıtlı bitkisi yok.")
+
+        # Son Siparişler
+        orders_res = await db.execute(
+            select(CustOrd)
+            .options(selectinload(CustOrd.items))
+            .where(CustOrd.cust_id == cust.cust_id)
+            .order_by(CustOrd.order_date.desc())
+            .limit(10)
+        )
+        orders = orders_res.scalars().all()
+        
+        STATUS_MAP = {
+            5: "Sipariş Alındı 📦",
+            6: "Hazırlanıyor ⏳",
+            7: "Kargoda 🚚",
+            8: "Teslim Edildi ✅",
+            9: "İptal Edildi ❌",
+        }
+        
+        if orders:
+            context_lines.append("\n[KULLANICININ SON SİPARİŞLERİ]")
+            for ord_obj in orders:
+                st_text = STATUS_MAP.get(ord_obj.gnl_st_id, f"Durum Kodu: {ord_obj.gnl_st_id}")
+                date_str = ord_obj.order_date.strftime("%d.%m.%Y %H:%M")
+                items_list = [f"{item.prod_name} ({item.quantity} adet)" for item in ord_obj.items]
+                items_str = ", ".join(items_list) if items_list else "Ürün detayı yok"
+                context_lines.append(
+                    f"• Sipariş #{ord_obj.cust_ord_id} | Tarih: {date_str} | Tutar: ₺{ord_obj.total_price} | Durum: {st_text} | Ürünler: {items_str}"
+                )
+        else:
+            context_lines.append("\n[KULLANICININ SON SİPARİŞLERİ]")
+            context_lines.append("Kullanıcının henüz verilmiş bir siparişi bulunmuyor.")
+
+    # Kuponlar
+    coupons_res = await db.execute(
+        select(UserCoupon)
+        .where(UserCoupon.user_id == user.user_id, UserCoupon.is_used == False)
+    )
+    coupons = coupons_res.scalars().all()
+    if coupons:
+        context_lines.append("\n[KULLANICININ AKTİF KUPONLARI]")
+        for c in coupons:
+            context_lines.append(f"• Kod: {c.code} | İndirim Tutarı: ₺{c.discount_amount}")
+    else:
+        context_lines.append("\n[KULLANICININ AKTİF KUPONLARI]")
+        context_lines.append("Aktif tanımlı kupon bulunmuyor.")
+
+    return "\n".join(context_lines)
 
 
 async def analyze_plant_image(image_bytes: bytes, mime_type: str) -> dict:
@@ -71,15 +188,118 @@ async def analyze_plant_image(image_bytes: bytes, mime_type: str) -> dict:
     return parsed
 
 
-async def chat_reply(history: list[dict], new_message: str) -> str:
+async def chat_reply(history: list[dict], new_message: str, user_context: str | None = None) -> str:
     try:
-        model = genai.GenerativeModel(settings.GEMINI_CHAT_MODEL, system_instruction=_CHAT_SYSTEM_PROMPT)
+        system_instruction = _CHAT_SYSTEM_PROMPT
+        if user_context:
+            system_instruction += f"\n\nAşağıda oturum açan kullanıcının güncel veritabanı bilgileri yer almaktadır:\n\n{user_context}"
+
+        model = genai.GenerativeModel(settings.GEMINI_CHAT_MODEL, system_instruction=system_instruction)
         chat = model.start_chat(history=history)
         response = chat.send_message(new_message)
         return response.text
     except Exception as e:
         print(f"⚠️ Gemini Chat API Hatası: {e}")
         return "Yapay zeka asistanı şu anda yanıt veremiyor. Lütfen API anahtarınızı kontrol edin."
+
+
+async def process_user_action_intent(db, user, message: str) -> dict | None:
+    """Checks if user message intends to execute a care action (water, fertilize, repot).
+    If matched, updates the customer's plant record and logs the care action."""
+    from datetime import datetime, timezone
+    from sqlalchemy import select
+    from app.models.customer import Cust
+    from app.models.customer_product import CustProd, CustProdCareLog
+
+    msg_lower = message.lower()
+
+    action_type = None
+    if any(k in msg_lower for k in ["suladım", "sula", "sulanma", "su verdim", "sulama yaptım"]):
+        action_type = "water"
+    elif any(k in msg_lower for k in ["gübreledim", "gübrele", "gübre verdim", "besledim", "besin verdim"]):
+        action_type = "fertilize"
+    elif any(k in msg_lower for k in ["saksı değiştirdim", "saksı değiştir", "saksısını değiştirdim", "yeni saksıya aldım"]):
+        action_type = "repot"
+
+    if not action_type:
+        return None
+
+    cust_res = await db.execute(select(Cust).where(Cust.user_id == user.user_id))
+    cust = cust_res.scalar_one_or_none()
+    if not cust:
+        return None
+
+    plants_res = await db.execute(
+        select(CustProd).where(CustProd.cust_id == cust.cust_id).order_by(CustProd.created_at.desc())
+    )
+    plants = plants_res.scalars().all()
+    if not plants:
+        return None
+
+    # Try matching plant name in the message
+    target_plant = None
+    for p in plants:
+        if p.name.lower() in msg_lower:
+            target_plant = p
+            break
+
+    # If no specific name matched, default to the first plant
+    if not target_plant:
+        target_plant = plants[0]
+
+    now_time = datetime.now(timezone.utc)
+
+    if action_type == "water":
+        target_plant.last_watered_at = now_time
+        care_label = "Sulama"
+    elif action_type == "fertilize":
+        target_plant.last_fertilized_at = now_time
+        care_label = "Gübreleme"
+    elif action_type == "repot":
+        target_plant.last_repotted_at = now_time
+        care_label = "Saksı Değişimi"
+
+    # Add Care Log
+    log = CustProdCareLog(
+        cust_prod_id=target_plant.cust_prod_id,
+        care_type=action_type,
+        notes=f"{care_label} eylemi sohbet üzerinden kaydedildi. ({target_plant.name})"
+    )
+    db.add(log)
+    await db.commit()
+
+    return {
+        "type": action_type,
+        "plant_name": target_plant.name,
+        "care_label": care_label,
+        "success": True,
+    }
+
+
+async def find_recommended_products(db, user_message: str, ai_reply: str) -> list[dict]:
+    """Finds catalog products from DB matching care, disease, fertilizer, or soil query terms."""
+    from sqlalchemy import select
+    from app.models.catalog import Prod
+
+    text_corpus = f"{user_message} {ai_reply}".lower()
+    keywords = ["gübre", "ilaç", "saksı", "toprak", "sprey", "zararlı", "neem", "besin", "gübresi", "bakım", "öneri"]
+    
+    if not any(k in text_corpus for k in keywords):
+        return []
+
+    res = await db.execute(select(Prod).where(Prod.stock > 0).limit(4))
+    products = res.scalars().all()
+
+    matched = []
+    for p in products:
+        matched.append({
+            "prod_id": p.prod_id,
+            "name": p.name,
+            "price": p.price,
+            "image_url": p.image_url,
+            "stock": p.stock,
+        })
+    return matched[:2]
 
 
 

@@ -5,8 +5,10 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -14,6 +16,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useCart } from '../../context/CartContext';
 import { apiClient } from '../../services/apiClient';
 import { colors, fonts, radius, shadow, spacing } from '../../theme/theme';
 
@@ -21,23 +24,43 @@ interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   message: string;
+  recommended_products?: any[];
+  action_performed?: {
+    type: string;
+    plant_name: string;
+    care_label: string;
+    success: boolean;
+  } | null;
 }
 
 const WELCOME_MESSAGE: ChatMessage = {
   id: 'welcome',
   role: 'assistant',
-  message: 'Merhaba! Ben senin AI bitki asistanınım. Bitkinle ilgili merak ettiğin her şeyi sorabilirsin.',
+  message: 'Merhaba! Ben senin AI bitki ve kişisel bahçe asistanınım. Bitkilerin, bakım kayıtların veya verdiğin siparişlerin hakkında ne öğrenmek istersin?',
 };
 
-const SUGGESTIONS = [
-  'Bitkim neden sarardı?',
-  'Ne sıklıkla sulamalıyım?',
-  'Zararlı böcek var mı?',
-  'İç mekan için hangi bitki uygun?',
+const QUICK_ACTION_CHIPS = [
+  { label: '💧 Sulama Zamanı Gelenler', prompt: 'Bahçemde sulama zamanı yaklaşan veya geçen bitkilerim hangileri?' },
+  { label: '📦 Son Sipariş Durumum', prompt: 'Son siparişlerimin durumu nedir?' },
+  { label: '🎁 Puanlarım & Kuponlarım', prompt: 'Kaç birikmiş puanım var ve hangi kuponları kullanabilirim?' },
+  { label: '🌿 Bahçemdeki Bitkiler', prompt: 'Bahçemdeki kayıtlı bitkilerimi ve sağlık durumlarını özetle.' },
+  { label: '🩺 Bitkim Neden Sarardı?', prompt: 'Bitkimin yaprakları sararıyor, ne yapmalıyım?' },
+  { label: '🧪 Gübreleme Önerisi', prompt: 'Bitkilerimi ne zaman ve nasıl gübrelemeliyim?' },
 ];
+
+const cleanMarkdownText = (text: string) => {
+  if (!text) return '';
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/###?\s?/g, '')
+    .replace(/`{1,3}(.*?)`{1,3}/g, '$1')
+    .trim();
+};
 
 export default function AIChatScreen({ navigation, route }: any) {
   const insets = useSafeAreaInsets();
+  const { addToCart } = useCart();
   const resumeChatId: number | undefined = route?.params?.chatId;
 
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
@@ -57,6 +80,8 @@ export default function AIChatScreen({ navigation, route }: any) {
             id: `${m.role[0]}-${m.ai_message_id}`,
             role: m.role === 'user' ? 'user' : 'assistant',
             message: m.message,
+            recommended_products: m.recommended_products,
+            action_performed: m.action_performed,
           }))
         );
       } catch {
@@ -92,6 +117,8 @@ export default function AIChatScreen({ navigation, route }: any) {
         id: `a-${data.ai_message_id}`,
         role: 'assistant',
         message: data.message,
+        recommended_products: data.recommended_products,
+        action_performed: data.action_performed,
       };
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (err: any) {
@@ -104,7 +131,6 @@ export default function AIChatScreen({ navigation, route }: any) {
   };
 
   const handleSend = () => sendMessage(input.trim());
-  const showSuggestions = messages.length === 1 && !sending;
 
   return (
     <KeyboardAvoidingView
@@ -120,8 +146,8 @@ export default function AIChatScreen({ navigation, route }: any) {
           <Ionicons name="sparkles" size={20} color={colors.primary} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={styles.headerTitle}>AI Bitki Asistanı</Text>
-          <Text style={styles.headerSub}>Sorularını sor, öneriler al</Text>
+          <Text style={styles.headerTitle}>AI Akıllı Asistan</Text>
+          <Text style={styles.headerSub}>Sorularını sor, verilerini yönet</Text>
         </View>
         <TouchableOpacity style={styles.backButton} onPress={startNewChat} activeOpacity={0.7}>
           <Ionicons name="add" size={20} color={colors.white} />
@@ -159,28 +185,57 @@ export default function AIChatScreen({ navigation, route }: any) {
                 </View>
               )}
               <View style={[styles.bubble, item.role === 'user' ? styles.bubbleUser : styles.bubbleAssistant]}>
+                {item.action_performed && item.action_performed.success && (
+                  <View style={styles.actionBadge}>
+                    <Ionicons name="checkmark-circle" size={16} color="#15803d" />
+                    <Text style={styles.actionBadgeText}>
+                      {item.action_performed.plant_name} için {item.action_performed.care_label} işlemi veritabanına kaydedildi!
+                    </Text>
+                  </View>
+                )}
+
                 <Text style={[styles.bubbleText, item.role === 'user' && styles.bubbleTextUser]}>
-                  {item.message}
+                  {cleanMarkdownText(item.message)}
                 </Text>
+
+                {item.recommended_products && item.recommended_products.length > 0 && (
+                  <View style={styles.productsContainer}>
+                    <Text style={styles.productsTitle}>🛒 Önerilen Mağaza Ürünleri:</Text>
+                    <View style={styles.productsRow}>
+                      {item.recommended_products.map((prod: any) => (
+                        <View key={prod.prod_id} style={styles.productCard}>
+                          {prod.image_url ? (
+                            <Image source={{ uri: prod.image_url }} style={styles.productImage} />
+                          ) : (
+                            <View style={[styles.productImage, { backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }]}>
+                              <Ionicons name="leaf-outline" size={24} color={colors.primaryDeep} />
+                            </View>
+                          )}
+                          <Text style={styles.productName} numberOfLines={1}>{prod.name}</Text>
+                          <Text style={styles.productPrice}>₺{prod.price}</Text>
+                          <TouchableOpacity
+                            style={styles.addToCartBtn}
+                            onPress={() => {
+                              addToCart({
+                                prod_id: prod.prod_id,
+                                name: prod.name,
+                                price: prod.price,
+                                stock: prod.stock ?? 10,
+                              });
+                              Alert.alert('Sepete Eklendi 🛒', `${prod.name} sepetinize eklendi!`);
+                            }}
+                          >
+                            <Ionicons name="cart" size={13} color={colors.white} style={{ marginRight: 4 }} />
+                            <Text style={styles.addToCartText}>Sepete Ekle</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
               </View>
             </View>
         )}
-        ListFooterComponent={
-          showSuggestions ? (
-            <View style={styles.suggestionsWrap}>
-              {SUGGESTIONS.map((s) => (
-                <TouchableOpacity
-                  key={s}
-                  style={styles.suggestionChip}
-                  activeOpacity={0.8}
-                  onPress={() => sendMessage(s)}
-                >
-                  <Text style={styles.suggestionText}>{s}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          ) : null
-        }
       />
       )}
 
@@ -193,10 +248,26 @@ export default function AIChatScreen({ navigation, route }: any) {
         </View>
       )}
 
+      <View style={styles.chipsBar}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsScroll}>
+          {QUICK_ACTION_CHIPS.map((chip) => (
+            <TouchableOpacity
+              key={chip.label}
+              style={styles.chipBtn}
+              activeOpacity={0.8}
+              onPress={() => sendMessage(chip.prompt)}
+              disabled={sending}
+            >
+              <Text style={styles.chipText}>{chip.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
       <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
         <TextInput
           style={styles.input}
-          placeholder="Bir mesaj yaz..."
+          placeholder="Bir soru sor veya 'Suladım' de..."
           placeholderTextColor={colors.muted2}
           value={input}
           onChangeText={setInput}
@@ -315,4 +386,50 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   sendButtonDisabled: { backgroundColor: colors.border },
+  actionBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#dcfce7',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: radius.sm,
+    marginBottom: spacing.xs,
+    gap: 6,
+  },
+  actionBadgeText: { fontFamily: fonts.sansBold, fontSize: 11.5, color: '#15803d', flex: 1 },
+  productsContainer: { marginTop: spacing.sm, paddingTop: spacing.xs, borderTopWidth: 1, borderTopColor: colors.border },
+  productsTitle: { fontFamily: fonts.sansBold, fontSize: 11.5, color: colors.ink, marginBottom: 6 },
+  productsRow: { flexDirection: 'row', gap: 8 },
+  productCard: {
+    width: 110,
+    backgroundColor: colors.bg,
+    borderRadius: radius.sm,
+    padding: 6,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  productImage: { width: '100%', height: 65, borderRadius: radius.xs, marginBottom: 4 },
+  productName: { fontFamily: fonts.sansMedium, fontSize: 11, color: colors.ink },
+  productPrice: { fontFamily: fonts.sansBold, fontSize: 11, color: colors.primaryDeep, marginBottom: 4 },
+  addToCartBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primaryDeep,
+    paddingVertical: 4,
+    borderRadius: radius.xs,
+  },
+  addToCartText: { fontFamily: fonts.sansBold, fontSize: 10, color: colors.white },
+  chipsBar: { backgroundColor: colors.bg, paddingVertical: 8, borderTopWidth: 1, borderTopColor: colors.border },
+  chipsScroll: { paddingHorizontal: spacing.md, gap: 8 },
+  chipBtn: {
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.full,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    ...shadow.xs,
+  },
+  chipText: { fontFamily: fonts.sansMedium, fontSize: 12, color: colors.ink },
 });

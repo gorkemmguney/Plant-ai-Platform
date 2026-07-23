@@ -22,20 +22,17 @@ class BsnInter(Base):
 
     bsn_inter_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     cust_id: Mapped[int] = mapped_column(ForeignKey("cust.cust_id"), nullable=False)
-    cdate: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    bsn_inter_spec_id: Mapped[int] = mapped_column(ForeignKey("bsn_inter_spec.bsn_inter_spec_id", ondelete="CASCADE"), nullable=False)
-    sale_cnl_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    prod_id: Mapped[int] = mapped_column(ForeignKey("prod.prod_id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class BsnInterSpec(Base):
     __tablename__ = "bsn_inter_spec"
 
     bsn_inter_spec_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
-    description: Mapped[str] = mapped_column(String(50), nullable=False)
-    shrt_code: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    is_actv: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    cdate: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    bsn_inter_id: Mapped[int] = mapped_column(ForeignKey("bsn_inter.bsn_inter_id", ondelete="CASCADE"), nullable=False)
+    action_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    action_value: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
 
 class SchJob(Base):
