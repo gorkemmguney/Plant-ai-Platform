@@ -301,7 +301,7 @@ export default function MyGardenScreen({ navigation }: any) {
             plants.length > 0 && recs.length > 0 ? (
               <View style={styles.recSection}>
                 <Text style={styles.recTitle}>🌱 Bahçene Göre Öneriler</Text>
-                <Text style={styles.recSub}>Sahip olduğun bitki türlerine benzer ürünler</Text>
+                <Text style={styles.recSub}>Bitkilerine uygun ürünler ve bahçe malzemeleri</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recRow}>
                   {recs.map((p) => (
                     <View key={p.prod_id} style={styles.recCard}>

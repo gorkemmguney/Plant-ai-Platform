@@ -351,7 +351,8 @@ async def recommended_products(
     user: AppUser = Depends(get_current_user),
 ):
     """Kullanıcının 'Akıllı Bahçem'indeki bitki türlerine göre kişiselleştirilmiş
-    ürün önerileri. Bahçe boşsa/az ürün varsa genel bitkilerle tamamlanır."""
+    ürün önerileri: çoğunlukla sahip olunan türlerde bitkiler + birkaç bahçe malzemesi
+    (saksı, toprak, gübre). Bahçe boşsa boş döner."""
     # Kullanıcının bahçesindeki bitki türleri (en çok sahip olduğu tür önce)
     spec_ids: list[int] = []
     cust = (await db.execute(select(Cust).where(Cust.user_id == user.user_id))).scalar_one_or_none()
@@ -366,23 +367,43 @@ async def recommended_products(
         ).scalars().all()
         spec_ids = list(spec_rows)
 
-    ordered_ids: list[int] = []
+    if not spec_ids:
+        return []
 
-    async def _extend(condition):
+    # Bahçedeki türlerle eşleşen bitki önerileri (tür önceliği sırasıyla, tür içinde karışık)
+    plant_ids: list[int] = []
+    for sid in spec_ids:
         rows = (
             await db.execute(
                 select(Prod.prod_id).where(
-                    condition, Prod.stock > 0, Prod.is_active.is_(True), Prod.category == "plant"
+                    Prod.prod_spec_id == sid, Prod.stock > 0, Prod.is_active.is_(True), Prod.category == "plant"
                 )
             )
         ).scalars().all()
-        pool = [pid for pid in rows if pid not in ordered_ids]
-        random.shuffle(pool)  # aynı tür içinde çeşitlilik
-        ordered_ids.extend(pool)
+        pool = [pid for pid in rows if pid not in plant_ids]
+        random.shuffle(pool)
+        plant_ids.extend(pool)
 
-    # Yalnızca bahçedeki bitki türleriyle eşleşen ürünler (alakasız rastgele öneri yok)
-    for sid in spec_ids:
-        await _extend(Prod.prod_spec_id == sid)
+    # Bahçe malzemeleri (saksı/toprak/gübre) — bahçesi olan herkese uygun, karışık
+    supply_ids = (
+        await db.execute(
+            select(Prod.prod_id).where(
+                Prod.category == "supply", Prod.stock > 0, Prod.is_active.is_(True)
+            )
+        )
+    ).scalars().all()
+    supply_ids = list(supply_ids)
+    random.shuffle(supply_ids)
+
+    # Karışım: limitin ~1/3'ü malzeme, gerisi bitki; biri yetmezse diğerinden tamamla
+    n_supply = min(len(supply_ids), max(1, limit // 3))
+    n_plant = limit - n_supply
+    ordered_ids = plant_ids[:n_plant] + supply_ids[:n_supply]
+    for pid in plant_ids[n_plant:] + supply_ids[n_supply:]:
+        if len(ordered_ids) >= limit:
+            break
+        if pid not in ordered_ids:
+            ordered_ids.append(pid)
 
     if not ordered_ids:
         return []
