@@ -23,6 +23,15 @@ _STATUS_MESSAGES = {
     9: "Siparişiniz iptal edildi.",
 }
 
+# Bildirim basligi da asamaya gore degissin
+_STATUS_TITLES = {
+    5: "🛒 Sipariş Alındı",
+    6: "📦 Hazırlanıyor",
+    7: "🚚 Kargoya Verildi",
+    8: "✅ Teslim Edildi",
+    9: "❌ Sipariş İptal Edildi",
+}
+
 
 async def update_order_status(db: AsyncSession, cust_ord_id: int, gnl_st_id: int) -> CustOrd:
     result = await db.execute(
@@ -38,8 +47,9 @@ async def update_order_status(db: AsyncSession, cust_ord_id: int, gnl_st_id: int
     cust_result = await db.execute(select(Cust).where(Cust.cust_id == order.cust_id))
     cust = cust_result.scalar_one_or_none()
     if cust is not None:
+        title = _STATUS_TITLES.get(gnl_st_id, "Sipariş Güncellemesi")
         message = _STATUS_MESSAGES.get(gnl_st_id, "Sipariş durumunuz güncellendi.")
-        await create_notification(db, cust.user_id, "Sipariş Güncellemesi", message)
+        await create_notification(db, cust.user_id, title, f"#{order.cust_ord_id} — {message}")
 
     await db.commit()
 
@@ -154,6 +164,19 @@ async def create_order(db: AsyncSession, cust_id: int, payload: OrderCreateIn) -
                     gnl_char_id=gnl_char_id,
                     value=value_text,
                 )
+            )
+
+    await db.flush()
+
+    # Sipariş oluşturulur oluşturulmaz müşteriye "Sipariş Alındı" bildirimi düşsün
+    cust_row = (await db.execute(select(Cust).where(Cust.cust_id == cust_id))).scalar_one_or_none()
+    if cust_row is not None:
+        for order in new_orders:
+            await create_notification(
+                db,
+                cust_row.user_id,
+                _STATUS_TITLES[DEFAULT_ORDER_STATUS_ID],
+                f"#{order.cust_ord_id} — {_STATUS_MESSAGES[DEFAULT_ORDER_STATUS_ID]}",
             )
 
     await db.commit()

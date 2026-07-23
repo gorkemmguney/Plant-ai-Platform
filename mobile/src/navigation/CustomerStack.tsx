@@ -110,7 +110,7 @@ function CustomerTabNavigator() {
 export default function CustomerStack() {
   return (
     <CartProvider>
-      <Stack.Navigator>
+      <Stack.Navigator screenOptions={{ headerBackButtonDisplayMode: 'minimal' }}>
         <Stack.Screen name="Tabs" component={CustomerTabNavigator} options={{ headerShown: false }} />
         <Stack.Screen name="Cart" component={CartScreen} options={{ title: 'Sepetim' }} />
         <Stack.Screen name="Orders" component={OrdersScreen} options={{ title: 'Siparişlerim' }} />

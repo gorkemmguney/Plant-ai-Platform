@@ -12,6 +12,7 @@ from app.models.order import CustOrd, CustOrdItem
 from app.models.user import AppUser
 from app.rbac.roles import RoleName
 from app.schemas.order import OrderCreateIn, OrderOut, OrderStatusUpdateIn
+from app.services.notification_service import create_notification
 from app.services.order_service import create_order, update_order_status
 
 router = APIRouter(prefix="/orders", tags=["orders"])
@@ -177,6 +178,12 @@ async def cancel_my_order(
     # Sipariş için kazanılan puanı geri al (0'ın altına düşürme)
     refunded_points = int(float(order.total_price))
     user.points = max(0, (user.points or 0) - refunded_points)
+
+    # İptal de bir sipariş aşamasıdır — bildirim olarak da düşsün
+    await create_notification(
+        db, user.user_id, "❌ Sipariş İptal Edildi", f"#{order.cust_ord_id} — Siparişiniz iptal edildi."
+    )
+
     await db.commit()
 
     # NOT: commit sonrası db.refresh(order) sadece siparişin kendi kolonlarını

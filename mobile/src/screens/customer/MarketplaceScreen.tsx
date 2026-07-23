@@ -594,6 +594,23 @@ export default function MarketplaceScreen({ navigation }: any) {
               )}
             </ScrollView>
           </View>
+
+          {zoomImageUrl && (
+            <TouchableOpacity
+              style={styles.fullscreenImageWrap}
+              activeOpacity={1}
+              onPress={() => setZoomImageUrl(null)}
+            >
+              <Image source={{ uri: zoomImageUrl }} style={styles.fullscreenImage} resizeMode="contain" />
+              <TouchableOpacity
+                style={styles.fullscreenCloseBtn}
+                onPress={() => setZoomImageUrl(null)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="close" size={22} color={colors.white} />
+              </TouchableOpacity>
+            </TouchableOpacity>
+          )}
         </View>
       </Modal>
 
@@ -726,30 +743,6 @@ export default function MarketplaceScreen({ navigation }: any) {
         </TouchableOpacity>
       </Modal>
 
-      {/* Tam ekran görsel büyütme */}
-      <Modal
-        visible={zoomImageUrl !== null}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setZoomImageUrl(null)}
-      >
-        <TouchableOpacity
-          style={styles.fullscreenImageWrap}
-          activeOpacity={1}
-          onPress={() => setZoomImageUrl(null)}
-        >
-          {zoomImageUrl && (
-            <Image source={{ uri: zoomImageUrl }} style={styles.fullscreenImage} resizeMode="contain" />
-          )}
-          <TouchableOpacity
-            style={styles.fullscreenCloseBtn}
-            onPress={() => setZoomImageUrl(null)}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="close" size={22} color={colors.white} />
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
     </View>
   );
 }
@@ -1100,7 +1093,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   fullscreenImageWrap: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.92)',
     alignItems: 'center',
     justifyContent: 'center',

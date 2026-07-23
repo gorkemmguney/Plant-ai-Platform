@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   FlatList,
+  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -26,6 +27,7 @@ interface Suggestion {
   stock: number;
   seller_id: number | null;
   seller_name: string | null;
+  image_url: string | null;
 }
 
 export default function CartScreen({ navigation }: any) {
@@ -82,9 +84,13 @@ export default function CartScreen({ navigation }: any) {
     const variantLabel = item.selectedCharacteristics.map((c) => `${c.char_name}: ${c.value}`).join(' · ');
     return (
       <View style={styles.card}>
-        <View style={styles.thumb}>
-          <Text style={styles.thumbEmoji}>🪴</Text>
-        </View>
+        {item.product.image_url ? (
+          <Image source={{ uri: item.product.image_url }} style={styles.thumb} />
+        ) : (
+          <View style={styles.thumb}>
+            <Text style={styles.thumbEmoji}>🪴</Text>
+          </View>
+        )}
         <View style={styles.info}>
           <Text style={styles.name} numberOfLines={1}>{item.product.name}</Text>
           {variantLabel ? (
@@ -146,9 +152,13 @@ export default function CartScreen({ navigation }: any) {
               <View style={styles.suggestRow}>
                 {suggestions.map((s) => (
                   <View key={s.prod_id} style={styles.suggestCard}>
-                    <View style={styles.suggestThumb}>
-                      <Text style={styles.suggestEmoji}>🪴</Text>
-                    </View>
+                    {s.image_url ? (
+                      <Image source={{ uri: s.image_url }} style={styles.suggestThumb} />
+                    ) : (
+                      <View style={styles.suggestThumb}>
+                        <Text style={styles.suggestEmoji}>🪴</Text>
+                      </View>
+                    )}
                     <Text style={styles.suggestName} numberOfLines={1}>{s.name}</Text>
                     <Text style={styles.suggestPrice}>₺{Number(s.price).toFixed(2)}</Text>
                     <TouchableOpacity
@@ -162,6 +172,7 @@ export default function CartScreen({ navigation }: any) {
                             stock: s.stock,
                             seller_id: s.seller_id,
                             seller_name: s.seller_name,
+                            image_url: s.image_url,
                           },
                           1,
                           []
