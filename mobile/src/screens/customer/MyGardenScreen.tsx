@@ -1,21 +1,33 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   Image,
   RefreshControl,
   ScrollView,
+  SectionList,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useCart } from '../../context/CartContext';
 import { apiClient } from '../../services/apiClient';
+import { isPetToxic } from '../../utils/petToxic';
 import { colors, fonts, gradients, radius, shadow, spacing, badgeColors } from '../../theme/theme';
+
+interface RecProduct {
+  prod_id: number;
+  name: string;
+  price: string | number;
+  stock: number;
+  image_url: string | null;
+  seller_id: number | null;
+  seller_name: string | null;
+}
 
 interface CustProd {
   cust_prod_id: number;
@@ -44,11 +56,14 @@ const LOCATIONS = [
 ];
 
 export default function MyGardenScreen({ navigation }: any) {
+  const { addToCart } = useCart();
   const [plants, setPlants] = useState<CustProd[]>([]);
+  const [recs, setRecs] = useState<RecProduct[]>([]);
   const [selectedLocation, setSelectedLocation] = useState('all');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [wateringId, setWateringId] = useState<number | null>(null);
+  const [bulkGroup, setBulkGroup] = useState<string | null>(null);
 
   const loadPlants = useCallback(async () => {
     try {
@@ -61,7 +76,21 @@ export default function MyGardenScreen({ navigation }: any) {
       setLoading(false);
       setRefreshing(false);
     }
+    // Bahçedeki bitki türlerine göre kişisel öneriler
+    apiClient
+      .get<RecProduct[]>('/catalog/products/recommended?limit=6')
+      .then(({ data }) => setRecs(data))
+      .catch(() => setRecs([]));
   }, []);
+
+  const handleAddRec = (p: RecProduct) => {
+    addToCart(
+      { prod_id: p.prod_id, name: p.name, price: p.price, stock: p.stock, seller_id: p.seller_id, seller_name: p.seller_name },
+      1,
+      []
+    );
+    Alert.alert('Sepete eklendi 🛒', `${p.name} sepete eklendi.`);
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -127,6 +156,39 @@ export default function MyGardenScreen({ navigation }: any) {
     (p) => selectedLocation === 'all' || p.location === selectedLocation
   );
 
+  const toxicCount = plants.filter(isPetToxic).length;
+
+  // Bitkileri türe (species_name) göre grupla — SectionList için
+  const sections = useMemo(() => {
+    const map = new Map<string, CustProd[]>();
+    filteredPlants.forEach((p) => {
+      const key = p.species_name || 'Diğer';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(p);
+    });
+    return Array.from(map.entries()).map(([title, data]) => ({ title, data }));
+  }, [filteredPlants]);
+
+  // Bir gruptaki tüm bitkileri toplu sula
+  const handleWaterGroup = async (title: string, groupPlants: CustProd[]) => {
+    setBulkGroup(title);
+    try {
+      const results = await Promise.all(
+        groupPlants.map((p) =>
+          apiClient
+            .post<CustProd>(`/customer-products/${p.cust_prod_id}/water`)
+            .then((r) => r.data)
+            .catch(() => null)
+        )
+      );
+      const updated = results.filter((r): r is CustProd => r !== null);
+      setPlants((prev) => prev.map((p) => updated.find((u) => u.cust_prod_id === p.cust_prod_id) ?? p));
+      Alert.alert('Sulandı 💧', `${title} grubundaki ${updated.length} bitki sulandı.`);
+    } finally {
+      setBulkGroup(null);
+    }
+  };
+
   const renderItem = ({ item }: { item: CustProd }) => {
     const moisturePct = calculateWateringPercentage(item.last_watered_at, item.watering_interval_days);
     const waterStatus = calculateWateringStatus(item.last_watered_at, item.watering_interval_days);
@@ -164,6 +226,12 @@ export default function MyGardenScreen({ navigation }: any) {
             </View>
             
             <Text style={styles.speciesName} numberOfLines={1}>{item.species_name}</Text>
+
+            {isPetToxic(item) && (
+              <View style={styles.petWarnPill}>
+                <Text style={styles.petWarnText}>⚠️ Evcil hayvana zararlı</Text>
+              </View>
+            )}
 
             {/* Moisture Progress Bar */}
             <View style={styles.moistureSection}>
@@ -259,17 +327,73 @@ export default function MyGardenScreen({ navigation }: any) {
         </View>
       )}
 
+      {!loading && toxicCount > 0 && (
+        <View style={styles.petBanner}>
+          <Text style={styles.petBannerIcon}>🐾</Text>
+          <Text style={styles.petBannerText}>
+            Bahçende evcil hayvana zararlı {toxicCount} bitki var. Kedi/köpeğin varsa erişemeyeceği yerde tut.
+          </Text>
+        </View>
+      )}
+
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
-        <FlatList
-          data={filteredPlants}
+        <SectionList
+          sections={sections}
           keyExtractor={(item) => String(item.cust_prod_id)}
           renderItem={renderItem}
+          stickySectionHeadersEnabled={false}
+          renderSectionHeader={({ section }) => (
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>
+                {section.title} · {section.data.length}
+              </Text>
+              <TouchableOpacity
+                style={[styles.groupWaterBtn, bulkGroup === section.title && styles.waterButtonDisabled]}
+                onPress={() => handleWaterGroup(section.title, section.data)}
+                disabled={bulkGroup === section.title}
+                activeOpacity={0.8}
+              >
+                {bulkGroup === section.title ? (
+                  <ActivityIndicator size="small" color={colors.white} />
+                ) : (
+                  <Text style={styles.groupWaterText}>💧 Hepsini Sula</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
           contentContainerStyle={styles.list}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+          ListFooterComponent={
+            plants.length > 0 && recs.length > 0 ? (
+              <View style={styles.recSection}>
+                <Text style={styles.recTitle}>🌱 Bahçene Göre Öneriler</Text>
+                <Text style={styles.recSub}>Bitkilerine uygun ürünler ve bahçe malzemeleri</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recRow}>
+                  {recs.map((p) => (
+                    <View key={p.prod_id} style={styles.recCard}>
+                      {p.image_url ? (
+                        <Image source={{ uri: p.image_url }} style={styles.recImage} />
+                      ) : (
+                        <View style={styles.recImagePlaceholder}>
+                          <Ionicons name="leaf" size={28} color={colors.primaryDeep} />
+                        </View>
+                      )}
+                      <Text style={styles.recName} numberOfLines={1}>{p.name}</Text>
+                      {!!p.seller_name && <Text style={styles.recSeller} numberOfLines={1}>{p.seller_name}</Text>}
+                      <Text style={styles.recPrice}>₺{Number(p.price).toFixed(2)}</Text>
+                      <TouchableOpacity style={styles.recAddBtn} onPress={() => handleAddRec(p)} activeOpacity={0.85}>
+                        <Text style={styles.recAddText}>+ Sepete Ekle</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </ScrollView>
+              </View>
+            ) : null
+          }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <View style={styles.emptyIcon}>
@@ -412,6 +536,83 @@ const styles = StyleSheet.create({
     fontFamily: fonts.sansBold,
   },
 
+  // Evcil hayvan uyarısı
+  petWarnPill: {
+    alignSelf: 'flex-start',
+    backgroundColor: badgeColors.red.bg,
+    borderRadius: radius.full,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginBottom: 4,
+  },
+  petWarnText: { fontFamily: fonts.sansBold, fontSize: 10, color: badgeColors.red.text },
+  petBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    backgroundColor: badgeColors.amber.bg,
+    borderRadius: radius.md,
+    padding: spacing.md,
+  },
+  petBannerIcon: { fontSize: 18 },
+  petBannerText: { flex: 1, fontFamily: fonts.sansMedium, fontSize: 12.5, color: badgeColors.amber.text, lineHeight: 18 },
+
+  // Tür grubu başlığı + toplu sula
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
+  },
+  sectionTitle: { fontFamily: fonts.sansBold, fontSize: 15, color: colors.ink },
+  groupWaterBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: radius.full,
+  },
+  groupWaterText: { fontFamily: fonts.sansBold, fontSize: 11.5, color: colors.white },
+
+  // Bahçene göre öneriler
+  recSection: { marginTop: spacing.xl, gap: 2 },
+  recTitle: { fontFamily: fonts.sansBold, fontSize: 16, color: colors.ink },
+  recSub: { fontFamily: fonts.sans, fontSize: 12, color: colors.muted, marginBottom: spacing.sm },
+  recRow: { gap: spacing.md, paddingVertical: 2, paddingRight: spacing.lg },
+  recCard: {
+    width: 150,
+    backgroundColor: colors.card,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.sm,
+    gap: 4,
+    ...shadow.sm,
+  },
+  recImage: { width: '100%', height: 90, borderRadius: radius.sm, resizeMode: 'cover' },
+  recImagePlaceholder: {
+    width: '100%',
+    height: 90,
+    borderRadius: radius.sm,
+    backgroundColor: colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recName: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.ink, marginTop: 4 },
+  recSeller: { fontFamily: fonts.sans, fontSize: 11, color: colors.muted2 },
+  recPrice: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.primaryDeep },
+  recAddBtn: {
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.full,
+    paddingVertical: 7,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  recAddText: { fontFamily: fonts.sansBold, fontSize: 11.5, color: colors.primaryDeep },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',

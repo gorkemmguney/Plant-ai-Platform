@@ -487,14 +487,14 @@ export default function MarketplaceScreen({ navigation }: any) {
         />
       )}
 
-      {/* Sepete ekle modalı */}
-      <Modal visible={selected !== null} transparent animationType="fade" onRequestClose={() => setSelected(null)}>
+      {/* Sepete ekle modalı — büyütme açıkken gizle (iki modal üst üste açılmasın) */}
+      <Modal visible={selected !== null && zoomImageUrl === null} transparent animationType="fade" onRequestClose={() => setSelected(null)}>
         <View style={styles.modalWrap}>
           <View style={styles.modalCard}>
             <ScrollView showsVerticalScrollIndicator={false} bounces={false} overScrollMode="never">
               {selected?.image_url ? (
                 <TouchableOpacity activeOpacity={0.9} onPress={() => setZoomImageUrl(selected.image_url)}>
-                  <Image source={{ uri: selected.image_url }} style={styles.modalImage} />
+                  <Image source={{ uri: selected.image_url }} style={styles.modalImage} resizeMode="contain" />
                   <View style={styles.zoomHint}>
                     <Ionicons name="expand-outline" size={14} color={colors.white} />
                   </View>

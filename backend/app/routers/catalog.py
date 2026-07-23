@@ -5,10 +5,12 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import get_user_roles, require_role
+from app.core.security import get_current_user, get_user_roles, require_role
 from app.core.storage import upload_image
 from app.db.session import get_db
 from app.models.catalog import GnlChar, GnlCharVal, Prod, ProdCharVal, ProdSpec
+from app.models.customer import Cust
+from app.models.customer_product import CustProd
 from app.models.order import CustOrdItem
 from app.models.user import AppUser
 from app.rbac.roles import RoleName
@@ -321,6 +323,91 @@ async def related_products(
         return []
 
     # Geçerli (stokta + aktif) ürünleri çek, aday sırasına göre diz, limitle
+    rows = (
+        await db.execute(
+            select(Prod, AppUser.store_name, AppUser.first_name, AppUser.last_name)
+            .outerjoin(AppUser, AppUser.user_id == Prod.seller_id)
+            .where(Prod.prod_id.in_(ordered_ids), Prod.stock > 0, Prod.is_active.is_(True))
+        )
+    ).all()
+    by_id = {prod.prod_id: (prod, store_name, first, last) for (prod, store_name, first, last) in rows}
+
+    result: list[ProductOut] = []
+    for pid in ordered_ids:
+        entry = by_id.get(pid)
+        if entry is None:
+            continue
+        prod, store_name, first, last = entry
+        result.append(_product_out(prod, store_name, first, last, []))
+        if len(result) >= limit:
+            break
+    return result
+
+
+@router.get("/products/recommended", response_model=list[ProductOut])
+async def recommended_products(
+    limit: int = Query(default=6, ge=1, le=20),
+    db: AsyncSession = Depends(get_db),
+    user: AppUser = Depends(get_current_user),
+):
+    """Kullanıcının 'Akıllı Bahçem'indeki bitki türlerine göre kişiselleştirilmiş
+    ürün önerileri: çoğunlukla sahip olunan türlerde bitkiler + birkaç bahçe malzemesi
+    (saksı, toprak, gübre). Bahçe boşsa boş döner."""
+    # Kullanıcının bahçesindeki bitki türleri (en çok sahip olduğu tür önce)
+    spec_ids: list[int] = []
+    cust = (await db.execute(select(Cust).where(Cust.user_id == user.user_id))).scalar_one_or_none()
+    if cust is not None:
+        spec_rows = (
+            await db.execute(
+                select(CustProd.prod_spec_id)
+                .where(CustProd.cust_id == cust.cust_id)
+                .group_by(CustProd.prod_spec_id)
+                .order_by(func.count().desc())
+            )
+        ).scalars().all()
+        spec_ids = list(spec_rows)
+
+    if not spec_ids:
+        return []
+
+    # Bahçedeki türlerle eşleşen bitki önerileri (tür önceliği sırasıyla, tür içinde karışık)
+    plant_ids: list[int] = []
+    for sid in spec_ids:
+        rows = (
+            await db.execute(
+                select(Prod.prod_id).where(
+                    Prod.prod_spec_id == sid, Prod.stock > 0, Prod.is_active.is_(True), Prod.category == "plant"
+                )
+            )
+        ).scalars().all()
+        pool = [pid for pid in rows if pid not in plant_ids]
+        random.shuffle(pool)
+        plant_ids.extend(pool)
+
+    # Bahçe malzemeleri (saksı/toprak/gübre) — bahçesi olan herkese uygun, karışık
+    supply_ids = (
+        await db.execute(
+            select(Prod.prod_id).where(
+                Prod.category == "supply", Prod.stock > 0, Prod.is_active.is_(True)
+            )
+        )
+    ).scalars().all()
+    supply_ids = list(supply_ids)
+    random.shuffle(supply_ids)
+
+    # Karışım: limitin ~1/3'ü malzeme, gerisi bitki; biri yetmezse diğerinden tamamla
+    n_supply = min(len(supply_ids), max(1, limit // 3))
+    n_plant = limit - n_supply
+    ordered_ids = plant_ids[:n_plant] + supply_ids[:n_supply]
+    for pid in plant_ids[n_plant:] + supply_ids[n_supply:]:
+        if len(ordered_ids) >= limit:
+            break
+        if pid not in ordered_ids:
+            ordered_ids.append(pid)
+
+    if not ordered_ids:
+        return []
+
     rows = (
         await db.execute(
             select(Prod, AppUser.store_name, AppUser.first_name, AppUser.last_name)
