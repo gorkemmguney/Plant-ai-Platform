@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { useCart } from '../../context/CartContext';
 import { apiClient } from '../../services/apiClient';
+import { trackInteraction } from '../../services/interactionService';
 import { colors, fonts, radius, shadow, spacing } from '../../theme/theme';
 
 const SALE_CHANNEL_ID = 1;
@@ -86,17 +87,9 @@ export default function CheckoutScreen({ navigation, route }: any) {
     }, [loadAddresses])
   );
 
-  const ensureCustomerProfile = async () => {
-    try {
-      await apiClient.get('/customers/me');
-    } catch (err: any) {
-      if (err?.response?.status === 404) {
-        await apiClient.post('/customers/me', { customer_type: 'IND', individual: {} });
-      } else {
-        throw err;
-      }
-    }
-  };
+  // NOT: Müşteri profilinin (cust) var olduğundan artık burada emin olmuyoruz —
+  // bu kontrol AuthContext.refreshProfile() içinde, giriş/kayıt sonrası TEK
+  // SEFER merkezi olarak yapılıyor (bkz. ensureCustomerProfile orada).
 
   const handleConfirm = async () => {
     if (!selectedAddressId) {
@@ -127,7 +120,6 @@ export default function CheckoutScreen({ navigation, route }: any) {
 
     setPlacing(true);
     try {
-      await ensureCustomerProfile();
       // NOT: Kart bilgileri SADECE formalite amaçlı — hiçbir kart verisi backend'e
       // gönderilmiyor/saklanmıyor. Gerçek bir ödeme altyapısı bağlanmadı.
       await apiClient.post('/orders', {
@@ -140,6 +132,10 @@ export default function CheckoutScreen({ navigation, route }: any) {
           selected_char_value_ids: i.selectedCharacteristics.map((c) => c.gnl_char_val_id),
         })),
       });
+      trackInteraction('PURCHASE');
+      if (couponId) {
+        trackInteraction('COUPON_USE');
+      }
       clearCart();
       Alert.alert('Sipariş alındı 🎉', 'Siparişin oluşturuldu.', [
         {

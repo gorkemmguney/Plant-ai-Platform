@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { SelectedCharacteristic, useCart } from '../../context/CartContext';
 import { apiClient } from '../../services/apiClient';
+import { trackInteraction } from '../../services/interactionService';
 import { colors, fonts, radius, shadow, spacing } from '../../theme/theme';
 
 interface ProductCharacteristic {
@@ -74,6 +75,10 @@ export default function StoreProductsScreen({ route }: any) {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (sellerId) trackInteraction('STORE_VISIT');
+  }, [sellerId]);
 
   const charGroups = useMemo(
     () => (selected ? groupCharacteristics(selected.characteristics ?? []) : []),

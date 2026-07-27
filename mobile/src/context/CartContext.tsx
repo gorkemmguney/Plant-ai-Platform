@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState } from 'react';
+import { trackInteraction } from '../services/interactionService';
 
 export interface CartProduct {
   prod_id: number;
@@ -59,6 +60,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     quantity: number = 1,
     selectedCharacteristics: SelectedCharacteristic[] = []
   ) => {
+    trackInteraction('ADD_CART');
     const lineKey = buildLineKey(product.prod_id, selectedCharacteristics);
     setItems((prev) => {
       const existing = prev.find((i) => i.lineKey === lineKey);

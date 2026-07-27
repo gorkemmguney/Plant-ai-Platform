@@ -13,7 +13,7 @@ from app.models.user import AppUser
 from app.rbac.roles import RoleName
 from app.schemas.order import OrderCreateIn, OrderOut, OrderStatusUpdateIn, OrderVisibilityUpdateIn
 from app.services.notification_service import create_notification
-from app.services.order_service import create_order, update_order_status
+from app.services.order_service import attach_hidden_flags, create_order, set_order_hidden, update_order_status
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
@@ -94,7 +94,9 @@ async def list_my_orders(
     result = await db.execute(
         select(CustOrd).options(selectinload(CustOrd.items)).where(CustOrd.cust_id == cust_id)
     )
-    return result.scalars().all()
+    orders = list(result.scalars().all())
+    await attach_hidden_flags(db, orders)
+    return orders
 
 
 @router.get("/all", response_model=list[OrderOut])
@@ -121,7 +123,9 @@ async def list_all_orders(
     )
 
     result = await db.execute(query)
-    return result.scalars().all()
+    orders = list(result.scalars().all())
+    await attach_hidden_flags(db, orders)
+    return orders
 
 
 async def _ensure_seller_owns_order(cust_ord_id: int, user: AppUser, db: AsyncSession) -> None:
@@ -167,9 +171,10 @@ async def update_order_visibility(
     if order.cust_id != cust_id:
         raise HTTPException(status_code=403, detail="Bu sipariş size ait değil")
 
-    order.is_hidden = payload.is_hidden
+    await set_order_hidden(db, order.cust_ord_id, payload.is_hidden)
     await db.commit()
     await db.refresh(order, attribute_names=["items"])
+    order.is_hidden = payload.is_hidden
     return order
 
 
@@ -217,4 +222,6 @@ async def cancel_my_order(
     result = await db.execute(
         select(CustOrd).options(selectinload(CustOrd.items)).where(CustOrd.cust_ord_id == cust_ord_id)
     )
-    return result.scalar_one()
+    cancelled_order = result.scalar_one()
+    await attach_hidden_flags(db, [cancelled_order])
+    return cancelled_order

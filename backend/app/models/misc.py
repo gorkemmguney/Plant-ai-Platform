@@ -17,23 +17,27 @@ class Notification(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class BsnSpec(Base):
+
+    __tablename__ = "bsn_spec"
+
+    bsn_spec_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(150), nullable=False)
+    description: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    srt_code: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    cdate: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class BsnInter(Base):
+
     __tablename__ = "bsn_inter"
 
     bsn_inter_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    bsn_spec_id: Mapped[int] = mapped_column(ForeignKey("bsn_spec.bsn_spec_id"), nullable=False)
     cust_id: Mapped[int] = mapped_column(ForeignKey("cust.cust_id"), nullable=False)
-    prod_id: Mapped[int] = mapped_column(ForeignKey("prod.prod_id"), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-
-class BsnInterSpec(Base):
-    __tablename__ = "bsn_inter_spec"
-
-    bsn_inter_spec_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    bsn_inter_id: Mapped[int] = mapped_column(ForeignKey("bsn_inter.bsn_inter_id", ondelete="CASCADE"), nullable=False)
-    action_type: Mapped[str] = mapped_column(String(50), nullable=False)
-    action_value: Mapped[str | None] = mapped_column(String(255), nullable=True)
-
+    sale_cnl_id: Mapped[int | None] = mapped_column(ForeignKey("sale_cnl.sale_cnl_id"), nullable=True)
+    cdate: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 class SchJob(Base):
     __tablename__ = "sch_job"

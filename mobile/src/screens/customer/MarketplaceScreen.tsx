@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { SelectedCharacteristic, useCart } from '../../context/CartContext';
 import { apiClient } from '../../services/apiClient';
+import { trackInteraction } from '../../services/interactionService';
 import { badgeColors, colors, fonts, radius, shadow, spacing } from '../../theme/theme';
 
 interface ProductCharacteristic {
@@ -134,6 +135,7 @@ export default function MarketplaceScreen({ navigation }: any) {
   const [zoomImageUrl, setZoomImageUrl] = useState<string | null>(null);
 
   const openAddModal = (product: Product) => {
+    trackInteraction('PROD_VIEW');
     const initial: Record<number, number> = {};
     (product.characteristics ?? []).forEach((c) => {
       const sameChar = (product.characteristics ?? []).filter((x) => x.gnl_char_id === c.gnl_char_id);

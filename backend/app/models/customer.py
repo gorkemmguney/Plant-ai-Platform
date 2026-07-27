@@ -10,7 +10,9 @@ class Cust(Base):
     __tablename__ = "cust"
 
     cust_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("app_user.user_id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("app_user.user_id", ondelete="CASCADE"), unique=True, nullable=False
+    )
     customer_type: Mapped[str] = mapped_column(String(50), nullable=False)  # 'individual' | 'organization'
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

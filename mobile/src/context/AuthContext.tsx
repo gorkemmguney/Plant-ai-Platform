@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Session, User } from '@supabase/supabase-js';
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { PENDING_ROLE_PREFIX } from '../constants/auth';
 import { supabase } from '../lib/supabaseClient';
 import { apiClient } from '../services/apiClient';
@@ -73,51 +73,94 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const refreshProfile = async () => {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (!session) {
-      setRoles([]);
-      setSellerStatus('none');
-      setFirstName('');
-      setLastName('');
-      return;
-    }
-
+  // Backend'de "hesap" (app_user) ile "müşteri profili" (cust) ayrı şeyler —
+  // cust, ayrı bir POST /customers/me çağrısıyla oluşuyor. Bunu ekran ekran
+  // (checkout, adres ekleme...) tekrar tekrar kontrol etmek yerine, giriş/kayıt
+  // sonrası burada TEK SEFER, kullanıcı 'customer' rolüne sahipse yapıyoruz.
+  const ensureCustomerProfile = async () => {
     try {
-      let { data } = await apiClient.get('/auth/me');
-
-      // Kayıt sırasında email onayı beklendiği için seçilen rol (özellikle 'seller'
-      // başvurusu) backend'e bildirilememişse, kullanıcı ilk kez giriş yaptığında
-      // burada tamamlanır. Backend zaten her kullanıcıya varsayılan 'customer'
-      // rolünü otomatik atadığı için bu kontrolü rolün boş olmasına değil,
-      // cihazda bekleyen bir seçim olup olmadığına dayandırıyoruz.
-      const applied = await applyPendingRoleIfAny(session.user.email);
-      if (applied) {
-        ({ data } = await apiClient.get('/auth/me'));
-      }
-
-      const nextRoles: Role[] = data.roles ?? [];
-      setUserId(data.user_id ?? null);
-      setRoles(nextRoles);
-      setSellerStatus(data.seller_status ?? 'none');
-      setFirstName(data.first_name ?? '');
-      setLastName(data.last_name ?? '');
-      setPoints(data.points ?? 0);
-
-      setActiveRole((current) => (current && !nextRoles.includes(current) ? null : current));
-      if (nextRoles.length === 1) {
-        chooseRole(nextRoles[0]);
-      }
+      await apiClient.get('/customers/me');
     } catch (err: any) {
-      console.log('[AuthContext] /auth/me başarısız:', err?.message ?? err);
-      setUserId(null);
-      setRoles([]);
-      setSellerStatus('none');
-      setFirstName('');
-      setLastName('');
+      if (err?.response?.status === 404) {
+        try {
+          await apiClient.post('/customers/me', { customer_type: 'IND', individual: {} });
+        } catch (createErr: any) {
+          console.log('[AuthContext] müşteri profili oluşturulamadı:', createErr?.message ?? createErr);
+        }
+      } else {
+        console.log('[AuthContext] müşteri profili kontrol edilemedi:', err?.message ?? err);
+      }
+    }
+  };
+
+  // getSession() ve onAuthStateChange listener'ı mount anında neredeyse aynı
+  // anda tetiklenebiliyor; ikisi de refreshProfile() çağırırsa (ör.
+  // ensureCustomerProfile içindeki POST /customers/me) yarış durumu oluşur.
+  // Aynı anda sadece TEK bir refreshProfile çalışmasını garanti ediyoruz.
+  const refreshInFlightRef = useRef<Promise<void> | null>(null);
+
+  const refreshProfile = async () => {
+    if (refreshInFlightRef.current) {
+      return refreshInFlightRef.current;
+    }
+    const run = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        setRoles([]);
+        setSellerStatus('none');
+        setFirstName('');
+        setLastName('');
+        return;
+      }
+
+      try {
+        let { data } = await apiClient.get('/auth/me');
+
+        // Kayıt sırasında email onayı beklendiği için seçilen rol (özellikle 'seller'
+        // başvurusu) backend'e bildirilememişse, kullanıcı ilk kez giriş yaptığında
+        // burada tamamlanır. Backend zaten her kullanıcıya varsayılan 'customer'
+        // rolünü otomatik atadığı için bu kontrolü rolün boş olmasına değil,
+        // cihazda bekleyen bir seçim olup olmadığına dayandırıyoruz.
+        const applied = await applyPendingRoleIfAny(session.user.email);
+        if (applied) {
+          ({ data } = await apiClient.get('/auth/me'));
+        }
+
+        const nextRoles: Role[] = data.roles ?? [];
+        setUserId(data.user_id ?? null);
+        setRoles(nextRoles);
+        setSellerStatus(data.seller_status ?? 'none');
+        setFirstName(data.first_name ?? '');
+        setLastName(data.last_name ?? '');
+        setPoints(data.points ?? 0);
+
+        if (nextRoles.includes('customer')) {
+          await ensureCustomerProfile();
+        }
+
+        setActiveRole((current) => (current && !nextRoles.includes(current) ? null : current));
+        if (nextRoles.length === 1) {
+          chooseRole(nextRoles[0]);
+        }
+      } catch (err: any) {
+        console.log('[AuthContext] /auth/me başarısız:', err?.message ?? err);
+        setUserId(null);
+        setRoles([]);
+        setSellerStatus('none');
+        setFirstName('');
+        setLastName('');
+      }
+    };
+
+    const promise = run();
+    refreshInFlightRef.current = promise;
+    try {
+      await promise;
+    } finally {
+      refreshInFlightRef.current = null;
     }
   };
 

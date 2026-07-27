@@ -1,5 +1,6 @@
 from fastapi import HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.customer import Cust, Ind, Org
@@ -21,7 +22,18 @@ async def create_customer_profile(db: AsyncSession, user_id: int, payload: Custo
 
     cust = Cust(user_id=user_id, customer_type=payload.customer_type, is_active=True)
     db.add(cust)
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError:
+        # İki eşzamanlı istek (ör. mobil tarafta aynı anda tetiklenen iki
+        # "profil var mı" kontrolü) burada yarışabilir — cust.user_id artık
+        # DB'de UNIQUE olduğu için ikincisi burada patlar. Hatayı yutup zaten
+        # oluşmuş olan profili döndürüyoruz, kullanıcı 500 görmesin.
+        await db.rollback()
+        existing = await get_customer_by_user_id(db, user_id)
+        if existing is not None:
+            return existing
+        raise
 
     if payload.customer_type == "IND":
         db.add(

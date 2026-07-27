@@ -20,8 +20,6 @@ import CommunityFeedScreen from '../screens/customer/CommunityFeedScreen';
 import PostDetailScreen from '../screens/customer/PostDetailScreen';
 import CreatePostScreen from '../screens/customer/CreatePostScreen';
 import AddressScreen from '../screens/customer/AddressScreen';
-import AppSettingsScreen from '../screens/customer/AppSettingsScreen';
-import HiddenOrdersScreen from '../screens/customer/HiddenOrdersScreen';
 import CheckoutScreen from '../screens/customer/CheckoutScreen';
 import MyGardenScreen from '../screens/customer/MyGardenScreen';
 import AddPlantScreen from '../screens/customer/AddPlantScreen';
@@ -46,8 +44,6 @@ export type CustomerStackParamList = {
   MyReviews: undefined;
   Campaigns: undefined;
   AddressScreen: undefined;
-  AppSettings: undefined;
-  HiddenOrders: undefined;
   Support: { sourcePanel?: 'customer' | 'seller' } | undefined;
   Checkout: { couponId?: number | null; discount?: number } | undefined;
   ImageAnalysis: undefined;
@@ -125,8 +121,6 @@ export default function CustomerStack() {
         <Stack.Screen name="MyReviews" component={MyReviewsScreen} options={{ title: 'Değerlendirmelerim' }} />
         <Stack.Screen name="Campaigns" component={CampaignsScreen} options={{ title: 'Kampanyalar' }} />
         <Stack.Screen name="AddressScreen" component={AddressScreen} options={{ headerShown: false }} />
-        <Stack.Screen name="AppSettings" component={AppSettingsScreen} options={{ title: 'Uygulama Ayarları' }} />
-        <Stack.Screen name="HiddenOrders" component={HiddenOrdersScreen} options={{ title: 'Gizli Siparişler' }} />
         <Stack.Screen name="Support" component={SupportScreen} options={{ headerShown: false }} initialParams={{ sourcePanel: 'customer' }} />
         <Stack.Screen name="Checkout" component={CheckoutScreen} options={{ headerShown: false }} />
         <Stack.Screen name="ImageAnalysis" component={ImageAnalysisScreen} options={{ headerShown: false }} />

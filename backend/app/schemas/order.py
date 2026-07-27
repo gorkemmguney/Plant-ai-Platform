@@ -39,6 +39,10 @@ class OrderItemOut(BaseModel):
     prod_name: str
     quantity: int
     unit_price: Decimal
+    # Hangi satıcıdan alındığının anlık kopyası (snapshot) — satıcı hesabı
+    # silinse bile bozulmaz, prod_name ile aynı mantık.
+    seller_id: int | None = None
+    seller_store_name: str | None = None
     char_values: list[OrderItemCharOut] = []
 
 

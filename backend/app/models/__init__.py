@@ -2,13 +2,12 @@ from app.models.ai import AiChat, AiFeedback, AiImageAnalysis, AiMessage, AiReco
 from app.models.catalog import GnlChar, GnlCharVal, GnlSt, Prod, ProdCharVal, ProdOfr, ProdSpec
 from app.models.complaint import Complaint
 from app.models.customer import Cust, Ind, Org
-from app.models.misc import BsnInter, BsnInterSpec, Notification, SchJob, UserPreference
+from app.models.misc import BsnInter, BsnSpec, Notification, SchJob, UserPreference
 from app.models.order import CustOrd, CustOrdCharVal, CustOrdItem, CustOrdItemCharVal, SaleCnl
 from app.models.ai import AiChat, AiFeedback, AiImageAnalysis, AiMessage, AiRecommendation
 from app.models.catalog import GnlChar, GnlCharVal, GnlSt, Prod, ProdCharVal, ProdOfr, ProdSpec
 from app.models.complaint import Complaint
 from app.models.customer import Cust, Ind, Org
-from app.models.misc import BsnInter, BsnInterSpec, Notification, SchJob, UserPreference
 from app.models.order import CustOrd, CustOrdCharVal, CustOrdItem, CustOrdItemCharVal, SaleCnl
 from app.models.bundle import Bundle, BundleItem
 from app.models.campaign import Campaign, UserCoupon
@@ -25,9 +24,10 @@ __all__ = [
     "GnlSt", "Prod", "ProdSpec", "GnlChar", "GnlCharVal", "ProdCharVal", "ProdOfr",
     "SaleCnl", "CustOrd", "CustOrdItem", "CustOrdCharVal", "CustOrdItemCharVal",
     "AiChat", "AiMessage", "AiImageAnalysis", "AiRecommendation", "AiFeedback",
-    "Notification", "BsnInter", "BsnInterSpec", "SchJob", "UserPreference",
+    "Notification", "BsnInter", "BsnSpec", "SchJob", "UserPreference",
     "Complaint", "Review", "Campaign", "UserCoupon", "Bundle", "BundleItem",
     "CommunityPost", "CommunityLike", "CommunityComment", "CustProd",
     "CustProdCareLog", "CustProdGrowthLog",
     "Il", "Ilce", "Mahalle", "CustomerAddress",
+    
 ]

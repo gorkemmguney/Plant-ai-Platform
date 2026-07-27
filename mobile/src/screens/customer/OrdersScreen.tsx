@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { useCart } from '../../context/CartContext';
 import { apiClient } from '../../services/apiClient';
+import { trackInteraction } from '../../services/interactionService';
 import { badgeColors, colors, fonts, radius, shadow, spacing } from '../../theme/theme';
 
 interface CatalogProduct {
@@ -142,6 +143,7 @@ export default function OrdersScreen({ navigation }: any) {
         rating: stars,
         comment: comment.trim() || null,
       });
+      trackInteraction('REVIEW_SUBMIT');
       setReviewedItemIds((prev) => new Set(prev).add(reviewItem.cust_ord_item_id));
       setReviewItem(null);
       Alert.alert('Teşekkürler 🌿', 'Değerlendirmen kaydedildi.');

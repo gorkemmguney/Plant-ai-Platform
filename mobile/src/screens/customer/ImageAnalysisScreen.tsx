@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { apiClient } from '../../services/apiClient';
+import { trackInteraction } from '../../services/interactionService';
 import { badgeColors, colors, fonts, radius, shadow, spacing } from '../../theme/theme';
 
 interface AnalysisHistoryItem {
@@ -119,6 +120,7 @@ export default function ImageAnalysisScreen({ navigation }: any) {
       });
 
       const data = response.data;
+      trackInteraction('AI_ANALYSIS');
       setSelectedImage(null);
       
       fetchHistory();

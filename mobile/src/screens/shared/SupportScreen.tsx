@@ -5,6 +5,7 @@ import {
   ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { apiClient } from '../../services/apiClient';
+import { trackInteraction } from '../../services/interactionService';
 import { badgeColors, colors, fonts, radius, shadow, spacing } from '../../theme/theme';
 
 interface Complaint {
@@ -56,6 +57,7 @@ export default function SupportScreen({ navigation, route }: any) {
         complaint_type: type, source_panel: sourcePanel,
         title: title.trim(), description: description.trim(),
       });
+      trackInteraction('SUPPORT_TICKET');
       setCreateOpen(false); setTitle(''); setDescription(''); setType('general');
       await load();
       Alert.alert('Talebin alındı', 'Ekibimiz en kısa sürede dönüş yapacak.');
