@@ -28,7 +28,7 @@ const sellerStatusInfo: Record<string, { label: string; badge: keyof typeof badg
   rejected: { label: 'Reddedildi', badge: 'red' },
 };
 
-export default function SettingsScreen() {
+export default function SettingsScreen({ navigation }: any) {
   const { firebaseUser, roles, sellerStatus, chooseRole } = useAuth();
   const sellerInfo = sellerStatusInfo[sellerStatus];
 
@@ -159,6 +159,11 @@ export default function SettingsScreen() {
             </View>
           </View>
         </View>
+
+        <TouchableOpacity style={styles.switchButton} onPress={() => navigation.navigate('Support', { sourcePanel: 'seller' })} activeOpacity={0.85}>
+          <Ionicons name="help-buoy-outline" size={16} color={colors.ink} />
+          <Text style={styles.switchButtonText}>Destek & Şikayet</Text>
+        </TouchableOpacity>
 
         {roles.length > 1 && (
           <TouchableOpacity style={styles.switchButton} onPress={() => chooseRole(null)} activeOpacity={0.85}>

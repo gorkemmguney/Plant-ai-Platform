@@ -185,14 +185,7 @@ export default function AIChatScreen({ navigation, route }: any) {
                 </View>
               )}
               <View style={[styles.bubble, item.role === 'user' ? styles.bubbleUser : styles.bubbleAssistant]}>
-                {item.action_performed && item.action_performed.success && (
-                  <View style={styles.actionBadge}>
-                    <Ionicons name="checkmark-circle" size={16} color="#15803d" />
-                    <Text style={styles.actionBadgeText}>
-                      {item.action_performed.plant_name} için {item.action_performed.care_label} işlemi veritabanına kaydedildi!
-                    </Text>
-                  </View>
-                )}
+                
 
                 <Text style={[styles.bubbleText, item.role === 'user' && styles.bubbleTextUser]}>
                   {cleanMarkdownText(item.message)}

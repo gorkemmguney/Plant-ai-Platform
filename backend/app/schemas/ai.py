@@ -30,7 +30,6 @@ class ChatMessageOut(BaseModel):
 
 
 class ChatSessionOut(BaseModel):
-    """Geçmiş sohbet oturumlarını listelemek için — her satır bir 'ai_chat' kaydı."""
 
     ai_chat_id: int
     created_at: datetime

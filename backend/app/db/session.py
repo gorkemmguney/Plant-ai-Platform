@@ -6,8 +6,6 @@ from app.core.config import get_settings
 
 settings = get_settings()
 
-# Supabase'in yönetilen PostgreSQL'i SSL zorunlu kılıyor. asyncpg, psycopg2'nin
-# aksine "sslmode" query param'ını değil connect_args üzerinden ssl bekler.
 _connect_args = {"ssl": "require"} if "supabase.co" in settings.DB_HOST else {}
 
 engine = create_async_engine(

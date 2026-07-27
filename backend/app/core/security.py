@@ -23,7 +23,7 @@ async def get_current_user(
     except InvalidTokenError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Geçersiz veya süresi dolmuş token")
 
-    firebase_uid = decoded["uid"]  # NOT: artık Supabase kullanıcı UUID'si (sub claim)
+    firebase_uid = decoded["uid"]  
     email = decoded.get("email", "")
     user_metadata = decoded.get("user_metadata") or {}
     first_name = user_metadata.get("first_name", "")
@@ -35,7 +35,6 @@ async def get_current_user(
     user = result.scalar_one_or_none()
 
     if user is None:
-        # E-posta ile kaydolmuş eski bir hesap varsa, Firebase UID'yi ona bağla
         email_result = await db.execute(select(AppUser).where(AppUser.email == email))
         existing_user = email_result.scalar_one_or_none()
 
@@ -61,7 +60,6 @@ async def get_current_user(
             try:
                 await db.flush()
             except IntegrityError:
-                # Aynı yeni kullanıcı için eşzamanlı ilk istekler çakışabilir
                 await db.rollback()
                 result = await db.execute(select(AppUser).where(AppUser.firebase_uid == firebase_uid))
                 user = result.scalar_one()

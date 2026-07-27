@@ -78,6 +78,7 @@ export default function AdminComplaintsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
+  const [activePanel, setActivePanel] = useState<'customer' | 'seller'>('customer');
   const [error, setError] = useState<string | null>(null);
 
   const fetchComplaints = useCallback(async (isRefresh = false) => {
@@ -88,9 +89,10 @@ export default function AdminComplaintsScreen() {
     }
     setError(null);
     try {
-      const url = activeFilter === 'all'
-        ? '/complaints/admin/all'
-        : `/complaints/admin/all?status_filter=${activeFilter}`;
+      const params = new URLSearchParams();
+      if (activeFilter !== 'all') params.append('status_filter', activeFilter);
+      params.append('source_panel', activePanel);
+      const url = `/complaints/admin/all?${params.toString()}`;
 
       const { data } = await apiClient.get<Complaint[]>(url);
       setComplaints(data);
@@ -100,7 +102,7 @@ export default function AdminComplaintsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [activeFilter]);
+  }, [activeFilter, activePanel]);
 
   useEffect(() => {
     fetchComplaints();
@@ -132,9 +134,6 @@ export default function AdminComplaintsScreen() {
   const renderItem = ({ item }: { item: Complaint }) => {
     const statusInfo = statusMapping[item.status] || { label: item.status, bg: colors.borderSoft, text: colors.muted, icon: 'help-outline' };
     const typeInfo = typeMapping[item.complaint_type] || { label: 'Bilinmeyen', icon: 'help-outline' };
-    const sentimentInfo = item.sentiment ? sentimentMapping[item.sentiment] : null;
-    const urgencyInfo = item.urgency ? urgencyMapping[item.urgency] : null;
-    const tagsList = item.ai_tags ? item.ai_tags.split(',').map(t => t.trim()).filter(Boolean) : [];
 
     return (
       <TouchableOpacity
@@ -156,31 +155,6 @@ export default function AdminComplaintsScreen() {
         <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
         <Text style={styles.description} numberOfLines={2}>{item.description}</Text>
 
-        {/* AI Badges Row */}
-        {(sentimentInfo || urgencyInfo) && (
-          <View style={styles.aiBadgesRow}>
-            {urgencyInfo && (
-              <View style={[styles.aiBadge, { backgroundColor: urgencyInfo.bg, borderColor: urgencyInfo.text }]}>
-                <Text style={[styles.aiBadgeText, { color: urgencyInfo.text }]}>{urgencyInfo.label}</Text>
-              </View>
-            )}
-            {sentimentInfo && (
-              <View style={[styles.aiBadge, { backgroundColor: sentimentInfo.bg, borderColor: sentimentInfo.text }]}>
-                <Text style={[styles.aiBadgeText, { color: sentimentInfo.text }]}>{sentimentInfo.label}</Text>
-              </View>
-            )}
-          </View>
-        )}
-
-        {/* AI Tags Row */}
-        {tagsList.length > 0 && (
-          <View style={styles.tagsContainer}>
-            {tagsList.map((tag, idx) => (
-              <Text key={idx} style={styles.tagText}>#{tag}</Text>
-            ))}
-          </View>
-        )}
-
         <View style={styles.cardFooter}>
           <View style={styles.userInfo}>
             <Ionicons name="person-outline" size={13} color={colors.muted2} style={{ marginRight: 4 }} />
@@ -194,6 +168,21 @@ export default function AdminComplaintsScreen() {
 
   return (
     <View style={styles.container}>
+      <View style={styles.panelTabs}>
+        {([
+          { key: 'customer', label: '👤 Müşteri Talepleri' },
+          { key: 'seller', label: '🏪 Satıcı Talepleri' },
+        ] as { key: 'customer' | 'seller'; label: string }[]).map((t) => {
+          const active = activePanel === t.key;
+          return (
+            <TouchableOpacity key={t.key} style={[styles.panelTab, active && styles.panelTabActive]}
+              onPress={() => setActivePanel(t.key)} activeOpacity={0.8}>
+              <Text style={[styles.panelTabText, active && styles.panelTabTextActive]}>{t.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
       {/* Filter Chips */}
       <View style={styles.filterContainer}>
         <FlatList
@@ -266,6 +255,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.bg,
   },
+  panelTabs: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingTop: spacing.md },
+  panelTab: { flex: 1, paddingVertical: 11, borderRadius: radius.full, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, alignItems: 'center' },
+  panelTabActive: { backgroundColor: colors.buttonPrimary, borderColor: colors.buttonPrimary },
+  panelTabText: { fontFamily: fonts.sansSemi, fontSize: 12.5, color: colors.ink },
+  panelTabTextActive: { color: colors.buttonPrimaryText },
   filterContainer: {
     backgroundColor: colors.card,
     borderBottomWidth: 1,

@@ -44,6 +44,10 @@ const QUICK_TILES: QuickTile[] = [
 
 const FALLBACK_COORDS = { latitude: 41.0082, longitude: 28.9784 };
 
+// GECICI: sunum/ekran goruntusu icin hava durumunu her zaman "gunesli" goster.
+// Gercek hava durumuna donmek icin bu satiri null yap.
+const DEMO_WEATHER_CODE: number | null = null;
+
 export default function HomeScreen({ navigation }: any) {
   const { firebaseUser, firstName, points, refreshProfile } = useAuth();
 
@@ -122,7 +126,7 @@ export default function HomeScreen({ navigation }: any) {
 
   const displayName = firstName || firebaseUser?.email?.split('@')[0] || 'Bitki Sever';
   const featured = products.slice(0, 6);
-  const weatherInfo = weather ? describeWeatherCode(weather.weatherCode, weather.isDay) : null;
+  const weatherInfo = weather ? describeWeatherCode(DEMO_WEATHER_CODE ?? weather.weatherCode, true) : null;
 
   return (
     <LinearGradient colors={gradients.screenBg} locations={[0, 0.45, 1]} style={styles.screen}>

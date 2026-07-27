@@ -81,7 +81,6 @@ async def _ensure_owner_or_admin(product: Prod, user: AppUser, db: AsyncSession)
 
 
 async def _characteristics_for_products(db: AsyncSession, prod_ids: list[int]) -> dict[int, list[ProductCharacteristicOut]]:
-    """Birden fazla ürünün karakteristiklerini TEK sorguda toplu olarak çeker."""
     if not prod_ids:
         return {}
     result = await db.execute(
@@ -107,7 +106,6 @@ async def _characteristics_for_products(db: AsyncSession, prod_ids: list[int]) -
 
 
 async def _sync_product_characteristics(db: AsyncSession, prod: Prod, char_value_ids: list[int]) -> None:
-    """Ürünün karakteristik atamalarını verilen gnl_char_val_id listesiyle değiştirir (tamamen yeniden yazar)."""
     await db.execute(delete(ProdCharVal).where(ProdCharVal.prod_id == prod.prod_id))
     if not char_value_ids:
         return
@@ -130,12 +128,10 @@ async def _sync_product_characteristics(db: AsyncSession, prod: Prod, char_value
         )
 
 
-# Karakteristikler (gnl_char / gnl_char_val) - herkese acik okuma, admin yazma
 
 
 @router.get("/characteristics", response_model=list[CharacteristicOut])
 async def list_characteristics(db: AsyncSession = Depends(get_db)):
-    """Satıcının ürün formunda seçebileceği, müşterinin filtrede kullanabileceği tam liste."""
     result = await db.execute(select(GnlChar).order_by(GnlChar.name))
     chars = result.scalars().all()
 

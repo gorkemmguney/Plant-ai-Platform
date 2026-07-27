@@ -7,9 +7,6 @@ from app.db.base import Base
 
 
 class CustomerAddress(Base):
-    """Müşterinin kayıtlı teslimat adresi. il/ilçe/mahalle sabit referans
-    tablolarından seçilir (kullanıcı elle yazmaz); address_line ise sokak,
-    bina/daire no gibi serbest metin ek bilgiyi tutar."""
 
     __tablename__ = "customer_address"
 

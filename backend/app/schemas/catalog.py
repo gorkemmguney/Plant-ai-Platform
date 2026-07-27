@@ -78,8 +78,6 @@ class ProductCreateIn(BaseModel):
     stock: int = 0
     gnl_st_id: int
     prod_spec_id: int
-    # Admin'in gnl_char_val tablosunda tanımladığı değerlerden satıcının seçtikleri.
-    # Boş bırakılırsa ürüne hiç karakteristik atanmaz.
     char_value_ids: list[int] = []
 
 
@@ -90,7 +88,6 @@ class ProductUpdateIn(BaseModel):
     stock: int | None = None
     gnl_st_id: int | None = None
     prod_spec_id: int | None = None
-    # None = karakteristikler değiştirilmesin; [] = tümünü kaldır; dolu liste = değiştir
     char_value_ids: list[int] | None = None
 
 

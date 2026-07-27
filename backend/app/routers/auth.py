@@ -10,7 +10,6 @@ from app.schemas.user import ProfileUpdateIn, RoleSelectIn, UserOut
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-# Kullanıcının kayıt sırasında kendisi seçebileceği roller (admin hariç — güvenlik)
 SELF_SELECTABLE_ROLES = {RoleName.CUSTOMER.value, RoleName.SELLER.value}
 
 

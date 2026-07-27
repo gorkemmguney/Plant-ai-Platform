@@ -5,11 +5,17 @@ from pydantic import BaseModel, ConfigDict
 
 class ComplaintCreate(BaseModel):
     complaint_type: str  # 'general' | 'order' | 'product' | 'seller'
+    source_panel: str = "customer"  # 'customer' | 'seller'
     title: str
     description: str
     cust_ord_id: int | None = None
     prod_id: int | None = None
     reported_seller_id: int | None = None
+
+
+class ComplaintUserReply(BaseModel):
+    """Talebi acan kisinin ek aciklamasi (admin cevap vermeden once)."""
+    user_reply: str
 
 
 class ComplaintAdminUpdate(BaseModel):
@@ -23,6 +29,7 @@ class ComplaintOut(BaseModel):
     complaint_id: int
     user_id: int
     complaint_type: str
+    source_panel: str = "customer"
     cust_ord_id: int | None = None
     prod_id: int | None = None
     reported_seller_id: int | None = None
@@ -30,6 +37,7 @@ class ComplaintOut(BaseModel):
     description: str
     status: str
     admin_note: str | None = None
+    user_reply: str | None = None
     sentiment: str | None = None
     urgency: str | None = None
     ai_summary: str | None = None

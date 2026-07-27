@@ -128,6 +128,14 @@ export default function SettingsScreen({ navigation }: any) {
             <Ionicons name="chevron-forward" size={18} color={colors.muted2} />
           </TouchableOpacity>
           <View style={styles.menuDivider} />
+          <TouchableOpacity style={styles.menuRow} onPress={() => navigation.navigate('Support', { sourcePanel: 'customer' })} activeOpacity={0.7}>
+            <View style={styles.menuLeft}>
+              <Ionicons name="help-buoy-outline" size={18} color={colors.ink} />
+              <Text style={styles.menuText}>Destek & Şikayet</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.muted2} />
+          </TouchableOpacity>
+          <View style={styles.menuDivider} />
           <TouchableOpacity style={styles.menuRow} onPress={() => navigation.navigate('MyReviews')} activeOpacity={0.7}>
             <View style={styles.menuLeft}>
               <Ionicons name="star-outline" size={18} color={colors.ink} />

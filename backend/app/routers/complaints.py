@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import get_current_user, require_role
+from app.core.security import get_current_user, get_user_roles, require_role
 from app.db.session import get_db
 from app.models.catalog import Prod
 from app.models.misc import Notification
@@ -10,12 +10,11 @@ from app.models.order import CustOrd
 from app.models.complaint import Complaint
 from app.models.user import AppUser
 from app.rbac.roles import RoleName
-from app.schemas.complaint import ComplaintAdminUpdate, ComplaintCreate, ComplaintOut
+from app.schemas.complaint import ComplaintAdminUpdate, ComplaintCreate, ComplaintOut, ComplaintUserReply
 
 router = APIRouter(prefix="/complaints", tags=["complaints"])
 
 
-# Status labels for notification message mapping
 STATUS_LABELS = {
     "pending": "Beklemede",
     "in_progress": "İnceleniyor",
@@ -32,28 +31,24 @@ async def _to_complaint_out(complaint: Complaint, db: AsyncSession) -> Complaint
     order_price = None
     order_date = None
 
-    # Fetch complainant user info
     user_res = await db.execute(select(AppUser).where(AppUser.user_id == complaint.user_id))
     user = user_res.scalar_one_or_none()
     if user:
         user_name = f"{user.first_name} {user.last_name}".strip()
         user_email = user.email
 
-    # Fetch reported seller info if applicable
     if complaint.reported_seller_id:
         seller_res = await db.execute(select(AppUser).where(AppUser.user_id == complaint.reported_seller_id))
         seller = seller_res.scalar_one_or_none()
         if seller:
             reported_seller_name = f"{seller.first_name} {seller.last_name}".strip()
 
-    # Fetch product info if applicable
     if complaint.prod_id:
         prod_res = await db.execute(select(Prod).where(Prod.prod_id == complaint.prod_id))
         prod = prod_res.scalar_one_or_none()
         if prod:
             product_name = prod.name
 
-    # Fetch order info if applicable
     if complaint.cust_ord_id:
         ord_res = await db.execute(select(CustOrd).where(CustOrd.cust_ord_id == complaint.cust_ord_id))
         order = ord_res.scalar_one_or_none()
@@ -65,6 +60,7 @@ async def _to_complaint_out(complaint: Complaint, db: AsyncSession) -> Complaint
         complaint_id=complaint.complaint_id,
         user_id=complaint.user_id,
         complaint_type=complaint.complaint_type,
+        source_panel=complaint.source_panel,
         cust_ord_id=complaint.cust_ord_id,
         prod_id=complaint.prod_id,
         reported_seller_id=complaint.reported_seller_id,
@@ -72,6 +68,7 @@ async def _to_complaint_out(complaint: Complaint, db: AsyncSession) -> Complaint
         description=complaint.description,
         status=complaint.status,
         admin_note=complaint.admin_note,
+        user_reply=complaint.user_reply,
         sentiment=complaint.sentiment,
         urgency=complaint.urgency,
         ai_summary=complaint.ai_summary,
@@ -87,14 +84,13 @@ async def _to_complaint_out(complaint: Complaint, db: AsyncSession) -> Complaint
     )
 
 
-# 1. POST /complaints (Customer / Admin / Seller can create)
 @router.post("", response_model=ComplaintOut, status_code=status.HTTP_201_CREATED)
 async def create_complaint(
     payload: ComplaintCreate,
     db: AsyncSession = Depends(get_db),
     current_user: AppUser = Depends(get_current_user),
 ):
-    # Validate reference entities if provided
+
     if payload.cust_ord_id:
         ord_res = await db.execute(select(CustOrd).where(CustOrd.cust_ord_id == payload.cust_ord_id))
         order = ord_res.scalar_one_or_none()
@@ -113,7 +109,6 @@ async def create_complaint(
         if not seller:
             raise HTTPException(status_code=400, detail="Belirtilen satıcı bulunamadı.")
 
-    # Yapay Zeka Analizlerini Çalıştır (Duygu, Aciliyet, Özet, Etiket)
     from app.services.ai_service import analyze_new_complaint
     ai_res = await analyze_new_complaint(
         title=payload.title,
@@ -121,8 +116,14 @@ async def create_complaint(
         complaint_type=payload.complaint_type
     )
 
+    roles = await get_user_roles(current_user, db)
+    source_panel = payload.source_panel if payload.source_panel in ("customer", "seller") else "customer"
+    if source_panel == "seller" and RoleName.SELLER not in roles and RoleName.ADMIN not in roles:
+        raise HTTPException(status_code=403, detail="Satıcı paneli adına talep açma yetkiniz yok.")
+
     complaint = Complaint(
         user_id=current_user.user_id,
+        source_panel=source_panel,
         complaint_type=payload.complaint_type,
         cust_ord_id=payload.cust_ord_id,
         prod_id=payload.prod_id,
@@ -142,7 +143,6 @@ async def create_complaint(
     return await _to_complaint_out(complaint, db)
 
 
-# 2. GET /complaints (Get current user's complaints)
 @router.get("", response_model=list[ComplaintOut])
 async def list_my_complaints(
     db: AsyncSession = Depends(get_db),
@@ -155,7 +155,6 @@ async def list_my_complaints(
     return [await _to_complaint_out(c, db) for c in complaints]
 
 
-# 3. GET /complaints/{complaint_id} (Get single complaint details for current user)
 @router.get("/{complaint_id}", response_model=ComplaintOut)
 async def get_my_complaint(
     complaint_id: int,
@@ -169,38 +168,54 @@ async def get_my_complaint(
     if not complaint:
         raise HTTPException(status_code=404, detail="Şikayet kaydı bulunamadı.")
     
-    # Admins can view any complaint; users can only view their own
     roles_res = await db.execute(
         select(AppUser).where(AppUser.user_id == current_user.user_id)
     )
-    # Check if admin
     is_admin = False
     result = await db.execute(
         select(AppUser).where(AppUser.user_id == current_user.user_id)
     )
-    # Import require_role to verify but simpler to check roles inline or just allow admin access
-    # We will let admin access this endpoint too for convenience, but the primary admin list is separate.
     if complaint.user_id != current_user.user_id:
-        # Check admin role
         admin_check = await db.execute(
             select(AppUser).join(Notification, False).where(AppUser.user_id == current_user.user_id) # dummy join or reuse logic
         )
-        # We will enforce ownership unless admin (implemented below)
         raise HTTPException(status_code=403, detail="Bu şikayet kaydına erişim yetkiniz yok.")
         
     return await _to_complaint_out(complaint, db)
 
 
-# 4. GET /admin/complaints (Admin list all complaints with optional status filter)
+@router.patch("/{complaint_id}/reply", response_model=ComplaintOut)
+async def add_user_reply(
+    complaint_id: int,
+    payload: ComplaintUserReply,
+    db: AsyncSession = Depends(get_db),
+    current_user: AppUser = Depends(get_current_user),
+):
+    """Talebi acan kisi ek aciklama ekler. Admin cevap verdikten SONRA kilitlenir."""
+    res = await db.execute(select(Complaint).where(Complaint.complaint_id == complaint_id))
+    complaint = res.scalar_one_or_none()
+    if complaint is None or complaint.user_id != current_user.user_id:
+        raise HTTPException(status_code=404, detail="Talep bulunamadı.")
+    if complaint.admin_note:
+        raise HTTPException(status_code=400, detail="Bu talep yanıtlandı, yeni mesaj ekleyemezsiniz.")
+    complaint.user_reply = payload.user_reply
+    await db.commit()
+    await db.refresh(complaint)
+    return await _to_complaint_out(complaint, db)
+
+
 @router.get("/admin/all", response_model=list[ComplaintOut])
 async def admin_list_complaints(
     status_filter: str | None = None,
+    source_panel: str | None = None,
     db: AsyncSession = Depends(get_db),
     _: AppUser = Depends(require_role(RoleName.ADMIN)),
 ):
     query = select(Complaint)
     if status_filter:
         query = query.where(Complaint.status == status_filter)
+    if source_panel in ("customer", "seller"):
+        query = query.where(Complaint.source_panel == source_panel)
     query = query.order_by(Complaint.created_at.desc())
     
     res = await db.execute(query)
@@ -208,7 +223,6 @@ async def admin_list_complaints(
     return [await _to_complaint_out(c, db) for c in complaints]
 
 
-# 5. GET /admin/complaints/{complaint_id} (Admin detail view)
 @router.get("/admin/{complaint_id}", response_model=ComplaintOut)
 async def admin_get_complaint(
     complaint_id: int,
@@ -224,7 +238,6 @@ async def admin_get_complaint(
     return await _to_complaint_out(complaint, db)
 
 
-# 6. PATCH /admin/complaints/{complaint_id} (Admin updates status and admin note)
 @router.patch("/admin/{complaint_id}", response_model=ComplaintOut)
 async def admin_update_complaint(
     complaint_id: int,
@@ -257,7 +270,6 @@ async def admin_update_complaint(
         await db.commit()
         await db.refresh(complaint)
         
-        # Send Notification to customer
         status_label = STATUS_LABELS.get(complaint.status, complaint.status)
         notif_msg = f"'{complaint.title}' başlıklı şikayet/destek talebiniz güncellendi. Yeni Durum: {status_label}."
         if complaint.admin_note:
@@ -278,7 +290,6 @@ async def admin_update_complaint(
     return await _to_complaint_out(complaint, db)
 
 
-# 7. POST /admin/complaints/{complaint_id}/ai-draft (Admin drafts response with AI)
 @router.post("/admin/{complaint_id}/ai-draft")
 async def admin_ai_draft_complaint_response(
     complaint_id: int,
@@ -299,14 +310,12 @@ async def admin_ai_draft_complaint_response(
             detail="Geçersiz hedef durum. Yapay zeka taslağı sadece 'pending', 'in_progress', 'resolved' veya 'rejected' durumları için oluşturulabilir."
         )
 
-    # Fetch complainant user info
     user_name = None
     user_res = await db.execute(select(AppUser).where(AppUser.user_id == complaint.user_id))
     user = user_res.scalar_one_or_none()
     if user:
         user_name = f"{user.first_name} {user.last_name}".strip()
 
-    # Fetch product info
     product_name = None
     if complaint.prod_id:
         prod_res = await db.execute(select(Prod).where(Prod.prod_id == complaint.prod_id))
@@ -314,7 +323,6 @@ async def admin_ai_draft_complaint_response(
         if prod:
             product_name = prod.name
 
-    # Fetch reported seller info
     reported_seller_name = None
     if complaint.reported_seller_id:
         seller_res = await db.execute(select(AppUser).where(AppUser.user_id == complaint.reported_seller_id))
@@ -336,7 +344,6 @@ async def admin_ai_draft_complaint_response(
     return ai_res
 
 
-# 8. GET /admin/complaints/{complaint_id}/seller-risk-advisor (Admin views seller risk advice)
 @router.get("/admin/{complaint_id}/seller-risk-advisor")
 async def admin_get_seller_risk_advice(
     complaint_id: int,
@@ -350,7 +357,6 @@ async def admin_get_seller_risk_advice(
     if not complaint:
         raise HTTPException(status_code=404, detail="Şikayet kaydı bulunamadı.")
 
-    # Find seller_id
     seller_id = complaint.reported_seller_id
     if not seller_id and complaint.prod_id:
         prod_res = await db.execute(select(Prod).where(Prod.prod_id == complaint.prod_id))
@@ -361,14 +367,12 @@ async def admin_get_seller_risk_advice(
     if not seller_id:
         raise HTTPException(status_code=400, detail="Bu şikayet kaydı herhangi bir satıcı ile ilişkili değil.")
 
-    # Fetch reported seller user info
     seller_res = await db.execute(select(AppUser).where(AppUser.user_id == seller_id))
     seller = seller_res.scalar_one_or_none()
     if not seller:
         raise HTTPException(status_code=404, detail="Şikayet edilen satıcı profili bulunamadı.")
     seller_name = f"{seller.first_name} {seller.last_name}".strip()
 
-    # Query complaints against this seller
     seller_complaints_res = await db.execute(
         select(Complaint).where(
             (Complaint.reported_seller_id == seller_id) |

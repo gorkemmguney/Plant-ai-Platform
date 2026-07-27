@@ -259,7 +259,7 @@ async def process_user_action_intent(db, user, message: str) -> dict | None:
         target_plant.last_repotted_at = now_time
         care_label = "Saksı Değişimi"
 
-    # Add Care Log
+
     log = CustProdCareLog(
         cust_prod_id=target_plant.cust_prod_id,
         care_type=action_type,
@@ -762,3 +762,53 @@ SADECE aşağıdaki JSON formatında yanıt ver:
 
 
 
+
+
+
+async def generate_seller_report(stats: dict) -> str:
+    """Saticinin kendi magaza verilerini analiz eden Turkce AI raporu."""
+    model = genai.GenerativeModel(settings.GEMINI_CHAT_MODEL)
+
+    def _fmt(rows: list[dict], value_key: str, suffix: str = "") -> str:
+        if not rows:
+            return "  (veri yok)"
+        return "\n".join(f"  - {r['name']}: {r[value_key]}{suffix}" for r in rows)
+
+    prompt = f"""Sen Plant AI platformunda satıcılara özel çalışan bir mağaza analisti asistanısın.
+Aşağıdaki gerçek verileri analiz edip satıcıya yol gösteren bir rapor hazırla.
+
+📦 Genel Durum:
+- Toplam ürün sayısı: {stats.get('total_products', 0)}
+- Aktif (satıştaki) ürün: {stats.get('active_products', 0)}
+- Stoğu biten ürün: {stats.get('out_of_stock', 0)}
+- Toplam sipariş kalemi: {stats.get('total_order_items', 0)}
+- Teslim edilen sipariş: {stats.get('delivered_orders', 0)}
+- İptal edilen sipariş: {stats.get('cancelled_orders', 0)}
+- Toplam ciro: {stats.get('total_revenue', 0)} TL
+- Ortalama ürün puanı: {stats.get('avg_rating', 'veri yok')}
+- Toplam yorum sayısı: {stats.get('review_count', 0)}
+
+🔥 En çok sipariş edilen ürünler:
+{_fmt(stats.get('top_products', []), 'qty', ' adet')}
+
+❌ En çok iptal edilen ürünler:
+{_fmt(stats.get('cancelled_products', []), 'qty', ' adet')}
+
+⭐ En düşük puanlı ürünler:
+{_fmt(stats.get('low_rated', []), 'rating', ' yıldız')}
+
+Raporu şu başlıklar altında yaz:
+**📈 Mağaza Performansı** - Verilerin kısa yorumu
+**🔥 Öne Çıkan Ürünler** - Neyin iyi gittiği ve nedeni
+**⚠️ Sorunlu Alanlar** - İptaller, düşük puanlar, stok sorunları
+**🚀 Mağazanı Öne Çıkarmak İçin** - 3-4 SOMUT, uygulanabilir öneri
+(örn. fiyat/stok ayarı, hangi ürüne kampanya, hangi ürünün görseli/açıklaması iyileştirilmeli)
+
+Türkçe, samimi ama profesyonel, emoji kullan. Veri azsa bunu dürüstçe belirt ve
+satıcının ne yapması gerektiğini yine de söyle."""
+    try:
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        print(f"⚠️ Gemini Seller Report Hatası: {e}")
+        return "Mağaza raporu şu anda oluşturulamıyor. Lütfen daha sonra tekrar deneyin."

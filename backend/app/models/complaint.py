@@ -12,6 +12,8 @@ class Complaint(Base):
     complaint_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("app_user.user_id", ondelete="CASCADE"), nullable=False)
     complaint_type: Mapped[str] = mapped_column(String(50), nullable=False)  # 'general' | 'order' | 'product' | 'seller'
+    # Talebin hangi panelden acildigi — admin panelinde iki ayri liste icin
+    source_panel: Mapped[str] = mapped_column(String(20), server_default="customer", nullable=False)  # 'customer' | 'seller'
     
     # Referans nesneleri (şikayet türüne göre isteğe bağlı)
     cust_ord_id: Mapped[int | None] = mapped_column(ForeignKey("cust_ord.cust_ord_id", ondelete="SET NULL"), nullable=True)
@@ -22,6 +24,8 @@ class Complaint(Base):
     description: Mapped[str] = mapped_column(String, nullable=False)
     status: Mapped[str] = mapped_column(String(20), server_default="pending", nullable=False)  # 'pending' | 'in_progress' | 'resolved' | 'rejected'
     admin_note: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Talebi acan kisinin ek aciklamasi — SADECE admin cevap vermeden once yazilabilir
+    user_reply: Mapped[str | None] = mapped_column(String, nullable=True)
     
     # AI Analiz Alanları
     sentiment: Mapped[str | None] = mapped_column(String(30), nullable=True)  # 'angry' | 'sad' | 'neutral'

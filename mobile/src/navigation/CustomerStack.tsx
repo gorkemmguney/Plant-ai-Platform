@@ -24,6 +24,7 @@ import CheckoutScreen from '../screens/customer/CheckoutScreen';
 import MyGardenScreen from '../screens/customer/MyGardenScreen';
 import AddPlantScreen from '../screens/customer/AddPlantScreen';
 import PlantDetailScreen from '../screens/customer/PlantDetailScreen';
+import SupportScreen from '../screens/shared/SupportScreen';
 import CustomTabBar from './CustomTabBar';
 
 export type CustomerTabParamList = {
@@ -43,6 +44,7 @@ export type CustomerStackParamList = {
   MyReviews: undefined;
   Campaigns: undefined;
   AddressScreen: undefined;
+  Support: { sourcePanel?: 'customer' | 'seller' } | undefined;
   Checkout: { couponId?: number | null; discount?: number } | undefined;
   ImageAnalysis: undefined;
   ChatScreen: { chatId?: number } | undefined;
@@ -119,6 +121,7 @@ export default function CustomerStack() {
         <Stack.Screen name="MyReviews" component={MyReviewsScreen} options={{ title: 'Değerlendirmelerim' }} />
         <Stack.Screen name="Campaigns" component={CampaignsScreen} options={{ title: 'Kampanyalar' }} />
         <Stack.Screen name="AddressScreen" component={AddressScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="Support" component={SupportScreen} options={{ headerShown: false }} initialParams={{ sourcePanel: 'customer' }} />
         <Stack.Screen name="Checkout" component={CheckoutScreen} options={{ headerShown: false }} />
         <Stack.Screen name="ImageAnalysis" component={ImageAnalysisScreen} options={{ headerShown: false }} />
         <Stack.Screen name="ChatScreen" component={AIChatScreen} options={{ headerShown: false }} />
