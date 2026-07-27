@@ -12,20 +12,18 @@ export default function AppSettingsScreen({ navigation }: any) {
 
       <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: spacing.xl }}>
         <View style={styles.menuCard}>
-          <TouchableOpacity
-            style={styles.menuRow}
-            onPress={() => navigation.navigate('HiddenOrders')}
-            activeOpacity={0.7}
-          >
+          <View style={styles.menuRow}>
             <View style={styles.menuLeft}>
-              <Ionicons name="lock-closed-outline" size={18} color={colors.ink} />
-              <View>
-                <Text style={styles.menuText}>Gizli Siparişleri Geri Getir</Text>
-                <Text style={styles.menuSubText}>Şifre doğrulaması gerektirir</Text>
+              <Ionicons name="eye-outline" size={18} color={colors.ink} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.menuText}>Gizli Siparişler</Text>
+                <Text style={styles.menuSubText}>
+                  Gizlediğin siparişleri Siparişlerim &gt; Gizlenenler sekmesinden görüp "Geri Getir" ile tekrar
+                  gösterebilirsin.
+                </Text>
               </View>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.muted2} />
-          </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
     </View>
