@@ -29,3 +29,9 @@ class ProfileUpdateIn(BaseModel):
     first_name: str | None = None
     last_name: str | None = None
     store_name: str | None = None
+
+
+class PasswordVerifyIn(BaseModel):
+    # Gizli siparişler gibi hassas ekranlara girmeden önce mevcut kullanıcının
+    # şifresini backend üzerinden (Supabase'e sorarak) doğrulamak için.
+    password: str

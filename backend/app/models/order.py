@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -27,6 +27,10 @@ class CustOrd(Base):
     total_price: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     order_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     gnl_st_id: Mapped[int] = mapped_column(ForeignKey("gnl_st.gnl_st_id"), nullable=False)
+    # Müşteri "Gizle"ye bastığında true olur — sipariş silinmez, sadece
+    # müşterinin kendi sipariş listesinde varsayılan olarak görünmez.
+    # Satıcı/admin tarafındaki listeleri ETKİLEMEZ.
+    is_hidden: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
 
     items: Mapped[list["CustOrdItem"]] = relationship(back_populates="order", cascade="all, delete-orphan")
 

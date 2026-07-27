@@ -11,7 +11,7 @@ from app.models.customer import Cust
 from app.models.order import CustOrd, CustOrdItem
 from app.models.user import AppUser
 from app.rbac.roles import RoleName
-from app.schemas.order import OrderCreateIn, OrderOut, OrderStatusUpdateIn
+from app.schemas.order import OrderCreateIn, OrderOut, OrderStatusUpdateIn, OrderVisibilityUpdateIn
 from app.services.notification_service import create_notification
 from app.services.order_service import create_order, update_order_status
 
@@ -147,6 +147,30 @@ async def update_order_status_endpoint(
 ):
     await _ensure_seller_owns_order(cust_ord_id, user, db)
     return await update_order_status(db, cust_ord_id, payload.gnl_st_id)
+
+
+@router.patch("/{cust_ord_id}/visibility", response_model=OrderOut)
+async def update_order_visibility(
+    cust_ord_id: int,
+    payload: OrderVisibilityUpdateIn,
+    db: AsyncSession = Depends(get_db),
+    user: AppUser = Depends(require_role(RoleName.CUSTOMER, RoleName.ADMIN)),
+):
+    
+    cust_id = await _get_cust_id(user, db)
+    result = await db.execute(
+        select(CustOrd).options(selectinload(CustOrd.items)).where(CustOrd.cust_ord_id == cust_ord_id)
+    )
+    order = result.scalar_one_or_none()
+    if order is None:
+        raise HTTPException(status_code=404, detail="Sipariş bulunamadı")
+    if order.cust_id != cust_id:
+        raise HTTPException(status_code=403, detail="Bu sipariş size ait değil")
+
+    order.is_hidden = payload.is_hidden
+    await db.commit()
+    await db.refresh(order, attribute_names=["items"])
+    return order
 
 
 @router.post("/{cust_ord_id}/cancel", response_model=OrderOut)

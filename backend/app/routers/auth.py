@@ -1,16 +1,19 @@
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.supabase_auth import set_role_claim
 from app.core.security import get_current_user, get_user_roles
 from app.db.session import get_db
 from app.models.user import AppUser
 from app.rbac.roles import ROLE_HIERARCHY, RoleName
-from app.schemas.user import ProfileUpdateIn, RoleSelectIn, UserOut
+from app.schemas.user import PasswordVerifyIn, ProfileUpdateIn, RoleSelectIn, UserOut
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 SELF_SELECTABLE_ROLES = {RoleName.CUSTOMER.value, RoleName.SELLER.value}
+settings = get_settings()
 
 
 def _user_out(user: AppUser, roles: list[str]) -> UserOut:
@@ -75,3 +78,32 @@ async def select_role(
         top_role = max(roles, key=lambda r: ROLE_HIERARCHY.get(r, -1))
         set_role_claim(user.firebase_uid, top_role)
     return _user_out(user, roles)
+
+
+@router.post("/verify-password")
+async def verify_password(
+    payload: PasswordVerifyIn,
+    user: AppUser = Depends(get_current_user),
+):
+    """Gizli siparişler gibi hassas bir bölüme girmeden önce mevcut oturumdaki
+    kullanıcının şifresini teyit eder. Şifreyi biz saklamıyoruz — Supabase'in
+    password grant uç noktasına email+girilen şifre ile deneme yaptırıyoruz;
+    200 dönerse şifre doğru, aksi halde 401."""
+    if not payload.password:
+        raise HTTPException(status_code=400, detail="Şifre boş olamaz")
+
+    try:
+        response = httpx.post(
+            f"{settings.SUPABASE_URL}/auth/v1/token",
+            params={"grant_type": "password"},
+            headers={"apikey": settings.SUPABASE_PUBLISHABLE_KEY, "Content-Type": "application/json"},
+            json={"email": user.email, "password": payload.password},
+            timeout=10.0,
+        )
+    except httpx.HTTPError:
+        raise HTTPException(status_code=503, detail="Doğrulama servisine ulaşılamadı, tekrar dene")
+
+    if response.status_code != 200:
+        raise HTTPException(status_code=401, detail="Şifre hatalı")
+
+    return {"verified": True}

@@ -51,7 +51,13 @@ class OrderOut(BaseModel):
     total_price: Decimal
     order_date: datetime
     gnl_st_id: int
+    is_hidden: bool = False
     items: list[OrderItemOut] = []
+
 
 class OrderStatusUpdateIn(BaseModel):
     gnl_st_id: int
+
+
+class OrderVisibilityUpdateIn(BaseModel):
+    is_hidden: bool

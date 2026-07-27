@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -82,6 +81,7 @@ interface Order {
   total_price: string | number;
   order_date: string;
   gnl_st_id: number;
+  is_hidden: boolean;
   items: OrderItem[];
 }
 
@@ -95,8 +95,6 @@ const statusLabels: Record<number, string> = {
 
 const CANCELLABLE = [5, 6];
 
-const HIDDEN_ORDERS_KEY = 'hidden_order_ids';
-
 export default function OrdersScreen({ navigation }: any) {
   const { addToCart } = useCart();
   const [orders, setOrders] = useState<Order[]>([]);
@@ -106,8 +104,7 @@ export default function OrdersScreen({ navigation }: any) {
   const [error, setError] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<number | null>(null);
   const [reorderingId, setReorderingId] = useState<number | null>(null);
-  const [hiddenIds, setHiddenIds] = useState<number[]>([]);
-  const [filter, setFilter] = useState<'active' | 'hidden' | 'all'>('active');
+  const [hidingId, setHidingId] = useState<number | null>(null);
 
   // Değerlendirme (yıldız + yorum) modalı — sipariş KALEMİ bazında tek seferlik
   const [reviewItem, setReviewItem] = useState<{ prod_id: number; prod_name: string; cust_ord_item_id: number } | null>(null);
@@ -172,31 +169,20 @@ export default function OrdersScreen({ navigation }: any) {
     loadReviewedItems();
   }, [load, loadReviewedItems]);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const stored = await AsyncStorage.getItem(HIDDEN_ORDERS_KEY);
-        if (stored) setHiddenIds(JSON.parse(stored));
-      } catch {
-        // sessizce geç
-      }
-    })();
-  }, []);
-
-  const hideOrder = (id: number) => {
-    setHiddenIds((prev) => {
-      const next = [...prev, id];
-      AsyncStorage.setItem(HIDDEN_ORDERS_KEY, JSON.stringify(next)).catch(() => {});
-      return next;
-    });
-  };
-
-  const unhideOrder = (id: number) => {
-    setHiddenIds((prev) => {
-      const next = prev.filter((x) => x !== id);
-      AsyncStorage.setItem(HIDDEN_ORDERS_KEY, JSON.stringify(next)).catch(() => {});
-      return next;
-    });
+  // Gizleme artık backend'de kalıcı. Geri getirme burada YOK — sadece
+  // Ayarlar > Uygulama Ayarları > Gizli Siparişleri Geri Getir (şifre korumalı) üzerinden yapılabilir.
+  const hideOrder = async (id: number) => {
+    const prevOrders = orders;
+    setHidingId(id);
+    setOrders((prev) => prev.filter((o) => o.cust_ord_id !== id));
+    try {
+      await apiClient.patch(`/orders/${id}/visibility`, { is_hidden: true });
+    } catch (err: any) {
+      setOrders(prevOrders);
+      Alert.alert('İşlem başarısız', err?.response?.data?.detail ?? 'Sipariş gizlenemedi.');
+    } finally {
+      setHidingId(null);
+    }
   };
 
   const handleReorder = async (order: Order) => {
@@ -374,25 +360,18 @@ export default function OrdersScreen({ navigation }: any) {
       </TouchableOpacity>
     );
 
-    const isHidden = hiddenIds.includes(item.cust_ord_id);
-
-    // Gizlenmiş sipariş (Gizlenenler/Tümü görünümünde) → "Geri Getir" butonu
-    if (isHidden) {
-      return (
-        <View>
-          {card}
-          <TouchableOpacity style={styles.unhideBtn} onPress={() => unhideOrder(item.cust_ord_id)} activeOpacity={0.85}>
-            <Text style={styles.unhideText}>↩︎ Geri Getir</Text>
-          </TouchableOpacity>
-        </View>
-      );
-    }
-
-    // İptal edilmiş ve gizlenmemiş → sola kaydırıp gizlenebilir
+    // İptal edilmiş sipariş → sola kaydırıp gizlenebilir (gizlenince listeden anında kalkar,
+    // geri getirmek için: Ayarlar > Uygulama Ayarları > Gizli Siparişleri Geri Getir)
     if (item.gnl_st_id === 9) {
       return (
         <SwipeToHide onHide={() => hideOrder(item.cust_ord_id)}>
-          {card}
+          {hidingId === item.cust_ord_id ? (
+            <View style={styles.hidingOverlay}>
+              <ActivityIndicator size="small" color={colors.muted} />
+            </View>
+          ) : (
+            card
+          )}
         </SwipeToHide>
       );
     }
@@ -404,26 +383,6 @@ export default function OrdersScreen({ navigation }: any) {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Siparişlerim</Text>
         <Text style={styles.headerSub}>Verdiğin siparişleri takip et</Text>
-
-        <View style={styles.filterRow}>
-          {([
-            { key: 'active', label: 'Aktif' },
-            { key: 'hidden', label: `Gizlenenler${hiddenIds.length ? ` (${hiddenIds.length})` : ''}` },
-            { key: 'all', label: 'Tümü' },
-          ] as { key: 'active' | 'hidden' | 'all'; label: string }[]).map((f) => {
-            const active = filter === f.key;
-            return (
-              <TouchableOpacity
-                key={f.key}
-                style={[styles.filterBtn, active && styles.filterBtnActive]}
-                onPress={() => setFilter(f.key)}
-                activeOpacity={0.85}
-              >
-                <Text style={[styles.filterText, active && styles.filterTextActive]}>{f.label}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
       </View>
 
       {loading ? (
@@ -439,12 +398,7 @@ export default function OrdersScreen({ navigation }: any) {
         </View>
       ) : (
         <FlatList
-          data={orders.filter((o) => {
-            const isHidden = hiddenIds.includes(o.cust_ord_id);
-            if (filter === 'active') return !isHidden;
-            if (filter === 'hidden') return isHidden;
-            return true; // tümü
-          })}
+          data={orders.filter((o) => !o.is_hidden)}
           keyExtractor={(item) => String(item.cust_ord_id)}
           contentContainerStyle={styles.list}
           renderItem={renderOrder}
@@ -458,13 +412,7 @@ export default function OrdersScreen({ navigation }: any) {
             />
           }
           ListEmptyComponent={
-            <Text style={styles.emptyText}>
-              {filter === 'hidden'
-                ? 'Gizlenmiş siparişin yok.'
-                : filter === 'active'
-                ? 'Aktif siparişin yok.'
-                : "Henüz siparişin yok. Mağaza'dan alışverişe başla!"}
-            </Text>
+            <Text style={styles.emptyText}>Henüz siparişin yok. Mağaza'dan alışverişe başla!</Text>
           }
         />
       )}
@@ -516,29 +464,6 @@ const styles = StyleSheet.create({
   header: { paddingTop: 16, paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
   headerTitle: { fontFamily: fonts.display, fontSize: 24, color: colors.ink },
   headerSub: { fontFamily: fonts.sans, fontSize: 12.5, color: colors.muted, marginTop: 2 },
-  filterRow: {
-    flexDirection: 'row',
-    gap: 6,
-    marginTop: spacing.md,
-    backgroundColor: colors.bgAlt,
-    borderRadius: radius.full,
-    padding: 4,
-  },
-  filterBtn: { flex: 1, paddingVertical: 8, borderRadius: radius.full, alignItems: 'center' },
-  filterBtnActive: { backgroundColor: colors.buttonPrimary },
-  filterText: { fontFamily: fonts.sansSemi, fontSize: 12.5, color: colors.muted },
-  filterTextActive: { color: colors.buttonPrimaryText, fontFamily: fonts.sansBold },
-  unhideBtn: {
-    marginTop: spacing.sm,
-    alignSelf: 'flex-start',
-    borderWidth: 1,
-    borderColor: colors.primary,
-    borderRadius: radius.full,
-    paddingVertical: 7,
-    paddingHorizontal: spacing.md,
-    backgroundColor: colors.primarySoft,
-  },
-  unhideText: { fontFamily: fonts.sansBold, fontSize: 12.5, color: colors.primaryDeep },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.md },
   list: { padding: spacing.lg, gap: spacing.md },
   swipeWrap: { position: 'relative', justifyContent: 'center' },
@@ -554,6 +479,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   hideActionText: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.white },
+  hidingOverlay: {
+    minHeight: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.card,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   card: {
     backgroundColor: colors.card,
     borderRadius: radius.md,
@@ -623,7 +557,7 @@ const styles = StyleSheet.create({
   emptyText: { fontFamily: fonts.sans, fontSize: 13, color: colors.muted, textAlign: 'center', marginTop: spacing.xl },
   modalWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', padding: spacing.xl },
   modalCard: { backgroundColor: colors.bg, borderRadius: radius.lg, padding: spacing.xl },
-  modalTitle: { fontFamily: fonts.display, fontSize: 18, color: colors.ink },
+  modalTitle: { fontFamily: fonts.display, fontSize: 18, color: colors.ink, marginBottom: 2 },
   modalSub: { fontFamily: fonts.sans, fontSize: 13, color: colors.muted, marginTop: 2 },
   starsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg, marginBottom: spacing.lg },
   star: { fontSize: 38 },
