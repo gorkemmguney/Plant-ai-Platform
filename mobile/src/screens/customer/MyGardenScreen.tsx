@@ -189,6 +189,58 @@ export default function MyGardenScreen({ navigation }: any) {
     }
   };
 
+  // Toprak nemi hâlâ yüksekse (sulama vakti gelmediyse) fazla sulama sayılır
+  const OVER_WATER_PCT = 50;
+  const isRecentlyWatered = (p: CustProd) =>
+    calculateWateringPercentage(p.last_watered_at, p.watering_interval_days) >= OVER_WATER_PCT;
+
+  // Tek bitki: nem yüksekse önce uyar, kullanıcı onaylarsa sula
+  const requestWaterPlant = (p: CustProd) => {
+    if (!isRecentlyWatered(p)) {
+      handleWaterPlant(p.cust_prod_id);
+      return;
+    }
+    const pct = calculateWateringPercentage(p.last_watered_at, p.watering_interval_days);
+    Alert.alert(
+      'Fazla sulama olabilir 💧',
+      `${p.name} kısa süre önce sulandı (toprak nemi %${pct}). Fazla su kökleri çürütebilir. Yine de sulansın mı?`,
+      [
+        { text: 'Vazgeç', style: 'cancel' },
+        { text: 'Yine de sula', style: 'destructive', onPress: () => handleWaterPlant(p.cust_prod_id) },
+      ]
+    );
+  };
+
+  // Grup: nemli olanlar varsa "sadece gerekenler / hepsi" seçeneği sun
+  const requestWaterGroup = (title: string, plants: CustProd[]) => {
+    const moist = plants.filter(isRecentlyWatered);
+    const needy = plants.filter((p) => !isRecentlyWatered(p));
+    if (moist.length === 0) {
+      handleWaterGroup(title, plants);
+      return;
+    }
+    if (needy.length === 0) {
+      Alert.alert(
+        'Hepsi yeterince nemli 💧',
+        `${title} grubundaki tüm bitkiler yakında sulandı. Fazla sulama zararlı olabilir. Yine de hepsi sulansın mı?`,
+        [
+          { text: 'Vazgeç', style: 'cancel' },
+          { text: 'Yine de hepsini sula', style: 'destructive', onPress: () => handleWaterGroup(title, plants) },
+        ]
+      );
+      return;
+    }
+    Alert.alert(
+      'Bazı bitkiler zaten nemli 💧',
+      `${title} grubundaki ${moist.length} bitki yakında sulandı. Ne yapmak istersin?`,
+      [
+        { text: 'Vazgeç', style: 'cancel' },
+        { text: `Sadece gerekenler (${needy.length})`, onPress: () => handleWaterGroup(title, needy) },
+        { text: 'Hepsini sula', style: 'destructive', onPress: () => handleWaterGroup(title, plants) },
+      ]
+    );
+  };
+
   const renderItem = ({ item }: { item: CustProd }) => {
     const moisturePct = calculateWateringPercentage(item.last_watered_at, item.watering_interval_days);
     const waterStatus = calculateWateringStatus(item.last_watered_at, item.watering_interval_days);
@@ -264,7 +316,7 @@ export default function MyGardenScreen({ navigation }: any) {
               <TouchableOpacity
                 style={[styles.quickWaterBtn, isWatering && styles.waterButtonDisabled]}
                 disabled={isWatering}
-                onPress={() => handleWaterPlant(item.cust_prod_id)}
+                onPress={() => requestWaterPlant(item)}
                 activeOpacity={0.8}
               >
                 {isWatering ? (
@@ -353,7 +405,7 @@ export default function MyGardenScreen({ navigation }: any) {
               </Text>
               <TouchableOpacity
                 style={[styles.groupWaterBtn, bulkGroup === section.title && styles.waterButtonDisabled]}
-                onPress={() => handleWaterGroup(section.title, section.data)}
+                onPress={() => requestWaterGroup(section.title, section.data)}
                 disabled={bulkGroup === section.title}
                 activeOpacity={0.8}
               >
