@@ -107,6 +107,7 @@ export default function OrdersScreen({ navigation }: any) {
   const [cancellingId, setCancellingId] = useState<number | null>(null);
   const [reorderingId, setReorderingId] = useState<number | null>(null);
   const [hiddenIds, setHiddenIds] = useState<number[]>([]);
+  const [filter, setFilter] = useState<'active' | 'hidden' | 'all'>('active');
 
   // Değerlendirme (yıldız + yorum) modalı — sipariş KALEMİ bazında tek seferlik
   const [reviewItem, setReviewItem] = useState<{ prod_id: number; prod_name: string; cust_ord_item_id: number } | null>(null);
@@ -185,6 +186,14 @@ export default function OrdersScreen({ navigation }: any) {
   const hideOrder = (id: number) => {
     setHiddenIds((prev) => {
       const next = [...prev, id];
+      AsyncStorage.setItem(HIDDEN_ORDERS_KEY, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  };
+
+  const unhideOrder = (id: number) => {
+    setHiddenIds((prev) => {
+      const next = prev.filter((x) => x !== id);
       AsyncStorage.setItem(HIDDEN_ORDERS_KEY, JSON.stringify(next)).catch(() => {});
       return next;
     });
@@ -365,6 +374,21 @@ export default function OrdersScreen({ navigation }: any) {
       </TouchableOpacity>
     );
 
+    const isHidden = hiddenIds.includes(item.cust_ord_id);
+
+    // Gizlenmiş sipariş (Gizlenenler/Tümü görünümünde) → "Geri Getir" butonu
+    if (isHidden) {
+      return (
+        <View>
+          {card}
+          <TouchableOpacity style={styles.unhideBtn} onPress={() => unhideOrder(item.cust_ord_id)} activeOpacity={0.85}>
+            <Text style={styles.unhideText}>↩︎ Geri Getir</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    // İptal edilmiş ve gizlenmemiş → sola kaydırıp gizlenebilir
     if (item.gnl_st_id === 9) {
       return (
         <SwipeToHide onHide={() => hideOrder(item.cust_ord_id)}>
@@ -380,6 +404,26 @@ export default function OrdersScreen({ navigation }: any) {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Siparişlerim</Text>
         <Text style={styles.headerSub}>Verdiğin siparişleri takip et</Text>
+
+        <View style={styles.filterRow}>
+          {([
+            { key: 'active', label: 'Aktif' },
+            { key: 'hidden', label: `Gizlenenler${hiddenIds.length ? ` (${hiddenIds.length})` : ''}` },
+            { key: 'all', label: 'Tümü' },
+          ] as { key: 'active' | 'hidden' | 'all'; label: string }[]).map((f) => {
+            const active = filter === f.key;
+            return (
+              <TouchableOpacity
+                key={f.key}
+                style={[styles.filterBtn, active && styles.filterBtnActive]}
+                onPress={() => setFilter(f.key)}
+                activeOpacity={0.85}
+              >
+                <Text style={[styles.filterText, active && styles.filterTextActive]}>{f.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </View>
 
       {loading ? (
@@ -395,7 +439,12 @@ export default function OrdersScreen({ navigation }: any) {
         </View>
       ) : (
         <FlatList
-          data={orders.filter((o) => !hiddenIds.includes(o.cust_ord_id))}
+          data={orders.filter((o) => {
+            const isHidden = hiddenIds.includes(o.cust_ord_id);
+            if (filter === 'active') return !isHidden;
+            if (filter === 'hidden') return isHidden;
+            return true; // tümü
+          })}
           keyExtractor={(item) => String(item.cust_ord_id)}
           contentContainerStyle={styles.list}
           renderItem={renderOrder}
@@ -408,7 +457,15 @@ export default function OrdersScreen({ navigation }: any) {
               }}
             />
           }
-          ListEmptyComponent={<Text style={styles.emptyText}>Henüz siparişin yok. Mağaza'dan alışverişe başla!</Text>}
+          ListEmptyComponent={
+            <Text style={styles.emptyText}>
+              {filter === 'hidden'
+                ? 'Gizlenmiş siparişin yok.'
+                : filter === 'active'
+                ? 'Aktif siparişin yok.'
+                : "Henüz siparişin yok. Mağaza'dan alışverişe başla!"}
+            </Text>
+          }
         />
       )}
 
@@ -459,6 +516,29 @@ const styles = StyleSheet.create({
   header: { paddingTop: 16, paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
   headerTitle: { fontFamily: fonts.display, fontSize: 24, color: colors.ink },
   headerSub: { fontFamily: fonts.sans, fontSize: 12.5, color: colors.muted, marginTop: 2 },
+  filterRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: spacing.md,
+    backgroundColor: colors.bgAlt,
+    borderRadius: radius.full,
+    padding: 4,
+  },
+  filterBtn: { flex: 1, paddingVertical: 8, borderRadius: radius.full, alignItems: 'center' },
+  filterBtnActive: { backgroundColor: colors.buttonPrimary },
+  filterText: { fontFamily: fonts.sansSemi, fontSize: 12.5, color: colors.muted },
+  filterTextActive: { color: colors.buttonPrimaryText, fontFamily: fonts.sansBold },
+  unhideBtn: {
+    marginTop: spacing.sm,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: radius.full,
+    paddingVertical: 7,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.primarySoft,
+  },
+  unhideText: { fontFamily: fonts.sansBold, fontSize: 12.5, color: colors.primaryDeep },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.md },
   list: { padding: spacing.lg, gap: spacing.md },
   swipeWrap: { position: 'relative', justifyContent: 'center' },
