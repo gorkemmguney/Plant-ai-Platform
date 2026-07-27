@@ -103,6 +103,7 @@ export default function AddPlantScreen({ route, navigation }: any) {
   const [specs, setSpecs] = useState<SpecOption[]>([]);
   const [selectedSpecId, setSelectedSpecId] = useState<number | null>(null);
   const [selectedSpecies, setSelectedSpecies] = useState<string | null>(null);
+  const [editingCare, setEditingCare] = useState(false);
   const [location, setLocation] = useState<string | null>(null);
   const [wateringInterval, setWateringInterval] = useState('7');
   const [fertilizingInterval, setFertilizingInterval] = useState('30');
@@ -144,6 +145,7 @@ export default function AddPlantScreen({ route, navigation }: any) {
   // Bitki türü seçilince bakım aralıklarını türe göre otomatik ayarla + cins seçimini sıfırla
   useEffect(() => {
     setSelectedSpecies(null);
+    setEditingCare(false);
     if (selectedSpecId == null) return;
     const spec = specs.find((s) => s.prod_spec_id === selectedSpecId);
     const care = careForSpecName(spec?.name);
@@ -433,19 +435,47 @@ export default function AddPlantScreen({ route, navigation }: any) {
             </View>
           ) : (
             <View style={styles.careCard}>
-              <View style={styles.careRow}>
-                <Text style={styles.careIcon}>💧</Text>
-                <Text style={styles.careText}>Sulama: <Text style={styles.careDays}>{wateringInterval}</Text> günde bir</Text>
-              </View>
-              <View style={styles.careRow}>
-                <Text style={styles.careIcon}>🌿</Text>
-                <Text style={styles.careText}>Gübreleme: <Text style={styles.careDays}>{fertilizingInterval}</Text> günde bir</Text>
-              </View>
-              <View style={styles.careRow}>
-                <Text style={styles.careIcon}>🪴</Text>
-                <Text style={styles.careText}>Saksı değişimi: <Text style={styles.careDays}>{repottingInterval}</Text> günde bir</Text>
-              </View>
-              <Text style={styles.careNote}>Seçtiğin bitki türüne göre otomatik ayarlandı.</Text>
+              <TouchableOpacity
+                style={styles.careEditBtn}
+                onPress={() => setEditingCare((v) => !v)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name={editingCare ? 'checkmark' : 'pencil'} size={16} color={colors.primaryDeep} />
+              </TouchableOpacity>
+
+              {[
+                { icon: '💧', label: 'Sulama', value: wateringInterval, set: setWateringInterval },
+                { icon: '🌿', label: 'Gübreleme', value: fertilizingInterval, set: setFertilizingInterval },
+                { icon: '🪴', label: 'Saksı değişimi', value: repottingInterval, set: setRepottingInterval },
+              ].map((row) => (
+                <View key={row.label} style={styles.careRow}>
+                  <Text style={styles.careIcon}>{row.icon}</Text>
+                  {editingCare ? (
+                    <View style={styles.careEditRow}>
+                      <Text style={styles.careText}>{row.label}:</Text>
+                      <TextInput
+                        style={styles.careInput}
+                        keyboardType="number-pad"
+                        maxLength={4}
+                        value={row.value}
+                        onChangeText={row.set}
+                        editable={!submitting}
+                      />
+                      <Text style={styles.careText}>günde bir</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.careText}>
+                      {row.label}: <Text style={styles.careDays}>{row.value}</Text> günde bir
+                    </Text>
+                  )}
+                </View>
+              ))}
+              <Text style={styles.careNote}>
+                {editingCare
+                  ? 'Değerleri düzenleyebilirsin. Bitince ✓ ile onayla.'
+                  : 'Türe göre otomatik ayarlandı. Sağ üstteki ✏️ ile düzenleyebilirsin.'}
+              </Text>
             </View>
           )}
 
@@ -573,13 +603,40 @@ const styles = StyleSheet.create({
   wateringRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.xs },
   wateringSuffix: { fontFamily: fonts.sansMedium, fontSize: 14, color: colors.ink },
   careCard: {
+    position: 'relative',
     backgroundColor: colors.primarySoft,
     borderRadius: radius.md,
     padding: spacing.md,
+    paddingRight: 40,
     gap: spacing.sm,
     marginBottom: spacing.md,
   },
-  careRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  careEditBtn: {
+    position: 'absolute',
+    top: spacing.sm,
+    right: spacing.sm,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: colors.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  careRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 30 },
+  careEditRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, flex: 1 },
+  careInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    backgroundColor: colors.card,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    minWidth: 54,
+    textAlign: 'center',
+    fontFamily: fonts.sansBold,
+    fontSize: 13.5,
+    color: colors.primaryDeep,
+  },
   careIcon: { fontSize: 16 },
   careText: { fontFamily: fonts.sansMedium, fontSize: 13.5, color: colors.ink },
   careDays: { fontFamily: fonts.sansBold, color: colors.primaryDeep },
