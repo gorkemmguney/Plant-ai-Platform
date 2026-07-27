@@ -85,10 +85,7 @@ async def verify_password(
     payload: PasswordVerifyIn,
     user: AppUser = Depends(get_current_user),
 ):
-    """Gizli siparişler gibi hassas bir bölüme girmeden önce mevcut oturumdaki
-    kullanıcının şifresini teyit eder. Şifreyi biz saklamıyoruz — Supabase'in
-    password grant uç noktasına email+girilen şifre ile deneme yaptırıyoruz;
-    200 dönerse şifre doğru, aksi halde 401."""
+   
     if not payload.password:
         raise HTTPException(status_code=400, detail="Şifre boş olamaz")
 

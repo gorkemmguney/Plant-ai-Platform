@@ -17,7 +17,9 @@ import {
   View,
 } from 'react-native';
 import { apiClient } from '../../services/apiClient';
-import { colors, fonts, radius, shadow, spacing } from '../../theme/theme';
+import { badgeColors, colors, fonts, radius, shadow, spacing } from '../../theme/theme';
+
+const LOW_STOCK_THRESHOLD = 5;
 
 interface Product {
   prod_id: number;
@@ -71,10 +73,11 @@ export default function ProductsScreen() {
   const [pendingImageUri, setPendingImageUri] = useState<string | null>(null);
   const [existingImageUrl, setExistingImageUrl] = useState<string | null>(null);
 
+  const lowStockProducts = products.filter((p) => Number(p.stock) < LOW_STOCK_THRESHOLD);
+
   const loadProducts = useCallback(async () => {
     try {
       setError(null);
-      // Sadece bu satıcının kendi ürünleri (tüm ürünler değil)
       const { data } = await apiClient.get<Product[]>('/catalog/products/my-products');
       setProducts(data);
     } catch (err: any) {
@@ -240,7 +243,9 @@ export default function ProductsScreen() {
         <Text style={styles.price}>₺{Number(item.price).toFixed(2)}</Text>
       </View>
       <View style={styles.cardBottom}>
-        <Text style={styles.stock}>Stok: {item.stock}</Text>
+        <Text style={[styles.stock, Number(item.stock) < LOW_STOCK_THRESHOLD && styles.stockLow]}>
+          Stok: {item.stock}
+        </Text>
         <View style={styles.actions}>
           <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(item)} activeOpacity={0.8}>
             <Text style={styles.editText}>Düzenle</Text>
@@ -264,6 +269,23 @@ export default function ProductsScreen() {
           <Text style={styles.addButtonText}>+ Ekle</Text>
         </TouchableOpacity>
       </View>
+
+      {lowStockProducts.length > 0 && (
+        <View style={styles.lowStockCard}>
+          <View style={styles.lowStockIconWrap}>
+            <Text style={styles.lowStockIcon}>⚠️</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.lowStockTitle}>Stok kritik seviyede</Text>
+            <Text style={styles.lowStockSubtitle}>
+              {lowStockProducts.length} üründe stok 5 adedin altına düştü
+            </Text>
+          </View>
+          <View style={styles.lowStockCountBadge}>
+            <Text style={styles.lowStockCountText}>{lowStockProducts.length}</Text>
+          </View>
+        </View>
+      )}
 
       {loading ? (
         <View style={styles.center}>
@@ -469,6 +491,41 @@ const styles = StyleSheet.create({
     borderTopColor: colors.borderSoft,
   },
   stock: { fontFamily: fonts.sansMedium, fontSize: 12.5, color: colors.muted },
+  stockLow: { color: colors.red, fontFamily: fonts.sansBold },
+  lowStockCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: badgeColors.red.bg,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(194,52,52,0.18)',
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    padding: spacing.md,
+    ...shadow.sm,
+  },
+  lowStockIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: radius.full,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lowStockIcon: { fontSize: 17 },
+  lowStockTitle: { fontFamily: fonts.sansBold, fontSize: 13.5, color: badgeColors.red.text },
+  lowStockSubtitle: { fontFamily: fonts.sans, fontSize: 12, color: badgeColors.red.text, marginTop: 2, opacity: 0.85 },
+  lowStockCountBadge: {
+    minWidth: 26,
+    height: 26,
+    borderRadius: radius.full,
+    backgroundColor: colors.red,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  lowStockCountText: { fontFamily: fonts.sansBold, fontSize: 12.5, color: colors.white },
   actions: { flexDirection: 'row', gap: spacing.sm },
   editBtn: {
     borderWidth: 1,
