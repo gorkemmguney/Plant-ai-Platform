@@ -99,3 +99,19 @@ def require_role(*allowed_roles: str):
         return user
 
     return _guard
+
+
+async def resolve_role_id(user: AppUser, db: AsyncSession, priority: list[str]) -> int:
+    # bsn_inter gibi loglarda "kullanıcı hangi sıfatla işlem yaptı" sorusuna cevap üretir.
+    # Aynı kullanıcının birden fazla rolü olabilir (ör. hem customer hem seller) — bu
+    # durumda `priority` listesindeki sıraya göre, kullanıcının GERÇEKTEN sahip olduğu
+    # ilk rol seçilir. Çağıran endpoint zaten require_role ile bu roller arasından
+    # birini zorunlu kıldığı için burada en az biri eşleşir.
+    user_roles = set(await get_user_roles(user, db))
+    for role_name in priority:
+        if role_name in user_roles:
+            result = await db.execute(select(Role.role_id).where(Role.role_name == role_name))
+            role_id = result.scalar_one_or_none()
+            if role_id is not None:
+                return role_id
+    raise HTTPException(status_code=400, detail="Kullanıcının bu işlem için uygun bir rolü bulunamadı")

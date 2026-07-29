@@ -79,7 +79,7 @@ class ProductCreateIn(BaseModel):
     gnl_st_id: int
     prod_spec_id: int
     char_value_ids: list[int] = []
-
+    sale_cnl_id: int | None = None  
 
 class ProductUpdateIn(BaseModel):
     name: str | None = None
@@ -89,6 +89,7 @@ class ProductUpdateIn(BaseModel):
     gnl_st_id: int | None = None
     prod_spec_id: int | None = None
     char_value_ids: list[int] | None = None
+    sale_cnl_id: int | None = None  
 
 
 class ProductOfferOut(BaseModel):

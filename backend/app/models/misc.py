@@ -35,7 +35,13 @@ class BsnInter(Base):
 
     bsn_inter_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     bsn_spec_id: Mapped[int] = mapped_column(ForeignKey("bsn_spec.bsn_spec_id"), nullable=False)
-    cust_id: Mapped[int] = mapped_column(ForeignKey("cust.cust_id"), nullable=False)
+    # cust_id (cust.cust_id) değil, doğrudan app_user_id: olayı müşteri de satıcı da tetiklemiş olabilir,
+    # ikisi de app_user satırı.
+    app_user_id: Mapped[int] = mapped_column(ForeignKey("app_user.user_id"), nullable=False)
+    # Aynı app_user hem müşteri hem satıcı olabildiği için app_user_id tek başına
+    # "hangi şapkayla yapıldı" sorusunu cevaplamaz. Bu yüzden işlemi yapan endpoint
+    # hangi rol bağlamında çalıştığını burada açıkça yazar (role tablosuna referans).
+    actor_role_id: Mapped[int] = mapped_column(ForeignKey("role.role_id"), nullable=False)
     sale_cnl_id: Mapped[int | None] = mapped_column(ForeignKey("sale_cnl.sale_cnl_id"), nullable=True)
     cdate: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

@@ -5,12 +5,13 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import get_current_user, get_user_roles, require_role
+from app.core.security import get_current_user, get_user_roles, require_role, resolve_role_id
 from app.core.storage import upload_image
 from app.db.session import get_db
 from app.models.catalog import GnlChar, GnlCharVal, Prod, ProdCharVal, ProdSpec
 from app.models.customer import Cust
 from app.models.customer_product import CustProd
+from app.models.misc import BsnInter, BsnSpec
 from app.models.order import CustOrdItem
 from app.models.user import AppUser
 from app.rbac.roles import RoleName
@@ -28,6 +29,27 @@ from app.schemas.catalog import (
 )
 
 router = APIRouter(prefix="/catalog", tags=["catalog"])
+
+
+router = APIRouter(prefix="/catalog", tags=["catalog"])
+
+
+async def _log_prod_event(srt_code: str, user: AppUser, db: AsyncSession, sale_cnl_id: int | None = None) -> None:
+    spec_result = await db.execute(
+        select(BsnSpec).where(BsnSpec.srt_code == srt_code, BsnSpec.is_active.is_(True))
+    )
+    spec = spec_result.scalar_one_or_none()
+    if spec is None:
+        return
+    actor_role_id = await resolve_role_id(user, db, [RoleName.SELLER, RoleName.ADMIN])
+    db.add(
+        BsnInter(
+            bsn_spec_id=spec.bsn_spec_id,
+            app_user_id=user.user_id,
+            actor_role_id=actor_role_id,
+            sale_cnl_id=sale_cnl_id,
+        )
+    )
 
 
 def _full_name(first: str | None, last: str | None) -> str | None:
@@ -489,13 +511,14 @@ async def create_product(
     db: AsyncSession = Depends(get_db),
     user: AppUser = Depends(require_role(RoleName.SELLER, RoleName.ADMIN)),
 ):
-    data = payload.model_dump(exclude={"char_value_ids"})
+    data = payload.model_dump(exclude={"char_value_ids", "sale_cnl_id"})
     product = Prod(**data, seller_id=user.user_id)
     db.add(product)
     await db.flush()
 
     await _sync_product_characteristics(db, product, payload.char_value_ids)
 
+    await _log_prod_event("PROD_ADD", user, db, payload.sale_cnl_id)
     await db.commit()
     await db.refresh(product)
     char_map = await _characteristics_for_products(db, [product.prod_id])
@@ -516,12 +539,13 @@ async def update_product(
 
     await _ensure_owner_or_admin(product, user, db)
 
-    for field, value in payload.model_dump(exclude_unset=True, exclude={"char_value_ids"}).items():
+    for field, value in payload.model_dump(exclude_unset=True, exclude={"char_value_ids", "sale_cnl_id"}).items():
         setattr(product, field, value)
 
     if payload.char_value_ids is not None:
         await _sync_product_characteristics(db, product, payload.char_value_ids)
 
+    await _log_prod_event("PROD_UPDATE", user, db, payload.sale_cnl_id)
     await db.commit()
     await db.refresh(product)
     store_name, first, last = await _seller_name(db, product.seller_id)
@@ -558,6 +582,7 @@ async def upload_product_image(
 @router.delete("/products/{prod_id}")
 async def delete_product(
     prod_id: int,
+    sale_cnl_id: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
     user: AppUser = Depends(require_role(RoleName.SELLER, RoleName.ADMIN)),
 ):
@@ -570,5 +595,6 @@ async def delete_product(
 
     product.is_active = False
     product.deleted_at = datetime.now(timezone.utc)
+    await _log_prod_event("PROD_DELETE", user, db, sale_cnl_id)
     await db.commit()
     return {"detail": "Ürün pasifleştirildi"}

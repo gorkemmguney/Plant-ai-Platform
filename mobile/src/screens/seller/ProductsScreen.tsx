@@ -19,6 +19,10 @@ import {
 import { apiClient } from '../../services/apiClient';
 import { badgeColors, colors, fonts, radius, shadow, spacing } from '../../theme/theme';
 
+// interactionService.ts ve CheckoutScreen.tsx ile aynı desen — bsn_inter loglarında
+// hangi kanaldan işlem yapıldığını belirtmek için.
+const SALE_CHANNEL_ID = 1;
+
 const LOW_STOCK_THRESHOLD = 5;
 
 interface Product {
@@ -183,6 +187,7 @@ export default function ProductsScreen() {
       gnl_st_id: Number(form.gnl_st_id) || 1,
       prod_spec_id: form.prod_spec_id,
       category: form.category,
+      sale_cnl_id: SALE_CHANNEL_ID,
     };
     try {
       let prodId = editingId;
@@ -212,7 +217,9 @@ export default function ProductsScreen() {
         style: 'destructive',
         onPress: async () => {
           try {
-            await apiClient.delete(`/catalog/products/${product.prod_id}`);
+            await apiClient.delete(`/catalog/products/${product.prod_id}`, {
+              params: { sale_cnl_id: SALE_CHANNEL_ID },
+            });
             setProducts((prev) => prev.filter((p) => p.prod_id !== product.prod_id));
           } catch (err: any) {
             Alert.alert('Silinemedi', err?.response?.data?.detail ?? 'Ürün silinemedi.');

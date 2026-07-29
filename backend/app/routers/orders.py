@@ -3,11 +3,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import get_user_roles, require_role
+from app.core.security import get_user_roles, require_role, resolve_role_id
 from app.db.session import get_db
 from app.models.campaign import UserCoupon
 from app.models.catalog import Prod
 from app.models.customer import Cust
+from app.models.misc import BsnInter, BsnSpec
 from app.models.order import CustOrd, CustOrdItem
 from app.models.user import AppUser
 from app.rbac.roles import RoleName
@@ -207,6 +208,24 @@ async def cancel_my_order(
     # Sipariş için kazanılan puanı geri al (0'ın altına düşürme)
     refunded_points = int(float(order.total_price))
     user.points = max(0, (user.points or 0) - refunded_points)
+
+    # Her sipariş kalemi için ayrı bir PROD_CANCEL log'u — rolü sabit "customer" yazmak yerine
+    # kullanıcının gerçekte sahip olduğu role göre çözüyoruz (bu endpoint CUSTOMER/ADMIN alıyor).
+    cancel_spec_result = await db.execute(
+        select(BsnSpec).where(BsnSpec.srt_code == "PROD_CANCEL", BsnSpec.is_active.is_(True))
+    )
+    cancel_spec = cancel_spec_result.scalar_one_or_none()
+    if cancel_spec is not None:
+        actor_role_id = await resolve_role_id(user, db, [RoleName.CUSTOMER, RoleName.ADMIN])
+        for _item in order.items:
+            db.add(
+                BsnInter(
+                    bsn_spec_id=cancel_spec.bsn_spec_id,
+                    app_user_id=user.user_id,
+                    actor_role_id=actor_role_id,
+                    sale_cnl_id=order.sale_cnl_id,
+                )
+            )
 
     # İptal de bir sipariş aşamasıdır — bildirim olarak da düşsün
     await create_notification(
