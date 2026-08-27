@@ -12,6 +12,7 @@ from app.core.security import get_current_user
 from app.core.storage import upload_image
 from app.db.session import get_db
 from app.models.community import CommunityComment, CommunityLike, CommunityPost
+from app.models.customer import Ind, Org
 from app.models.user import AppUser
 from app.schemas.community import CommunityCommentCreate, CommunityCommentOut, CommunityPostOut
 
@@ -49,14 +50,31 @@ def _format_author_name(user: Optional[AppUser]) -> str:
     if not user:
         return "Anonim Kullanıcı"
     
-    first = (user.first_name or "").strip()
-    last = (user.last_name or "").strip()
+    ind = getattr(user, "ind_profile", None)
+    org = getattr(user, "org_profile", None)
     
-    if not first or first.lower() in ("isimsiz", "i̇simsiz", "unnamed"):
-        if user.store_name and user.store_name.strip():
-            return user.store_name.strip()
-        if user.email and "@" in user.email:
-            return user.email.split("@")[0].capitalize()
+    first = ""
+    last = ""
+    store = ""
+    email = ""
+    
+    if org:
+        first = (org.first_name or "").strip()
+        last = (org.last_name or "").strip()
+        store = (org.store_name or getattr(org, "company_name", "") or "").strip()
+        email = org.email or ""
+    
+    if not first and ind:
+        first = (ind.first_name or getattr(ind, "username", "") or "").strip()
+        last = (ind.last_name or "").strip()
+        if not email:
+            email = ind.email or ""
+
+    if not first or first.lower() in ("isimsiz", "i̇simsiz", "unnamed", "kullanıcı"):
+        if store:
+            return store
+        if email and "@" in email:
+            return email.split("@")[0].capitalize()
         return "Bitki Sever"
     
     full = f"{first} {last}".strip()
@@ -71,7 +89,12 @@ async def list_posts(
 ):
     query = (
         select(CommunityPost)
-        .options(selectinload(CommunityPost.user), selectinload(CommunityPost.likes), selectinload(CommunityPost.comments))
+        .options(
+            selectinload(CommunityPost.user).selectinload(AppUser.ind_profile),
+            selectinload(CommunityPost.user).selectinload(AppUser.org_profile),
+            selectinload(CommunityPost.likes),
+            selectinload(CommunityPost.comments)
+        )
         .order_by(CommunityPost.created_at.desc())
     )
     if tag and tag != "all":
@@ -152,7 +175,12 @@ async def create_post(
     # Re-fetch post with relationships
     res = await db.execute(
         select(CommunityPost)
-        .options(selectinload(CommunityPost.user), selectinload(CommunityPost.likes), selectinload(CommunityPost.comments))
+        .options(
+            selectinload(CommunityPost.user).selectinload(AppUser.ind_profile),
+            selectinload(CommunityPost.user).selectinload(AppUser.org_profile),
+            selectinload(CommunityPost.likes),
+            selectinload(CommunityPost.comments)
+        )
         .where(CommunityPost.post_id == post.post_id)
     )
     fetched = res.scalar_one()
@@ -243,7 +271,10 @@ async def list_comments(
 ):
     query = (
         select(CommunityComment)
-        .options(selectinload(CommunityComment.user))
+        .options(
+            selectinload(CommunityComment.user).selectinload(AppUser.ind_profile),
+            selectinload(CommunityComment.user).selectinload(AppUser.org_profile)
+        )
         .where(CommunityComment.post_id == post_id)
         .order_by(CommunityComment.created_at.asc())
     )
@@ -288,6 +319,12 @@ async def add_comment(
     db.add(comment)
     await db.commit()
     await db.refresh(comment)
+
+    # _format_author_name için profilleri yükle
+    ind_res = await db.execute(select(Ind).where(Ind.user_id == current_user.user_id))
+    org_res = await db.execute(select(Org).where(Org.user_id == current_user.user_id))
+    current_user.ind_profile = ind_res.scalar_one_or_none()
+    current_user.org_profile = org_res.scalar_one_or_none()
 
     return CommunityCommentOut(
         comment_id=comment.comment_id,

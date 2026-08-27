@@ -5,19 +5,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import get_current_user
 from app.db.session import get_db
 from app.models.address import CustomerAddress
-from app.models.customer import Cust
 from app.models.location import Il, Ilce, Mahalle
 from app.models.user import AppUser
 from app.schemas.address import AddressCreateIn, AddressOut, AddressUpdateIn
 
 router = APIRouter(prefix="/addresses", tags=["addresses"])
-
-
-async def _get_cust_id(user: AppUser, db: AsyncSession) -> int:
-    cust = (await db.execute(select(Cust).where(Cust.user_id == user.user_id))).scalar_one_or_none()
-    if cust is None:
-        raise HTTPException(status_code=400, detail="Müşteri profili bulunamadı")
-    return cust.cust_id
 
 
 async def _address_out(db: AsyncSession, addr: CustomerAddress) -> AddressOut:
@@ -41,11 +33,10 @@ async def _address_out(db: AsyncSession, addr: CustomerAddress) -> AddressOut:
 
 @router.get("", response_model=list[AddressOut])
 async def list_my_addresses(db: AsyncSession = Depends(get_db), user: AppUser = Depends(get_current_user)):
-    cust_id = await _get_cust_id(user, db)
     addresses = (
         await db.execute(
             select(CustomerAddress)
-            .where(CustomerAddress.cust_id == cust_id)
+            .where(CustomerAddress.user_id == user.user_id)
             .order_by(CustomerAddress.is_default.desc(), CustomerAddress.created_at.desc())
         )
     ).scalars().all()
@@ -58,9 +49,6 @@ async def create_address(
     db: AsyncSession = Depends(get_db),
     user: AppUser = Depends(get_current_user),
 ):
-    cust_id = await _get_cust_id(user, db)
-
-    # Seçilen il/ilçe/mahalle gerçekten var mı ve birbirine bağlı mı doğrula
     ilce = (await db.execute(select(Ilce).where(Ilce.ilce_id == payload.ilce_id))).scalar_one_or_none()
     if ilce is None or ilce.il_id != payload.il_id:
         raise HTTPException(status_code=400, detail="Geçersiz il/ilçe seçimi")
@@ -70,10 +58,10 @@ async def create_address(
 
     if payload.is_default:
         await db.execute(
-            update(CustomerAddress).where(CustomerAddress.cust_id == cust_id).values(is_default=False)
+            update(CustomerAddress).where(CustomerAddress.user_id == user.user_id).values(is_default=False)
         )
 
-    address = CustomerAddress(cust_id=cust_id, **payload.model_dump())
+    address = CustomerAddress(user_id=user.user_id, **payload.model_dump())
     db.add(address)
     await db.commit()
     await db.refresh(address)
@@ -87,11 +75,10 @@ async def update_address(
     db: AsyncSession = Depends(get_db),
     user: AppUser = Depends(get_current_user),
 ):
-    cust_id = await _get_cust_id(user, db)
     address = (
         await db.execute(
             select(CustomerAddress).where(
-                CustomerAddress.address_id == address_id, CustomerAddress.cust_id == cust_id
+                CustomerAddress.address_id == address_id, CustomerAddress.user_id == user.user_id
             )
         )
     ).scalar_one_or_none()
@@ -100,7 +87,7 @@ async def update_address(
 
     if payload.is_default:
         await db.execute(
-            update(CustomerAddress).where(CustomerAddress.cust_id == cust_id).values(is_default=False)
+            update(CustomerAddress).where(CustomerAddress.user_id == user.user_id).values(is_default=False)
         )
 
     for field, value in payload.model_dump(exclude_unset=True).items():
@@ -117,11 +104,10 @@ async def delete_address(
     db: AsyncSession = Depends(get_db),
     user: AppUser = Depends(get_current_user),
 ):
-    cust_id = await _get_cust_id(user, db)
     address = (
         await db.execute(
             select(CustomerAddress).where(
-                CustomerAddress.address_id == address_id, CustomerAddress.cust_id == cust_id
+                CustomerAddress.address_id == address_id, CustomerAddress.user_id == user.user_id
             )
         )
     ).scalar_one_or_none()

@@ -1,11 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.supabase_auth import set_role_claim
 from app.core.security import get_user_roles, require_role
 from app.db.session import get_db
+from app.models.customer import Ind, Org
 from app.models.user import AppUser, Role, UserRole
+
 from app.models.ai import AiImageAnalysis
 from app.models.catalog import Prod
 from app.models.misc import Notification
@@ -39,15 +42,55 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 
 
 async def _to_user_out(user: AppUser, db: AsyncSession) -> UserOut:
+    ind_res = await db.execute(select(Ind).where(Ind.user_id == user.user_id))
+    ind = ind_res.scalar_one_or_none()
+
+    org_res = await db.execute(select(Org).where(Org.user_id == user.user_id))
+    org = org_res.scalar_one_or_none()
+
+    first_name = ""
+    last_name = ""
+    email = ""
+    seller_status = "none"
+    store_name = None
+
+    if org:
+        first_name = org.first_name or ""
+        last_name = org.last_name or ""
+        email = org.email or ""
+        seller_status = org.seller_status or "none"
+        store_name = org.store_name or org.company_name
+
+    if ind:
+        if not first_name:
+            first_name = ind.first_name or getattr(ind, "username", "") or ""
+        if not last_name:
+            last_name = ind.last_name or ""
+        if not email:
+            email = ind.email or ""
+
+    first_name = first_name.strip()
+    last_name = last_name.strip()
+    
+    if not first_name or first_name.lower() in ("isimsiz", "unnamed"):
+        if store_name:
+            first_name = store_name
+        elif email and "@" in email:
+            first_name = email.split("@")[0].capitalize()
+        else:
+            first_name = "İsimsiz Kullanıcı"
+
     return UserOut(
         user_id=user.user_id,
-        email=user.email,
-        first_name=user.first_name,
-        last_name=user.last_name,
+        email=email,
+        first_name=first_name,
+        last_name=last_name,
         is_active=user.is_active,
         created_at=user.created_at,
         roles=await get_user_roles(user, db),
-        seller_status=user.seller_status,
+        seller_status=seller_status,
+        store_name=store_name,
+        points=user.points,
     )
 
 
@@ -66,15 +109,20 @@ async def list_pending_sellers(
     db: AsyncSession = Depends(get_db),
     _: AppUser = Depends(require_role(RoleName.ADMIN)),
 ):
-    result = await db.execute(
-        select(AppUser).where(AppUser.seller_status == "pending").order_by(AppUser.user_id)
-    )
+    org_res = await db.execute(select(Org).where(Org.seller_status == "pending"))
+    orgs = org_res.scalars().all()
+    user_ids = [o.user_id for o in orgs]
+    if not user_ids:
+        return []
+    result = await db.execute(select(AppUser).where(AppUser.user_id.in_(user_ids)).order_by(AppUser.user_id))
     users = result.scalars().all()
     return [await _to_user_out(user, db) for user in users]
 
 
+@router.post("/approve-seller/{user_id}", response_model=UserOut)
 @router.post("/verify-seller/{user_id}", response_model=UserOut)
-async def verify_seller(
+async def approve_seller(
+
     user_id: int,
     db: AsyncSession = Depends(get_db),
     _: AppUser = Depends(require_role(RoleName.ADMIN)),
@@ -95,14 +143,21 @@ async def verify_seller(
     if existing_result.scalar_one_or_none() is None:
         db.add(UserRole(user_id=user_id, role_id=seller_role.role_id))
 
-    target.seller_status = "verified"
+    org_res = await db.execute(select(Org).where(Org.user_id == user_id))
+    org = org_res.scalar_one_or_none()
+    if org is None:
+        org = Org(user_id=user_id, company_name="Satıcı Mağazası", seller_status="verified")
+        db.add(org)
+    else:
+        org.seller_status = "verified"
+
     await db.commit()
     await db.refresh(target)
 
     roles = await get_user_roles(target, db)
     if roles:
         top_role = max(roles, key=lambda r: ROLE_HIERARCHY.get(r, -1))
-        set_role_claim(target.firebase_uid, top_role)
+        set_role_claim(target.supabase_uid, top_role)
     return await _to_user_out(target, db)
 
 
@@ -117,7 +172,14 @@ async def reject_seller(
     if target is None:
         raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı")
 
-    target.seller_status = "rejected"
+    org_res = await db.execute(select(Org).where(Org.user_id == user_id))
+    org = org_res.scalar_one_or_none()
+    if org is None:
+        org = Org(user_id=user_id, company_name="Satıcı Mağazası", seller_status="rejected")
+        db.add(org)
+    else:
+        org.seller_status = "rejected"
+
     await db.commit()
     await db.refresh(target)
     return await _to_user_out(target, db)
@@ -147,7 +209,7 @@ async def assign_role(
 
     db.add(UserRole(user_id=payload.user_id, role_id=role.role_id))
     await db.commit()
-    set_role_claim(target_user.firebase_uid, payload.role_name)
+    set_role_claim(target_user.supabase_uid, payload.role_name)
     return {"detail": "Rol atandı"}
 
 
@@ -177,7 +239,7 @@ async def remove_role(
     await db.delete(assignment)
     await db.commit()
 
-    # Firebase custom claim'i kalan rollerin en yükseğine göre yeniden hesapla
+    # Supabase custom claim'i kalan rollerin en yükseğine göre yeniden hesapla
     remaining_result = await db.execute(
         select(Role.role_name)
         .join(UserRole, UserRole.role_id == Role.role_id)
@@ -187,9 +249,10 @@ async def remove_role(
 
     if remaining_roles:
         top_role = max(remaining_roles, key=lambda r: ROLE_HIERARCHY.get(r, -1))
-        set_role_claim(target_user.firebase_uid, top_role)
+        set_role_claim(target_user.supabase_uid, top_role)
     else:
-        set_role_claim(target_user.firebase_uid, "")
+        set_role_claim(target_user.supabase_uid, "")
+
 
     return {"detail": "Rol kaldırıldı", "remaining_roles": remaining_roles}
 
@@ -313,15 +376,19 @@ async def ai_seller_profile(
     _: AppUser = Depends(require_role(RoleName.ADMIN)),
 ):
     """Gemini analyses a pending seller's registration data and returns a risk verdict."""
-    result = await db.execute(select(AppUser).where(AppUser.user_id == user_id))
+    result = await db.execute(
+        select(AppUser)
+        .options(selectinload(AppUser.org_profile))
+        .where(AppUser.user_id == user_id)
+    )
     user = result.scalar_one_or_none()
     if user is None:
         raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı")
 
     profile = await profile_seller(
-        email=user.email or "",
-        first_name=user.first_name or "",
-        last_name=user.last_name or "",
+        email=user.org_profile.email if user.org_profile else "",
+        first_name=user.org_profile.first_name if user.org_profile else "",
+        last_name=user.org_profile.last_name if user.org_profile else "",
     )
     return AiSellerProfileOut(**profile)
 
@@ -487,7 +554,11 @@ async def ai_trigger_campaign(
     campaign = await generate_campaign_template(top_disease_pretty)
 
     # 3. Fetch all active users
-    users_result = await db.execute(select(AppUser).where(AppUser.is_active == True))
+    users_result = await db.execute(
+        select(AppUser)
+        .options(selectinload(AppUser.ind_profile), selectinload(AppUser.org_profile))
+        .where(AppUser.is_active == True)
+    )
     users = users_result.scalars().all()
 
     # 4. Insert notifications with personalized names
@@ -496,7 +567,11 @@ async def ai_trigger_campaign(
     
     for user in users:
         # Interpolate template
-        first_name = user.first_name or "Müşterimiz"
+        first_name = "Müşterimiz"
+        if user.ind_profile and user.ind_profile.first_name:
+            first_name = user.ind_profile.first_name
+        elif user.org_profile and user.org_profile.store_name:
+            first_name = user.org_profile.store_name
         message = template.replace("{first_name}", first_name)
         
         db.add(

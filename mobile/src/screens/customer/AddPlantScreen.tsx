@@ -14,6 +14,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useI18n } from '../../i18n';
+import { specTypeLabel } from '../../i18n/specType';
 import { apiClient } from '../../services/apiClient';
 import { colors, fonts, radius, shadow, spacing } from '../../theme/theme';
 
@@ -23,7 +25,15 @@ interface SpecOption {
   description: string | null;
 }
 
-const FORM_LOCATIONS = ['Salon', 'Mutfak', 'Yatak Odası', 'Balkon', 'Ofis', 'Bahçe'];
+// value = backend'e kaydedilen konum (değiştirme), labelKey = gösterilen çeviri.
+const FORM_LOCATIONS: { value: string; labelKey: string }[] = [
+  { value: 'Salon', labelKey: 'addPlant.locSalon' },
+  { value: 'Mutfak', labelKey: 'addPlant.locKitchen' },
+  { value: 'Yatak Odası', labelKey: 'addPlant.locBedroom' },
+  { value: 'Balkon', labelKey: 'addPlant.locBalcony' },
+  { value: 'Ofis', labelKey: 'addPlant.locOffice' },
+  { value: 'Bahçe', labelKey: 'addPlant.locGarden' },
+];
 
 // Bitki türüne göre önerilen bakım aralıkları (gün) — türün adındaki anahtar kelimeyle eşleşir
 const CARE_BY_TYPE: { match: string; water: number; fertilize: number; repot: number }[] = [
@@ -44,49 +54,50 @@ function careForSpecName(name: string | undefined) {
 }
 
 // Bitki türü içindeki yaygın cinsler + evcil hayvana (kedi/köpek) zararlı mı
-const SPECIES_BY_TYPE: { match: string; species: { name: string; toxic: boolean }[] }[] = [
+// nameKey = i18n anahtarı (görünen ad), toxic = evcil hayvana zararlı mı.
+const SPECIES_BY_TYPE: { match: string; species: { nameKey: string; toxic: boolean }[] }[] = [
   { match: 'yaprak', species: [
-    { name: 'Monstera', toxic: true },
-    { name: 'Zamioculcas (ZZ)', toxic: true },
-    { name: 'Ficus / Kauçuk', toxic: true },
-    { name: 'Difenbahya', toxic: true },
-    { name: 'Pothos (Salon Sarmaşığı)', toxic: true },
-    { name: 'Calathea', toxic: false },
+    { nameKey: 'species.monstera', toxic: true },
+    { nameKey: 'species.zamioculcas', toxic: true },
+    { nameKey: 'species.ficusRubber', toxic: true },
+    { nameKey: 'species.dieffenbachia', toxic: true },
+    { nameKey: 'species.pothos', toxic: true },
+    { nameKey: 'species.calathea', toxic: false },
   ]},
   { match: 'çiçek', species: [
-    { name: 'Orkide', toxic: false },
-    { name: 'Gerbera', toxic: false },
-    { name: 'Gül', toxic: false },
-    { name: 'Menekşe', toxic: false },
-    { name: 'Zambak', toxic: true },
-    { name: 'Lavanta', toxic: true },
+    { nameKey: 'species.orchid', toxic: false },
+    { nameKey: 'species.gerbera', toxic: false },
+    { nameKey: 'species.rose', toxic: false },
+    { nameKey: 'species.violet', toxic: false },
+    { nameKey: 'species.lily', toxic: true },
+    { nameKey: 'species.lavender', toxic: true },
   ]},
   { match: 'kaktüs', species: [
-    { name: 'Echinocactus', toxic: false },
-    { name: 'Mammillaria', toxic: false },
-    { name: 'Mini Kaktüs', toxic: false },
+    { nameKey: 'species.echinocactus', toxic: false },
+    { nameKey: 'species.mammillaria', toxic: false },
+    { nameKey: 'species.miniCactus', toxic: false },
   ]},
   { match: 'sukulent', species: [
-    { name: 'Echeveria', toxic: false },
-    { name: 'Haworthia', toxic: false },
-    { name: 'Aloe Vera', toxic: true },
-    { name: 'Kalanchoe', toxic: true },
-    { name: 'Jade (Para Ağacı)', toxic: true },
+    { nameKey: 'species.echeveria', toxic: false },
+    { nameKey: 'species.haworthia', toxic: false },
+    { nameKey: 'species.aloeVera', toxic: true },
+    { nameKey: 'species.kalanchoe', toxic: true },
+    { nameKey: 'species.jade', toxic: true },
   ]},
   { match: 'palmiye', species: [
-    { name: 'Areka Palmiyesi', toxic: false },
-    { name: 'Kentia Palmiyesi', toxic: false },
-    { name: 'Sagu Palmiyesi', toxic: true },
+    { nameKey: 'species.arecaPalm', toxic: false },
+    { nameKey: 'species.kentiaPalm', toxic: false },
+    { nameKey: 'species.sagoPalm', toxic: true },
   ]},
   { match: 'dış', species: [
-    { name: 'Gül Fidanı', toxic: false },
-    { name: 'Lavanta', toxic: true },
-    { name: 'Zakkum', toxic: true },
-    { name: 'Ortanca', toxic: true },
+    { nameKey: 'species.roseSapling', toxic: false },
+    { nameKey: 'species.lavender', toxic: true },
+    { nameKey: 'species.oleander', toxic: true },
+    { nameKey: 'species.hydrangea', toxic: true },
   ]},
   { match: 'fidan', species: [
-    { name: 'Gül Fidanı', toxic: false },
-    { name: 'Zakkum', toxic: true },
+    { nameKey: 'species.roseSapling', toxic: false },
+    { nameKey: 'species.oleander', toxic: true },
   ]},
 ];
 
@@ -97,6 +108,7 @@ function speciesForSpecName(name: string | undefined) {
 }
 
 export default function AddPlantScreen({ route, navigation }: any) {
+  const { t, lang } = useI18n();
   const { prefilledData } = route.params || {};
 
   const [name, setName] = useState('');
@@ -135,7 +147,7 @@ export default function AddPlantScreen({ route, navigation }: any) {
           if (match) setSelectedSpecId(match.prod_spec_id);
         }
       } catch (err) {
-        Alert.alert('Hata', 'Bitki türleri yüklenemedi.');
+        Alert.alert(t('common.error'), t('addPlant.specsLoadFailed'));
       } finally {
         setLoadingSpecs(false);
       }
@@ -160,16 +172,16 @@ export default function AddPlantScreen({ route, navigation }: any) {
     return speciesForSpecName(spec?.name);
   }, [selectedSpecId, specs]);
 
-  const pickSpecies = (sp: { name: string; toxic: boolean }) => {
-    setSelectedSpecies(sp.name);
-    setName(sp.name); // bitki adını cinse göre doldur (kullanıcı sonra kişiselleştirebilir)
+  const pickSpecies = (sp: { nameKey: string; toxic: boolean }) => {
+    setSelectedSpecies(sp.nameKey);
+    setName(t(sp.nameKey)); // bitki adını cinse göre doldur (kullanıcı sonra kişiselleştirebilir)
   };
 
   const handlePickImage = async () => {
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert('İzin Gerekli', 'Fotoğraf seçebilmek için galeri izni vermelisiniz.');
+        Alert.alert(t('imageAnalysis.permissionRequired'), t('createPost.libraryPermMsg'));
         return;
       }
 
@@ -185,7 +197,7 @@ export default function AddPlantScreen({ route, navigation }: any) {
         await uploadSelectedImage(uri);
       }
     } catch (err) {
-      Alert.alert('Hata', 'Fotoğraf seçilemedi.');
+      Alert.alert(t('common.error'), t('addPlant.pickFailed'));
     }
   };
 
@@ -193,7 +205,7 @@ export default function AddPlantScreen({ route, navigation }: any) {
     try {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert('İzin Gerekli', 'Fotoğraf çekebilmek için kamera izni vermelisiniz.');
+        Alert.alert(t('imageAnalysis.permissionRequired'), t('createPost.cameraPermMsg'));
         return;
       }
 
@@ -208,7 +220,7 @@ export default function AddPlantScreen({ route, navigation }: any) {
         await uploadSelectedImage(uri);
       }
     } catch (err) {
-      Alert.alert('Hata', 'Kamera açılamadı.');
+      Alert.alert(t('common.error'), t('addPlant.cameraFailed'));
     }
   };
 
@@ -233,7 +245,7 @@ export default function AddPlantScreen({ route, navigation }: any) {
       setImageUrl(data.image_url);
     } catch (err) {
       console.log('[AddPlant] Image upload error:', err);
-      Alert.alert('Hata', 'Görsel sunucuya yüklenemedi, ancak yerel olarak saklandı.');
+      Alert.alert(t('common.error'), t('addPlant.uploadFailed'));
     } finally {
       setUploadingImage(false);
     }
@@ -241,16 +253,16 @@ export default function AddPlantScreen({ route, navigation }: any) {
 
   const handleAddPlant = async () => {
     if (!name.trim()) {
-      Alert.alert('Eksik Bilgi', 'Lütfen bitkinize bir takma ad verin.');
+      Alert.alert(t('createPost.missingInfo'), t('addPlant.nameReq'));
       return;
     }
     if (!selectedSpecId) {
-      Alert.alert('Eksik Bilgi', 'Lütfen bir bitki türü seçin.');
+      Alert.alert(t('createPost.missingInfo'), t('addPlant.typeReq'));
       return;
     }
     const days = parseInt(wateringInterval, 10);
     if (isNaN(days) || days <= 0) {
-      Alert.alert('Eksik Bilgi', 'Lütfen geçerli bir sulama aralığı (gün) girin.');
+      Alert.alert(t('createPost.missingInfo'), t('addPlant.wateringReq'));
       return;
     }
 
@@ -270,11 +282,11 @@ export default function AddPlantScreen({ route, navigation }: any) {
         image_url: imageUrl,
       });
 
-      Alert.alert('Başarılı', 'Bitkiniz bahçenize eklendi! 🎉');
+      Alert.alert(t('createPost.success'), t('addPlant.successMsg'));
       navigation.navigate('MyGarden');
     } catch (err: any) {
-      const detail = err?.response?.data?.detail ?? 'Bitki kaydedilirken bir hata oluştu.';
-      Alert.alert('Hata', detail);
+      const detail = err?.response?.data?.detail ?? t('addPlant.saveFailed');
+      Alert.alert(t('common.error'), detail);
     } finally {
       setSubmitting(false);
     }
@@ -290,7 +302,7 @@ export default function AddPlantScreen({ route, navigation }: any) {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} activeOpacity={0.7}>
           <Ionicons name="close" size={24} color={colors.ink} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Yeni Bitki Ekle</Text>
+        <Text style={styles.headerTitle}>{t('addPlant.title')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -303,7 +315,7 @@ export default function AddPlantScreen({ route, navigation }: any) {
               {uploadingImage && (
                 <View style={styles.imageOverlayLoading}>
                   <ActivityIndicator size="small" color={colors.white} />
-                  <Text style={styles.uploadingText}>Yükleniyor...</Text>
+                  <Text style={styles.uploadingText}>{t('addPlant.uploading')}</Text>
                 </View>
               )}
               <TouchableOpacity
@@ -320,11 +332,11 @@ export default function AddPlantScreen({ route, navigation }: any) {
             <View style={styles.photoOptions}>
               <TouchableOpacity style={styles.photoCard} onPress={handleTakeImage} activeOpacity={0.8}>
                 <Ionicons name="camera" size={32} color={colors.primaryDeep} />
-                <Text style={styles.photoText}>Fotoğraf Çek</Text>
+                <Text style={styles.photoText}>{t('createPost.takePhoto')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.photoCard} onPress={handlePickImage} activeOpacity={0.8}>
                 <Ionicons name="images" size={32} color={colors.primaryDeep} />
-                <Text style={styles.photoText}>Galeriden Seç</Text>
+                <Text style={styles.photoText}>{t('createPost.pickGallery')}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -332,34 +344,32 @@ export default function AddPlantScreen({ route, navigation }: any) {
 
         <View style={styles.form}>
           {/* Custom Name */}
-          <Text style={styles.label}>Bitki Takma Adı *</Text>
+          <Text style={styles.label}>{t('addPlant.nameLabel')}</Text>
           <TextInput
             style={styles.input}
-            placeholder="Örn: Salon Monsteram, Ofis Kaktüsü"
+            placeholder={t('addPlant.namePlaceholder')}
             placeholderTextColor={colors.muted2}
             value={name}
             onChangeText={setName}
             editable={!submitting}
           />
-          <Text style={styles.fieldHint}>
-            İpucu: Bitkinizin ismini kişiselleştirebilirsiniz.
-          </Text>
+          <Text style={styles.fieldHint}>{t('addPlant.nameHint')}</Text>
 
           {/* Plant Location Selection */}
-          <Text style={styles.label}>Bitki Konumu / Odası</Text>
+          <Text style={styles.label}>{t('addPlant.locationLabel')}</Text>
           <View style={styles.specsContainer}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.specsScroll}>
               {FORM_LOCATIONS.map((loc) => {
-                const isSelected = location === loc;
+                const isSelected = location === loc.value;
                 return (
                   <TouchableOpacity
-                    key={loc}
+                    key={loc.value}
                     style={[styles.specChip, isSelected && styles.specChipSelected]}
-                    onPress={() => setLocation(isSelected ? null : loc)}
+                    onPress={() => setLocation(isSelected ? null : loc.value)}
                     activeOpacity={0.8}
                   >
                     <Text style={[styles.specChipText, isSelected && styles.specChipTextSelected]}>
-                      {loc}
+                      {t(loc.labelKey)}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -368,7 +378,7 @@ export default function AddPlantScreen({ route, navigation }: any) {
           </View>
 
           {/* Plant Specification Selection */}
-          <Text style={styles.label}>Bitki Türü *</Text>
+          <Text style={styles.label}>{t('addPlant.typeLabel')}</Text>
           {loadingSpecs ? (
             <ActivityIndicator color={colors.primary} style={{ alignSelf: 'flex-start', marginVertical: 8 }} />
           ) : (
@@ -384,7 +394,7 @@ export default function AddPlantScreen({ route, navigation }: any) {
                       activeOpacity={0.8}
                     >
                       <Text style={[styles.specChipText, isSelected && styles.specChipTextSelected]}>
-                        {s.name}
+                        {specTypeLabel(s.name, lang)}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -396,20 +406,20 @@ export default function AddPlantScreen({ route, navigation }: any) {
           {/* Bitki Cinsi — tür seçilince o türe ait yaygın cinsler */}
           {speciesOptions.length > 0 && (
             <>
-              <Text style={styles.label}>Bitki Cinsi</Text>
+              <Text style={styles.label}>{t('addPlant.speciesLabel')}</Text>
               <View style={styles.specsContainer}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.specsScroll}>
                   {speciesOptions.map((sp) => {
-                    const isSelected = selectedSpecies === sp.name;
+                    const isSelected = selectedSpecies === sp.nameKey;
                     return (
                       <TouchableOpacity
-                        key={sp.name}
+                        key={sp.nameKey}
                         style={[styles.specChip, isSelected && styles.specChipSelected]}
                         onPress={() => pickSpecies(sp)}
                         activeOpacity={0.8}
                       >
                         <Text style={[styles.specChipText, isSelected && styles.specChipTextSelected]}>
-                          {sp.toxic ? '⚠️ ' : ''}{sp.name}
+                          {sp.toxic ? '⚠️ ' : ''}{t(sp.nameKey)}
                         </Text>
                       </TouchableOpacity>
                     );
@@ -417,10 +427,10 @@ export default function AddPlantScreen({ route, navigation }: any) {
                 </ScrollView>
               </View>
               {selectedSpecies != null &&
-                speciesOptions.find((s) => s.name === selectedSpecies)?.toxic && (
+                speciesOptions.find((s) => s.nameKey === selectedSpecies)?.toxic && (
                   <View style={styles.speciesWarn}>
                     <Text style={styles.speciesWarnText}>
-                      ⚠️ {selectedSpecies} evcil hayvanlar (kedi/köpek) için zararlı olabilir.
+                      ⚠️ {t(selectedSpecies)}{t('addPlant.toxicWarn')}
                     </Text>
                   </View>
                 )}
@@ -428,10 +438,10 @@ export default function AddPlantScreen({ route, navigation }: any) {
           )}
 
           {/* Bakım programı — yalnızca bir bitki türü seçilince, türe göre otomatik */}
-          <Text style={styles.label}>Bakım Programı</Text>
+          <Text style={styles.label}>{t('addPlant.careProgram')}</Text>
           {selectedSpecId == null ? (
             <View style={styles.careHint}>
-              <Text style={styles.careHintText}>Bakım programı için önce bir bitki türü seç.</Text>
+              <Text style={styles.careHintText}>{t('addPlant.careHint')}</Text>
             </View>
           ) : (
             <View style={styles.careCard}>
@@ -445,9 +455,9 @@ export default function AddPlantScreen({ route, navigation }: any) {
               </TouchableOpacity>
 
               {[
-                { icon: '💧', label: 'Sulama', value: wateringInterval, set: setWateringInterval },
-                { icon: '🌿', label: 'Gübreleme', value: fertilizingInterval, set: setFertilizingInterval },
-                { icon: '🪴', label: 'Saksı değişimi', value: repottingInterval, set: setRepottingInterval },
+                { icon: '💧', label: t('addPlant.careWatering'), value: wateringInterval, set: setWateringInterval },
+                { icon: '🌿', label: t('addPlant.careFertilizing'), value: fertilizingInterval, set: setFertilizingInterval },
+                { icon: '🪴', label: t('addPlant.careRepotting'), value: repottingInterval, set: setRepottingInterval },
               ].map((row) => (
                 <View key={row.label} style={styles.careRow}>
                   <Text style={styles.careIcon}>{row.icon}</Text>
@@ -462,28 +472,26 @@ export default function AddPlantScreen({ route, navigation }: any) {
                         onChangeText={row.set}
                         editable={!submitting}
                       />
-                      <Text style={styles.careText}>günde bir</Text>
+                      <Text style={styles.careText}>{t('addPlant.daysUnit')}</Text>
                     </View>
                   ) : (
                     <Text style={styles.careText}>
-                      {row.label}: <Text style={styles.careDays}>{row.value}</Text> günde bir
+                      {row.label}: <Text style={styles.careDays}>{row.value}</Text> {t('addPlant.daysUnit')}
                     </Text>
                   )}
                 </View>
               ))}
               <Text style={styles.careNote}>
-                {editingCare
-                  ? 'Değerleri düzenleyebilirsin. Bitince ✓ ile onayla.'
-                  : 'Türe göre otomatik ayarlandı. Sağ üstteki ✏️ ile düzenleyebilirsin.'}
+                {editingCare ? t('addPlant.careNoteEdit') : t('addPlant.careNoteAuto')}
               </Text>
             </View>
           )}
 
           {/* Description / Notes */}
-          <Text style={styles.label}>Özel Bakım Notları / Açıklama</Text>
+          <Text style={styles.label}>{t('addPlant.notesLabel')}</Text>
           <TextInput
             style={[styles.input, styles.textArea]}
-            placeholder="Bitkinizin konumu, sulama dışındaki bakım tüyoları veya özel durumu..."
+            placeholder={t('addPlant.notesPlaceholder')}
             placeholderTextColor={colors.muted2}
             value={description}
             onChangeText={setDescription}
@@ -502,7 +510,7 @@ export default function AddPlantScreen({ route, navigation }: any) {
             {submitting ? (
               <ActivityIndicator color={colors.white} />
             ) : (
-              <Text style={styles.saveBtnText}>Bitkiyi Bahçeme Kaydet</Text>
+              <Text style={styles.saveBtnText}>{t('addPlant.saveBtn')}</Text>
             )}
           </TouchableOpacity>
         </View>

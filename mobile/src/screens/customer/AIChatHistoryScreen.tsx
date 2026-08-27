@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useI18n } from '../../i18n';
 import { apiClient } from '../../services/apiClient';
 import { colors, fonts, radius, shadow, spacing } from '../../theme/theme';
 
@@ -22,6 +23,7 @@ interface ChatSession {
 }
 
 export default function AIChatHistoryScreen({ navigation }: any) {
+  const { t } = useI18n();
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -33,7 +35,7 @@ export default function AIChatHistoryScreen({ navigation }: any) {
       const { data } = await apiClient.get<ChatSession[]>('/ai/chats');
       setSessions(data);
     } catch (err: any) {
-      setError(err?.response?.data?.detail ?? 'Sohbet geçmişi yüklenemedi.');
+      setError(err?.response?.data?.detail ?? t('chatHistory.loadFailed'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -45,17 +47,17 @@ export default function AIChatHistoryScreen({ navigation }: any) {
   }, [load]);
 
   const handleDelete = (session: ChatSession) => {
-    Alert.alert('Sohbeti sil', 'Bu sohbet geçmişi tamamen silinsin mi?', [
-      { text: 'Vazgeç', style: 'cancel' },
+    Alert.alert(t('chatHistory.deleteTitle'), t('chatHistory.deleteMsg'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Sil',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
           try {
             await apiClient.delete(`/ai/chats/${session.ai_chat_id}`);
             setSessions((prev) => prev.filter((s) => s.ai_chat_id !== session.ai_chat_id));
           } catch (err: any) {
-            Alert.alert('Silinemedi', err?.response?.data?.detail ?? 'Sohbet silinemedi.');
+            Alert.alert(t('chatHistory.deleteFailed'), err?.response?.data?.detail ?? t('chatHistory.deleteFailedMsg'));
           }
         },
       },
@@ -79,10 +81,10 @@ export default function AIChatHistoryScreen({ navigation }: any) {
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.preview} numberOfLines={1}>
-            {item.preview ?? 'Sohbet'}
+            {item.preview ?? t('chatHistory.chat')}
           </Text>
           <Text style={styles.meta}>
-            {dateText} · {item.message_count} mesaj
+            {dateText} · {item.message_count} {t('chatHistory.messages')}
           </Text>
         </View>
         <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(item)} activeOpacity={0.7}>
@@ -99,8 +101,8 @@ export default function AIChatHistoryScreen({ navigation }: any) {
           <Ionicons name="arrow-back" size={20} color={colors.ink} />
         </TouchableOpacity>
         <View>
-          <Text style={styles.headerTitle}>Sohbet Geçmişi</Text>
-          <Text style={styles.headerSub}>Önceki AI sohbetlerine geri dön</Text>
+          <Text style={styles.headerTitle}>{t('chatHistory.title')}</Text>
+          <Text style={styles.headerSub}>{t('chatHistory.sub')}</Text>
         </View>
       </View>
 
@@ -112,7 +114,7 @@ export default function AIChatHistoryScreen({ navigation }: any) {
         <View style={styles.center}>
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={load} activeOpacity={0.85}>
-            <Text style={styles.retryText}>Tekrar dene</Text>
+            <Text style={styles.retryText}>{t('common.retry')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -131,7 +133,7 @@ export default function AIChatHistoryScreen({ navigation }: any) {
             />
           }
           ListEmptyComponent={
-            <Text style={styles.emptyText}>Henüz bir sohbetin yok. AI Sohbet ekranından başlayabilirsin.</Text>
+            <Text style={styles.emptyText}>{t('chatHistory.empty')}</Text>
           }
         />
       )}

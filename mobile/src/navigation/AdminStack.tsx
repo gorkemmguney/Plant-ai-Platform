@@ -10,6 +10,8 @@ import AIReportScreen from '../screens/admin/AIReportScreen';
 import AdminSettingsScreen from '../screens/admin/AdminSettingsScreen';
 import AdminComplaintsScreen from '../screens/admin/AdminComplaintsScreen';
 import AdminComplaintDetailScreen from '../screens/admin/AdminComplaintDetailScreen';
+import AppSettingsScreen from '../screens/shared/AppSettingsScreen';
+import { useI18n } from '../i18n';
 import { colors, fonts } from '../theme/theme';
 
 export type AdminTabParamList = {
@@ -24,6 +26,7 @@ export type AdminStackParamList = {
   Tabs: undefined;
   AdminComplaints: undefined;
   AdminComplaintDetail: { complaintId: number };
+  AppSettings: undefined;
 };
 
 const Tab = createBottomTabNavigator<AdminTabParamList>();
@@ -37,15 +40,23 @@ const icons: Record<keyof AdminTabParamList, { active: any; inactive: any }> = {
   Settings:  { active: 'settings',        inactive: 'settings-outline' },
 };
 
-const labels: Record<keyof AdminTabParamList, string> = {
-  Users:     'Kullanıcılar',
-  Approvals: 'Onaylar',
-  Diagnosis: 'AI Teşhis',
-  Reports:   'AI Rapor',
-  Settings:  'Ayarlar',
+const labelKeys: Record<keyof AdminTabParamList, string> = {
+  Users:     'adminTab.users',
+  Approvals: 'adminTab.approvals',
+  Diagnosis: 'adminTab.diagnosis',
+  Reports:   'adminTab.reports',
+  Settings:  'adminTab.settings',
 };
 
 function AdminTabs() {
+  const { t } = useI18n();
+  const labels: Record<keyof AdminTabParamList, string> = {
+    Users:     t(labelKeys.Users),
+    Approvals: t(labelKeys.Approvals),
+    Diagnosis: t(labelKeys.Diagnosis),
+    Reports:   t(labelKeys.Reports),
+    Settings:  t(labelKeys.Settings),
+  };
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -77,6 +88,7 @@ function AdminTabs() {
 }
 
 export default function AdminStack() {
+  const { t } = useI18n();
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Tabs" component={AdminTabs} />
@@ -85,7 +97,7 @@ export default function AdminStack() {
         component={AdminComplaintsScreen}
         options={{
           headerShown: true,
-          title: 'Şikayet Yönetimi',
+          title: t('adminNav.complaints'),
           headerTitleStyle: { fontFamily: fonts.display, fontSize: 18, color: colors.ink },
           headerStyle: { backgroundColor: colors.bg },
           headerTintColor: colors.primaryDeep,
@@ -96,12 +108,13 @@ export default function AdminStack() {
         component={AdminComplaintDetailScreen}
         options={{
           headerShown: true,
-          title: 'Şikayet Detayı',
+          title: t('adminNav.complaintDetail'),
           headerTitleStyle: { fontFamily: fonts.display, fontSize: 18, color: colors.ink },
           headerStyle: { backgroundColor: colors.bg },
           headerTintColor: colors.primaryDeep,
         }}
       />
+      <Stack.Screen name="AppSettings" component={AppSettingsScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }

@@ -46,8 +46,9 @@ class ProductOut(BaseModel):
     description: str | None = None
     price: Decimal
     stock: int
-    gnl_st_id: int
+    gnl_st_id: int | None = 1
     prod_spec_id: int
+
     category: str = "plant"
     image_url: str | None = None
     seller_id: int | None = None

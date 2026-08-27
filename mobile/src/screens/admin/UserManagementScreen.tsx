@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useI18n } from '../../i18n';
 import { apiClient } from '../../services/apiClient';
 import { badgeColors, colors, fonts, radius, shadow, spacing, gradients } from '../../theme/theme';
 
@@ -34,7 +35,8 @@ interface AdminStats {
 }
 
 const ALL_ROLES = ['admin', 'seller', 'customer'] as const;
-const roleLabels: Record<string, string> = { admin: 'Admin', seller: 'Satıcı', customer: 'Müşteri' };
+const roleLabelKeys: Record<string, string> = { admin: 'role.admin', seller: 'role.seller', customer: 'role.customer' };
+const roleDescKeys: Record<string, string> = { admin: 'userMgmt.adminDesc', seller: 'userMgmt.sellerDesc', customer: 'userMgmt.customerDesc' };
 
 const roleIcons: Record<string, any> = {
   admin: 'shield-checkmark',
@@ -55,6 +57,7 @@ const roleGradients: Record<string, readonly [string, string]> = {
 };
 
 export default function UserManagementScreen() {
+  const { t } = useI18n();
   const [users, setUsers] = useState<AppUser[]>([]);
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -93,7 +96,7 @@ export default function UserManagementScreen() {
       setUsers(data);
       await loadStats();
     } catch (err: any) {
-      setError(err?.response?.data?.detail ?? 'Kullanıcılar yüklenemedi.');
+      setError(err?.response?.data?.detail ?? t('userMgmt.loadFailed'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -127,7 +130,7 @@ export default function UserManagementScreen() {
       // Reload stats
       await loadStats();
     } catch (err: any) {
-      Alert.alert('İşlem başarısız', err?.response?.data?.detail ?? 'Rol güncellenemedi.');
+      Alert.alert(t('orders.actionFailed'), err?.response?.data?.detail ?? t('userMgmt.roleUpdateFailed'));
     } finally {
       setBusyKey(null);
     }
@@ -135,7 +138,7 @@ export default function UserManagementScreen() {
 
   const handleSendBroadcast = async () => {
     if (!broadcastTitle.trim() || !broadcastMessage.trim()) {
-      Alert.alert('Hata', 'Lütfen tüm alanları doldurun.');
+      Alert.alert(t('common.error'), t('userMgmt.fillAll'));
       return;
     }
     setSendingBroadcast(true);
@@ -144,12 +147,12 @@ export default function UserManagementScreen() {
         title: broadcastTitle,
         message: broadcastMessage,
       });
-      Alert.alert('Başarılı', 'Duyuru tüm kullanıcılara başarıyla gönderildi.');
+      Alert.alert(t('createPost.success'), t('userMgmt.broadcastSent'));
       setBroadcastVisible(false);
       setBroadcastTitle('');
       setBroadcastMessage('');
     } catch (err: any) {
-      Alert.alert('Hata', err?.response?.data?.detail ?? 'Duyuru gönderilemedi.');
+      Alert.alert(t('common.error'), err?.response?.data?.detail ?? t('userMgmt.broadcastFailed'));
     } finally {
       setSendingBroadcast(false);
     }
@@ -157,7 +160,7 @@ export default function UserManagementScreen() {
 
   const handleAiDraft = async () => {
     if (!aiDraftTopic.trim()) {
-      Alert.alert('Hata', 'Lütfen kısa bir konu girin.');
+      Alert.alert(t('common.error'), t('userMgmt.enterTopic'));
       return;
     }
     setDraftingAi(true);
@@ -170,7 +173,7 @@ export default function UserManagementScreen() {
       setBroadcastMessage(data.message);
       setAiDraftTopic('');
     } catch (err: any) {
-      Alert.alert('AI Hatası', err?.response?.data?.detail ?? 'Duyuru oluşturulamadı.');
+      Alert.alert(t('userMgmt.aiError'), err?.response?.data?.detail ?? t('userMgmt.draftFailed'));
     } finally {
       setDraftingAi(false);
     }
@@ -184,7 +187,7 @@ export default function UserManagementScreen() {
       const { data } = await apiClient.get<{ report: string }>('/admin/ai/insights');
       setInsightsReport(data.report);
     } catch (err: any) {
-      setInsightsReport('Platform analizi şu anda yapılamıyor.');
+      setInsightsReport(t('userMgmt.insightsFailed'));
     } finally {
       setLoadingInsights(false);
     }
@@ -210,7 +213,7 @@ export default function UserManagementScreen() {
   });
 
   const renderUser = ({ item }: { item: AppUser }) => {
-    const fullName = `${item.first_name} ${item.last_name}`.trim() || 'İsimsiz Kullanıcı';
+    const fullName = `${item.first_name} ${item.last_name}`.trim() || t('approvals.unnamedUser');
     const initials = getInitials(item.first_name, item.last_name);
     const grad = getUserGradient(item.roles);
 
@@ -243,14 +246,14 @@ export default function UserManagementScreen() {
         <View style={styles.cardDivider} />
 
         <View style={styles.cardFooter}>
-          <Text style={styles.cardFooterLabel}>Aktif Roller:</Text>
+          <Text style={styles.cardFooterLabel}>{t('userMgmt.activeRoles')}</Text>
           <View style={styles.miniBadgeRow}>
             {item.roles.map((role) => {
               const badgeStyle = roleBadgeColors[role] || badgeColors.primary;
               return (
                 <View key={role} style={[styles.miniBadge, { backgroundColor: badgeStyle.bg }]}>
                   <Ionicons name={roleIcons[role]} size={11} color={badgeStyle.text} style={{ marginRight: 3 }} />
-                  <Text style={[styles.miniBadgeText, { color: badgeStyle.text }]}>{roleLabels[role]}</Text>
+                  <Text style={[styles.miniBadgeText, { color: badgeStyle.text }]}>{roleLabelKeys[role] ? t(roleLabelKeys[role]) : role}</Text>
                 </View>
               );
             })}
@@ -265,8 +268,8 @@ export default function UserManagementScreen() {
       <LinearGradient colors={gradients.header} style={styles.header}>
         <View style={styles.headerRow}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.headerTitle}>Kullanıcı Yönetimi</Text>
-            <Text style={styles.headerSub}>Sistem üyelerini listeleyin ve yetkilerini yönetin</Text>
+            <Text style={styles.headerTitle}>{t('userMgmt.title')}</Text>
+            <Text style={styles.headerSub}>{t('userMgmt.sub')}</Text>
           </View>
           <View style={{ flexDirection: 'row', gap: spacing.sm }}>
             <TouchableOpacity 
@@ -291,7 +294,7 @@ export default function UserManagementScreen() {
         <View style={styles.searchBar}>
           <Ionicons name="search-outline" size={18} color={colors.muted} style={{ marginRight: spacing.sm }} />
           <TextInput
-            placeholder="İsim veya e-posta ile ara..."
+            placeholder={t('userMgmt.searchPlaceholder')}
             placeholderTextColor={colors.muted2}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -320,7 +323,7 @@ export default function UserManagementScreen() {
               </View>
               <View style={{ marginLeft: spacing.sm }}>
                 <Text style={[styles.statNumber, { color: '#3d8f66' }]}>{stats.total_users}</Text>
-                <Text style={[styles.statLabel, { color: '#3d8f6680' }]}>Toplam Üye</Text>
+                <Text style={[styles.statLabel, { color: '#3d8f6680' }]}>{t('userMgmt.totalUsers')}</Text>
               </View>
             </View>
 
@@ -330,7 +333,7 @@ export default function UserManagementScreen() {
               </View>
               <View style={{ marginLeft: spacing.sm }}>
                 <Text style={[styles.statNumber, { color: '#7c4dff' }]}>{stats.total_sellers}</Text>
-                <Text style={[styles.statLabel, { color: '#7c4dff80' }]}>Mağazalar</Text>
+                <Text style={[styles.statLabel, { color: '#7c4dff80' }]}>{t('userMgmt.stores')}</Text>
               </View>
             </View>
 
@@ -340,7 +343,7 @@ export default function UserManagementScreen() {
               </View>
               <View style={{ marginLeft: spacing.sm }}>
                 <Text style={[styles.statNumber, { color: '#0288d1' }]}>{stats.total_analyses}</Text>
-                <Text style={[styles.statLabel, { color: '#0288d180' }]}>AI Teşhis</Text>
+                <Text style={[styles.statLabel, { color: '#0288d180' }]}>{t('userMgmt.analyses')}</Text>
               </View>
             </View>
 
@@ -350,7 +353,7 @@ export default function UserManagementScreen() {
               </View>
               <View style={{ marginLeft: spacing.sm }}>
                 <Text style={[styles.statNumber, { color: '#b3711a' }]}>{stats.total_products}</Text>
-                <Text style={[styles.statLabel, { color: '#b3711a80' }]}>Ürünler</Text>
+                <Text style={[styles.statLabel, { color: '#b3711a80' }]}>{t('userMgmt.products')}</Text>
               </View>
             </View>
           </ScrollView>
@@ -365,7 +368,7 @@ export default function UserManagementScreen() {
         <View style={styles.center}>
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={loadUsers} activeOpacity={0.85}>
-            <Text style={styles.retryText}>Tekrar dene</Text>
+            <Text style={styles.retryText}>{t('common.retry')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -386,7 +389,7 @@ export default function UserManagementScreen() {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyEmoji}>👥</Text>
-              <Text style={styles.emptyText}>Aranan kriterlere uygun kullanıcı bulunamadı.</Text>
+              <Text style={styles.emptyText}>{t('userMgmt.noUsers')}</Text>
             </View>
           }
         />
@@ -404,7 +407,7 @@ export default function UserManagementScreen() {
             <View style={styles.alertHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
                 <Ionicons name="megaphone" size={22} color={colors.primaryDeep} style={{ marginRight: spacing.sm }} />
-                <Text style={styles.alertTitle}>Genel Duyuru Gönder</Text>
+                <Text style={styles.alertTitle}>{t('userMgmt.broadcastTitle')}</Text>
               </View>
               <TouchableOpacity 
                 style={styles.alertCloseButton}
@@ -419,17 +422,17 @@ export default function UserManagementScreen() {
                 <Ionicons name="close" size={18} color={colors.ink} />
               </TouchableOpacity>
             </View>
-            <Text style={styles.alertSub}>Bu bildirim sistemdeki tüm kayıtlı müşterilere anlık gönderilecektir.</Text>
+            <Text style={styles.alertSub}>{t('userMgmt.broadcastSub')}</Text>
 
             {/* AI Wizard Section */}
             <View style={styles.aiWizardBox}>
               <View style={styles.aiWizardHeader}>
                 <Ionicons name="sparkles" size={15} color="#7c4dff" />
-                <Text style={styles.aiWizardTitle}>AI ile Otomatik Yaz</Text>
+                <Text style={styles.aiWizardTitle}>{t('userMgmt.aiAutoWrite')}</Text>
               </View>
               <View style={styles.aiWizardRow}>
                 <TextInput
-                  placeholder="Kısa bir konu yaz (ör: bahar kampanyası)..."
+                  placeholder={t('userMgmt.topicPlaceholder')}
                   placeholderTextColor={colors.muted2}
                   value={aiDraftTopic}
                   onChangeText={setAiDraftTopic}
@@ -452,7 +455,7 @@ export default function UserManagementScreen() {
             </View>
 
             <TextInput
-              placeholder="Duyuru Başlığı"
+              placeholder={t('userMgmt.announcementTitle')}
               placeholderTextColor={colors.muted2}
               value={broadcastTitle}
               onChangeText={setBroadcastTitle}
@@ -460,7 +463,7 @@ export default function UserManagementScreen() {
             />
 
             <TextInput
-              placeholder="Duyuru Mesajı..."
+              placeholder={t('userMgmt.announcementMsg')}
               placeholderTextColor={colors.muted2}
               value={broadcastMessage}
               onChangeText={setBroadcastMessage}
@@ -478,7 +481,7 @@ export default function UserManagementScreen() {
                 }}
                 disabled={sendingBroadcast}
               >
-                <Text style={styles.alertCancelText}>İptal</Text>
+                <Text style={styles.alertCancelText}>{t('common.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.alertConfirm}
@@ -488,7 +491,7 @@ export default function UserManagementScreen() {
                 {sendingBroadcast ? (
                   <ActivityIndicator size="small" color={colors.white} />
                 ) : (
-                  <Text style={styles.alertConfirmText}>Gönder</Text>
+                  <Text style={styles.alertConfirmText}>{t('common.submit')}</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -512,7 +515,7 @@ export default function UserManagementScreen() {
                 <LinearGradient colors={['#7c4dff', '#5c35cc']} style={styles.insightsIconBox}>
                   <Ionicons name="bar-chart" size={16} color="#fff" />
                 </LinearGradient>
-                <Text style={[styles.alertTitle, { marginLeft: spacing.sm }]}>AI Platform Analizi</Text>
+                <Text style={[styles.alertTitle, { marginLeft: spacing.sm }]}>{t('userMgmt.aiPlatformAnalysis')}</Text>
               </View>
               <TouchableOpacity style={styles.alertCloseButton} onPress={() => setInsightsVisible(false)} activeOpacity={0.8}>
                 <Ionicons name="close" size={18} color={colors.ink} />
@@ -522,7 +525,7 @@ export default function UserManagementScreen() {
             {loadingInsights ? (
               <View style={{ paddingVertical: 40, alignItems: 'center', gap: spacing.md }}>
                 <ActivityIndicator size="large" color="#7c4dff" />
-                <Text style={styles.alertSub}>Gemini platform verilerini analiz ediyor...</Text>
+                <Text style={styles.alertSub}>{t('aiDiagnosis.analyzing')}</Text>
               </View>
             ) : (
               <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>
@@ -535,7 +538,7 @@ export default function UserManagementScreen() {
                   activeOpacity={0.8}
                 >
                   <Ionicons name="refresh" size={14} color="#7c4dff" style={{ marginRight: 6 }} />
-                  <Text style={styles.insightsRefreshText}>Raporu Yenile</Text>
+                  <Text style={styles.insightsRefreshText}>{t('userMgmt.refreshReport')}</Text>
                 </TouchableOpacity>
               </ScrollView>
             )}
@@ -583,7 +586,7 @@ export default function UserManagementScreen() {
               )}
             </View>
 
-            <Text style={styles.modalSectionTitle}>Yetki Seviyeleri (Dokunup Değiştir)</Text>
+            <Text style={styles.modalSectionTitle}>{t('userMgmt.roleLevels')}</Text>
 
             <View style={styles.rolesContainer}>
               {selectedUser &&
@@ -614,14 +617,10 @@ export default function UserManagementScreen() {
                       
                       <View style={{ flex: 1, marginLeft: spacing.md }}>
                         <Text style={[styles.roleNameText, active ? { color: badgeStyle.text } : null]}>
-                          {roleLabels[role]} Yetkisi
+                          {roleLabelKeys[role] ? t(roleLabelKeys[role]) : role} {t('userMgmt.permission')}
                         </Text>
                         <Text style={styles.roleDescText}>
-                          {role === 'admin'
-                            ? 'Sistem yönetimi, onaylar ve tüm kullanıcı yetkilendirmeleri.'
-                            : role === 'seller'
-                            ? 'Pazar yerinde mağaza açma, bitki satma ve sipariş yönetimi.'
-                            : 'Müşteri yetkisi, bitki analizi yapma ve sipariş verme.'}
+                          {roleDescKeys[role] ? t(roleDescKeys[role]) : ''}
                         </Text>
                       </View>
 

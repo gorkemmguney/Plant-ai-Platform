@@ -15,8 +15,10 @@ import {
   View,
 } from 'react-native';
 import { useCart } from '../../context/CartContext';
+import { useI18n } from '../../i18n';
 import { apiClient } from '../../services/apiClient';
 import { trackInteraction } from '../../services/interactionService';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, fonts, radius, shadow, spacing } from '../../theme/theme';
 
 const SALE_CHANNEL_ID = 1;
@@ -44,6 +46,8 @@ function formatExpiry(v: string) {
 }
 
 export default function CheckoutScreen({ navigation, route }: any) {
+  const insets = useSafeAreaInsets();
+  const { t } = useI18n();
   const { items, total, clearCart } = useCart();
   const couponId: number | null = route?.params?.couponId ?? null;
   const discount: number = route?.params?.discount ?? 0;
@@ -93,28 +97,28 @@ export default function CheckoutScreen({ navigation, route }: any) {
 
   const handleConfirm = async () => {
     if (!selectedAddressId) {
-      Alert.alert('Adres gerekli', 'Lütfen bir teslimat adresi seç ya da yeni adres ekle.');
+      Alert.alert(t('checkout.addressRequired'), t('checkout.addressRequiredMsg'));
       return;
     }
     const digits = cardNumber.replace(/\D/g, '');
     if (digits.length < 16) {
-      Alert.alert('Kart bilgisi eksik', 'Lütfen geçerli bir kart numarası gir.');
+      Alert.alert(t('checkout.cardMissing'), t('checkout.cardNumberMsg'));
       return;
     }
     if (cardExpiry.replace(/\D/g, '').length < 4) {
-      Alert.alert('Kart bilgisi eksik', 'Son kullanma tarihini AA/YY formatında gir.');
+      Alert.alert(t('checkout.cardMissing'), t('checkout.expiryMsg'));
       return;
     }
     if (cardCvv.length < 3) {
-      Alert.alert('Kart bilgisi eksik', 'CVV en az 3 haneli olmalı.');
+      Alert.alert(t('checkout.cardMissing'), t('checkout.cvvMsg'));
       return;
     }
     if (!cardName.trim()) {
-      Alert.alert('Kart bilgisi eksik', 'Kart üzerindeki ismi gir.');
+      Alert.alert(t('checkout.cardMissing'), t('checkout.cardNameMsg'));
       return;
     }
     if (invoiceEnabled && !invoiceTitle.trim()) {
-      Alert.alert('Fatura bilgisi eksik', 'Fatura için ad/unvan gerekli, ya da fatura seçeneğini kapat.');
+      Alert.alert(t('checkout.invoiceMissing'), t('checkout.invoiceMissingMsg'));
       return;
     }
 
@@ -137,15 +141,15 @@ export default function CheckoutScreen({ navigation, route }: any) {
         trackInteraction('COUPON_USE');
       }
       clearCart();
-      Alert.alert('Sipariş alındı 🎉', 'Siparişin oluşturuldu.', [
+      Alert.alert(t('checkout.orderPlaced'), t('checkout.orderPlacedMsg'), [
         {
-          text: 'Siparişlerim',
+          text: t('nav.orders'),
           onPress: () => navigation.reset({ index: 0, routes: [{ name: 'Tabs' }, { name: 'Orders' }] }),
         },
-        { text: 'Tamam', onPress: () => navigation.navigate('Tabs') },
+        { text: t('common.ok'), onPress: () => navigation.navigate('Tabs') },
       ]);
     } catch (err: any) {
-      Alert.alert('Sipariş verilemedi', err?.response?.data?.detail ?? 'Sipariş oluşturulamadı.');
+      Alert.alert(t('checkout.orderFailed'), err?.response?.data?.detail ?? t('checkout.orderFailedMsg'));
     } finally {
       setPlacing(false);
     }
@@ -157,16 +161,19 @@ export default function CheckoutScreen({ navigation, route }: any) {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} activeOpacity={0.7}>
           <Ionicons name="arrow-back" size={20} color={colors.ink} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Ödeme</Text>
+        <Text style={styles.headerTitle}>{t('checkout.title')}</Text>
         <View style={styles.backButton} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingBottom: spacing.xxl + insets.bottom }]}
+        keyboardShouldPersistTaps="handled"
+      >
         {/* Teslimat adresi */}
         <View style={styles.sectionRow}>
-          <Text style={styles.sectionTitle}>Teslimat Adresi</Text>
+          <Text style={styles.sectionTitle}>{t('checkout.deliveryAddress')}</Text>
           <TouchableOpacity onPress={() => navigation.navigate('AddressScreen')} activeOpacity={0.7}>
-            <Text style={styles.sectionLink}>+ Yeni Adres</Text>
+            <Text style={styles.sectionLink}>{t('checkout.newAddress')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -179,7 +186,7 @@ export default function CheckoutScreen({ navigation, route }: any) {
             activeOpacity={0.8}
           >
             <Ionicons name="location-outline" size={20} color={colors.muted} />
-            <Text style={styles.emptyAddressText}>Kayıtlı adresin yok, eklemek için dokun</Text>
+            <Text style={styles.emptyAddressText}>{t('checkout.noAddress')}</Text>
           </TouchableOpacity>
         ) : (
           addresses.map((addr) => {
@@ -206,12 +213,10 @@ export default function CheckoutScreen({ navigation, route }: any) {
         )}
 
         {/* Kart bilgileri (formalite) */}
-        <Text style={[styles.sectionTitle, { marginTop: spacing.xl }]}>Kart Bilgileri</Text>
-        <Text style={styles.helperText}>
-          Bu adım demo amaçlıdır — gerçek bir ödeme altyapısı bağlı değildir, kart bilgilerin saklanmaz.
-        </Text>
+        <Text style={[styles.sectionTitle, { marginTop: spacing.xl }]}>{t('checkout.cardInfo')}</Text>
+        <Text style={styles.helperText}>{t('checkout.demoNote')}</Text>
 
-        <Text style={styles.label}>Kart Numarası</Text>
+        <Text style={styles.label}>{t('checkout.cardNumber')}</Text>
         <TextInput
           style={styles.input}
           value={cardNumber}
@@ -224,12 +229,12 @@ export default function CheckoutScreen({ navigation, route }: any) {
 
         <View style={styles.inputRow}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.label}>Son Kullanma</Text>
+            <Text style={styles.label}>{t('checkout.expiry')}</Text>
             <TextInput
               style={styles.input}
               value={cardExpiry}
               onChangeText={(v) => setCardExpiry(formatExpiry(v))}
-              placeholder="AA/YY"
+              placeholder={t('checkout.expiryPlaceholder')}
               placeholderTextColor={colors.muted2}
               keyboardType="number-pad"
               maxLength={5}
@@ -250,19 +255,19 @@ export default function CheckoutScreen({ navigation, route }: any) {
           </View>
         </View>
 
-        <Text style={styles.label}>Kart Üzerindeki İsim</Text>
+        <Text style={styles.label}>{t('checkout.cardName')}</Text>
         <TextInput
           style={styles.input}
           value={cardName}
           onChangeText={setCardName}
-          placeholder="Ad Soyad"
+          placeholder={t('checkout.fullNamePlaceholder')}
           placeholderTextColor={colors.muted2}
           autoCapitalize="words"
         />
 
         {/* Fatura (opsiyonel) */}
         <View style={styles.switchRow}>
-          <Text style={styles.switchLabel}>Fatura bilgisi ekle (opsiyonel)</Text>
+          <Text style={styles.switchLabel}>{t('checkout.addInvoice')}</Text>
           <Switch
             value={invoiceEnabled}
             onValueChange={setInvoiceEnabled}
@@ -273,15 +278,15 @@ export default function CheckoutScreen({ navigation, route }: any) {
 
         {invoiceEnabled && (
           <>
-            <Text style={styles.label}>Ad Soyad / Ünvan</Text>
+            <Text style={styles.label}>{t('checkout.invoiceTitle')}</Text>
             <TextInput
               style={styles.input}
               value={invoiceTitle}
               onChangeText={setInvoiceTitle}
-              placeholder="Fatura üzerindeki isim"
+              placeholder={t('checkout.invoiceNamePlaceholder')}
               placeholderTextColor={colors.muted2}
             />
-            <Text style={styles.label}>TC Kimlik No / Vergi No (opsiyonel)</Text>
+            <Text style={styles.label}>{t('checkout.taxId')}</Text>
             <TextInput
               style={styles.input}
               value={invoiceIdNo}
@@ -296,17 +301,17 @@ export default function CheckoutScreen({ navigation, route }: any) {
         {/* Toplam */}
         <View style={styles.totalBox}>
           <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Ara Toplam</Text>
+            <Text style={styles.totalLabel}>{t('checkout.subtotal')}</Text>
             <Text style={styles.totalValue}>₺{total.toFixed(2)}</Text>
           </View>
           {discount > 0 && (
             <View style={styles.totalRow}>
-              <Text style={styles.totalLabelDiscount}>Kupon İndirimi</Text>
+              <Text style={styles.totalLabelDiscount}>{t('checkout.couponDiscount')}</Text>
               <Text style={styles.totalValueDiscount}>-₺{discount.toFixed(2)}</Text>
             </View>
           )}
           <View style={[styles.totalRow, styles.totalRowFinal]}>
-            <Text style={styles.totalLabelFinal}>Toplam</Text>
+            <Text style={styles.totalLabelFinal}>{t('cart.total')}</Text>
             <Text style={styles.totalValueFinal}>₺{finalTotal.toFixed(2)}</Text>
           </View>
         </View>
@@ -320,7 +325,7 @@ export default function CheckoutScreen({ navigation, route }: any) {
           {placing ? (
             <ActivityIndicator size="small" color={colors.buttonPrimaryText} />
           ) : (
-            <Text style={styles.confirmButtonText}>Siparişi Onayla</Text>
+            <Text style={styles.confirmButtonText}>{t('checkout.confirmOrder')}</Text>
           )}
         </TouchableOpacity>
       </ScrollView>

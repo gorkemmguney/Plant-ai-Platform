@@ -15,6 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useI18n } from '../../i18n';
 import { apiClient } from '../../services/apiClient';
 import { colors, fonts, radius, shadow, spacing } from '../../theme/theme';
 
@@ -54,6 +55,7 @@ const EMPTY_FORM: FormState = { title: '', il: null, ilce: null, mahalle: null, 
 type ModalView = 'form' | 'il' | 'ilce' | 'mahalle';
 
 export default function AddressScreen({ navigation }: any) {
+  const { t } = useI18n();
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -77,7 +79,7 @@ export default function AddressScreen({ navigation }: any) {
       const { data } = await apiClient.get<Address[]>('/addresses');
       setAddresses(data);
     } catch (err: any) {
-      setError(err?.response?.data?.detail ?? 'Adresler yüklenemedi.');
+      setError(err?.response?.data?.detail ?? t('address.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -165,9 +167,9 @@ export default function AddressScreen({ navigation }: any) {
   };
 
   const handleSave = async () => {
-    if (!form.title.trim()) return Alert.alert('Eksik bilgi', 'Adres başlığı gerekli (ör. Ev, İş).');
-    if (!form.il || !form.ilce || !form.mahalle) return Alert.alert('Eksik bilgi', 'İl, ilçe ve mahalle seçilmeli.');
-    if (!form.address_line.trim()) return Alert.alert('Eksik bilgi', 'Sokak/bina/daire bilgisi gerekli.');
+    if (!form.title.trim()) return Alert.alert(t('settings.missingInfo'), t('address.titleReq'));
+    if (!form.il || !form.ilce || !form.mahalle) return Alert.alert(t('settings.missingInfo'), t('address.locationReq'));
+    if (!form.address_line.trim()) return Alert.alert(t('settings.missingInfo'), t('address.lineReq'));
 
     setSaving(true);
     const payload = {
@@ -187,24 +189,24 @@ export default function AddressScreen({ navigation }: any) {
       closeModal();
       await load();
     } catch (err: any) {
-      Alert.alert('Kaydedilemedi', err?.response?.data?.detail ?? 'Adres kaydedilemedi.');
+      Alert.alert(t('common.saveFailed'), err?.response?.data?.detail ?? t('address.saveFailed'));
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = (addr: Address) => {
-    Alert.alert('Adresi sil', `"${addr.title}" adresi silinsin mi?`, [
-      { text: 'Vazgeç', style: 'cancel' },
+    Alert.alert(t('address.deleteTitle'), `"${addr.title}"${t('address.deleteQ')}`, [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Sil',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
           try {
             await apiClient.delete(`/addresses/${addr.address_id}`);
             setAddresses((prev) => prev.filter((a) => a.address_id !== addr.address_id));
           } catch (err: any) {
-            Alert.alert('Silinemedi', err?.response?.data?.detail ?? 'Adres silinemedi.');
+            Alert.alert(t('address.deleteFailed'), err?.response?.data?.detail ?? t('address.deleteFailedMsg'));
           }
         },
       },
@@ -217,7 +219,7 @@ export default function AddressScreen({ navigation }: any) {
         <Text style={styles.cardTitle}>{item.title}</Text>
         {item.is_default && (
           <View style={styles.defaultBadge}>
-            <Text style={styles.defaultBadgeText}>Varsayılan</Text>
+            <Text style={styles.defaultBadgeText}>{t('address.default')}</Text>
           </View>
         )}
       </View>
@@ -227,10 +229,10 @@ export default function AddressScreen({ navigation }: any) {
       <Text style={styles.cardLine} numberOfLines={2}>{item.address_line}</Text>
       <View style={styles.cardActions}>
         <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(item)} activeOpacity={0.8}>
-          <Text style={styles.editText}>Düzenle</Text>
+          <Text style={styles.editText}>{t('settings.edit')}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(item)} activeOpacity={0.8}>
-          <Text style={styles.deleteText}>Sil</Text>
+          <Text style={styles.deleteText}>{t('common.delete')}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -242,7 +244,7 @@ export default function AddressScreen({ navigation }: any) {
       <>
         <TextInput
           style={styles.pickerSearch}
-          placeholder="Ara..."
+          placeholder={t('address.searchPlaceholder')}
           placeholderTextColor={colors.muted2}
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -261,7 +263,7 @@ export default function AddressScreen({ navigation }: any) {
                 <Text style={styles.pickerRowText}>{item.name}</Text>
               </TouchableOpacity>
             )}
-            ListEmptyComponent={<Text style={styles.pickerEmpty}>Sonuç bulunamadı.</Text>}
+            ListEmptyComponent={<Text style={styles.pickerEmpty}>{t('address.noResults')}</Text>}
           />
         )}
       </>
@@ -269,10 +271,10 @@ export default function AddressScreen({ navigation }: any) {
   };
 
   const modalTitles: Record<ModalView, string> = {
-    form: editingId == null ? 'Yeni Adres' : 'Adresi Düzenle',
-    il: 'İl Seç',
-    ilce: 'İlçe Seç',
-    mahalle: 'Mahalle Seç',
+    form: editingId == null ? t('address.newAddress') : t('address.editAddress'),
+    il: t('address.selectIl'),
+    ilce: t('address.selectIlce'),
+    mahalle: t('address.selectMahalle'),
   };
 
   return (
@@ -282,11 +284,11 @@ export default function AddressScreen({ navigation }: any) {
           <Ionicons name="arrow-back" size={20} color={colors.ink} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text style={styles.headerTitle}>Adreslerim</Text>
-          <Text style={styles.headerSub}>Teslimat adreslerini yönet</Text>
+          <Text style={styles.headerTitle}>{t('settings.myAddresses')}</Text>
+          <Text style={styles.headerSub}>{t('address.sub')}</Text>
         </View>
         <TouchableOpacity style={styles.addButton} onPress={openCreate} activeOpacity={0.85}>
-          <Text style={styles.addButtonText}>+ Ekle</Text>
+          <Text style={styles.addButtonText}>{t('address.add')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -305,7 +307,7 @@ export default function AddressScreen({ navigation }: any) {
           contentContainerStyle={styles.list}
           renderItem={renderAddress}
           ListEmptyComponent={
-            <Text style={styles.emptyText}>Henüz kayıtlı adresin yok. "+ Ekle" ile başla.</Text>
+            <Text style={styles.emptyText}>{t('address.empty')}</Text>
           }
         />
       )}
@@ -316,12 +318,12 @@ export default function AddressScreen({ navigation }: any) {
             <View style={styles.modalHeader}>
               {modalView !== 'form' && (
                 <TouchableOpacity onPress={() => setModalView('form')} activeOpacity={0.7}>
-                  <Text style={styles.modalBack}>‹ Geri</Text>
+                  <Text style={styles.modalBack}>{t('market.back')}</Text>
                 </TouchableOpacity>
               )}
               <Text style={styles.modalTitle}>{modalTitles[modalView]}</Text>
               <TouchableOpacity onPress={closeModal} activeOpacity={0.7}>
-                <Text style={styles.modalClose}>Kapat</Text>
+                <Text style={styles.modalClose}>{t('market.close')}</Text>
               </TouchableOpacity>
             </View>
 
@@ -331,24 +333,24 @@ export default function AddressScreen({ navigation }: any) {
 
             {modalView === 'form' && (
               <ScrollView keyboardShouldPersistTaps="handled">
-                <Text style={styles.label}>Adres Başlığı</Text>
+                <Text style={styles.label}>{t('address.titleLabel')}</Text>
                 <TextInput
                   style={styles.input}
                   value={form.title}
                   onChangeText={(v) => setForm((f) => ({ ...f, title: v }))}
-                  placeholder="Örn. Ev, İş"
+                  placeholder={t('address.titlePlaceholder')}
                   placeholderTextColor={colors.muted2}
                 />
 
-                <Text style={styles.label}>İl</Text>
+                <Text style={styles.label}>{t('address.il')}</Text>
                 <TouchableOpacity style={styles.selectBox} onPress={() => setModalView('il')} activeOpacity={0.7}>
                   <Text style={form.il ? styles.selectValue : styles.selectPlaceholder}>
-                    {form.il?.name ?? 'İl seçin'}
+                    {form.il?.name ?? t('address.selectIlPlaceholder')}
                   </Text>
                   <Ionicons name="chevron-forward" size={16} color={colors.muted2} />
                 </TouchableOpacity>
 
-                <Text style={styles.label}>İlçe</Text>
+                <Text style={styles.label}>{t('address.ilce')}</Text>
                 <TouchableOpacity
                   style={[styles.selectBox, !form.il && styles.selectBoxDisabled]}
                   onPress={() => form.il && setModalView('ilce')}
@@ -356,12 +358,12 @@ export default function AddressScreen({ navigation }: any) {
                   disabled={!form.il}
                 >
                   <Text style={form.ilce ? styles.selectValue : styles.selectPlaceholder}>
-                    {form.ilce?.name ?? (form.il ? 'İlçe seçin' : 'Önce il seçin')}
+                    {form.ilce?.name ?? (form.il ? t('address.selectIlcePlaceholder') : t('address.pickIlFirst'))}
                   </Text>
                   <Ionicons name="chevron-forward" size={16} color={colors.muted2} />
                 </TouchableOpacity>
 
-                <Text style={styles.label}>Mahalle</Text>
+                <Text style={styles.label}>{t('address.mahalle')}</Text>
                 <TouchableOpacity
                   style={[styles.selectBox, !form.ilce && styles.selectBoxDisabled]}
                   onPress={() => form.ilce && setModalView('mahalle')}
@@ -369,23 +371,23 @@ export default function AddressScreen({ navigation }: any) {
                   disabled={!form.ilce}
                 >
                   <Text style={form.mahalle ? styles.selectValue : styles.selectPlaceholder}>
-                    {form.mahalle?.name ?? (form.ilce ? 'Mahalle seçin' : 'Önce ilçe seçin')}
+                    {form.mahalle?.name ?? (form.ilce ? t('address.selectMahallePlaceholder') : t('address.pickIlceFirst'))}
                   </Text>
                   <Ionicons name="chevron-forward" size={16} color={colors.muted2} />
                 </TouchableOpacity>
 
-                <Text style={styles.label}>Açık Adres</Text>
+                <Text style={styles.label}>{t('address.lineLabel')}</Text>
                 <TextInput
                   style={[styles.input, styles.inputMultiline]}
                   value={form.address_line}
                   onChangeText={(v) => setForm((f) => ({ ...f, address_line: v }))}
-                  placeholder="Sokak, bina no, daire no vb."
+                  placeholder={t('address.linePlaceholder')}
                   placeholderTextColor={colors.muted2}
                   multiline
                 />
 
                 <View style={styles.switchRow}>
-                  <Text style={styles.switchLabel}>Varsayılan adresim yap</Text>
+                  <Text style={styles.switchLabel}>{t('address.makeDefault')}</Text>
                   <Switch
                     value={form.is_default}
                     onValueChange={(v) => setForm((f) => ({ ...f, is_default: v }))}
@@ -396,10 +398,10 @@ export default function AddressScreen({ navigation }: any) {
 
                 <View style={styles.modalActions}>
                   <TouchableOpacity style={styles.cancelButton} onPress={closeModal} activeOpacity={0.85} disabled={saving}>
-                    <Text style={styles.cancelText}>Vazgeç</Text>
+                    <Text style={styles.cancelText}>{t('common.cancel')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.saveButton} onPress={handleSave} activeOpacity={0.85} disabled={saving}>
-                    {saving ? <ActivityIndicator size="small" color={colors.white} /> : <Text style={styles.saveText}>Kaydet</Text>}
+                    {saving ? <ActivityIndicator size="small" color={colors.white} /> : <Text style={styles.saveText}>{t('settings.save')}</Text>}
                   </TouchableOpacity>
                 </View>
               </ScrollView>

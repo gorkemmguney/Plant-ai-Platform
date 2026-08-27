@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useI18n } from '../../i18n';
 import { apiClient } from '../../services/apiClient';
 import { colors, fonts, radius, shadow, spacing, gradients } from '../../theme/theme';
 
@@ -31,14 +32,15 @@ const DISEASE_COLORS = [
   '#3498db', '#9b59b6', '#e91e63', '#00bcd4', '#8bc34a',
 ];
 
-const healthStatusLabels: Record<string, string> = {
-  healthy: '✅ Sağlıklı',
-  diseased: '🦠 Hastalıklı',
-  pest_damage: '🐛 Zararlı Zararı',
-  unknown: '❓ Belirsiz',
+const healthStatusKeys: Record<string, string> = {
+  healthy: 'aiDiagnosis.healthy',
+  diseased: 'aiDiagnosis.diseased',
+  pest_damage: 'aiDiagnosis.pest',
+  unknown: 'aiDiagnosis.unknown',
 };
 
 export default function AIDiagnosisCenterScreen() {
+  const { t } = useI18n();
   const [data, setData] = useState<DiagnosisCenterData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -50,7 +52,7 @@ export default function AIDiagnosisCenterScreen() {
       const { data: res } = await apiClient.get<DiagnosisCenterData>('/admin/ai/diagnosis-center');
       setData(res);
     } catch (err: any) {
-      setError(err?.response?.data?.detail ?? 'Teşhis verileri yüklenemedi.');
+      setError(err?.response?.data?.detail ?? t('aiDiagnosis.loadFailed'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -64,7 +66,7 @@ export default function AIDiagnosisCenterScreen() {
 
   const renderDisease = ({ item, index }: { item: DiseaseStatItem; index: number }) => {
     const color = DISEASE_COLORS[index % DISEASE_COLORS.length];
-    const label = healthStatusLabels[item.disease] ?? item.disease;
+    const label = healthStatusKeys[item.disease] ? t(healthStatusKeys[item.disease]) : item.disease;
     return (
       <View style={styles.diseaseRow}>
         <View style={styles.diseaseLeft}>
@@ -87,8 +89,8 @@ export default function AIDiagnosisCenterScreen() {
       <LinearGradient colors={gradients.header} style={styles.header}>
         <View style={styles.headerRow}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.headerTitle}>AI Teşhis Merkezi</Text>
-            <Text style={styles.headerSub}>Platform geneli bitki sağlık analizi</Text>
+            <Text style={styles.headerTitle}>{t('aiDiagnosis.title')}</Text>
+            <Text style={styles.headerSub}>{t('aiDiagnosis.sub')}</Text>
           </View>
           <TouchableOpacity
             style={styles.refreshButton}
@@ -103,13 +105,13 @@ export default function AIDiagnosisCenterScreen() {
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color="#7c4dff" />
-          <Text style={styles.loadingText}>Gemini platform verilerini analiz ediyor...</Text>
+          <Text style={styles.loadingText}>{t('aiDiagnosis.analyzing')}</Text>
         </View>
       ) : error ? (
         <View style={styles.center}>
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={load} activeOpacity={0.85}>
-            <Text style={styles.retryText}>Tekrar Dene</Text>
+            <Text style={styles.retryText}>{t('common.retry')}</Text>
           </TouchableOpacity>
         </View>
       ) : data ? (
@@ -124,7 +126,7 @@ export default function AIDiagnosisCenterScreen() {
             <LinearGradient colors={['#7c4dff', '#5c35cc']} style={styles.totalGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
               <Ionicons name="leaf" size={28} color="rgba(255,255,255,0.8)" />
               <Text style={styles.totalNumber}>{data.total_analyses}</Text>
-              <Text style={styles.totalLabel}>Toplam AI Teşhis</Text>
+              <Text style={styles.totalLabel}>{t('aiDiagnosis.totalAnalyses')}</Text>
             </LinearGradient>
           </View>
 
@@ -132,7 +134,7 @@ export default function AIDiagnosisCenterScreen() {
           <View style={styles.sectionCard}>
             <View style={styles.sectionHeader}>
               <Ionicons name="bar-chart" size={18} color={colors.ink} />
-              <Text style={styles.sectionTitle}>Hastalık & Durum Dağılımı</Text>
+              <Text style={styles.sectionTitle}>{t('aiDiagnosis.distribution')}</Text>
             </View>
             <View style={styles.diseaseList}>
               {data.disease_stats.map((item, index) => (
@@ -149,7 +151,7 @@ export default function AIDiagnosisCenterScreen() {
               <LinearGradient colors={['#7c4dff', '#5c35cc']} style={styles.aiIconBox}>
                 <Ionicons name="sparkles" size={14} color="#fff" />
               </LinearGradient>
-              <Text style={styles.aiCommentaryTitle}>Gemini Analiz Raporu</Text>
+              <Text style={styles.aiCommentaryTitle}>{t('aiDiagnosis.reportTitle')}</Text>
             </View>
             <Text style={styles.aiCommentaryText}>{data.ai_commentary}</Text>
           </View>

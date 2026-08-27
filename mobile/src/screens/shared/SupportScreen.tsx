@@ -4,6 +4,7 @@ import {
   ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Modal, Platform,
   ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
+import { useI18n } from '../../i18n';
 import { apiClient } from '../../services/apiClient';
 import { trackInteraction } from '../../services/interactionService';
 import { badgeColors, colors, fonts, radius, shadow, spacing } from '../../theme/theme';
@@ -14,19 +15,22 @@ interface Complaint {
   admin_note: string | null; user_reply: string | null; created_at: string;
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  pending: 'Beklemede', in_progress: 'İnceleniyor', resolved: 'Çözüldü', rejected: 'Reddedildi',
+const STATUS_LABEL_KEYS: Record<string, string> = {
+  pending: 'support.statusPending', in_progress: 'support.statusInProgress',
+  resolved: 'support.statusResolved', rejected: 'support.statusRejected',
 };
 const STATUS_STYLE: Record<string, { bg: string; text: string }> = {
   pending: badgeColors.amber, in_progress: badgeColors.secondary,
   resolved: badgeColors.green, rejected: badgeColors.red,
 };
 const TYPES = [
-  { key: 'general', label: 'Genel' }, { key: 'order', label: 'Sipariş' },
-  { key: 'product', label: 'Ürün' }, { key: 'seller', label: 'Satıcı' },
+  { key: 'general', labelKey: 'support.typeGeneral' }, { key: 'order', labelKey: 'support.typeOrder' },
+  { key: 'product', labelKey: 'support.typeProduct' }, { key: 'seller', labelKey: 'support.typeSeller' },
+  { key: 'suggestion', labelKey: 'support.typeSuggestion' },
 ];
 
 export default function SupportScreen({ navigation, route }: any) {
+  const { t } = useI18n();
   const sourcePanel: 'customer' | 'seller' = route?.params?.sourcePanel ?? 'customer';
   const [items, setItems] = useState<Complaint[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,8 +53,8 @@ export default function SupportScreen({ navigation, route }: any) {
   useEffect(() => { load(); }, [load]);
 
   const submit = async () => {
-    if (!title.trim()) return Alert.alert('Eksik bilgi', 'Konu başlığı gerekli.');
-    if (!description.trim()) return Alert.alert('Eksik bilgi', 'Açıklama gerekli.');
+    if (!title.trim()) return Alert.alert(t('settings.missingInfo'), t('support.titleReq'));
+    if (!description.trim()) return Alert.alert(t('settings.missingInfo'), t('support.descReq'));
     setSaving(true);
     try {
       await apiClient.post('/complaints', {
@@ -60,9 +64,9 @@ export default function SupportScreen({ navigation, route }: any) {
       trackInteraction('SUPPORT_TICKET');
       setCreateOpen(false); setTitle(''); setDescription(''); setType('general');
       await load();
-      Alert.alert('Talebin alındı', 'Ekibimiz en kısa sürede dönüş yapacak.');
+      Alert.alert(t('support.received'), t('support.receivedMsg'));
     } catch (err: any) {
-      Alert.alert('Gönderilemedi', err?.response?.data?.detail ?? 'Talep oluşturulamadı.');
+      Alert.alert(t('support.sendFailed'), err?.response?.data?.detail ?? t('support.createFailed'));
     } finally { setSaving(false); }
   };
 
@@ -75,7 +79,7 @@ export default function SupportScreen({ navigation, route }: any) {
       });
       setDetail(data); setReplyText(''); await load();
     } catch (err: any) {
-      Alert.alert('Gönderilemedi', err?.response?.data?.detail ?? 'Mesaj eklenemedi.');
+      Alert.alert(t('support.sendFailed'), err?.response?.data?.detail ?? t('support.replyFailed'));
     } finally { setSendingReply(false); }
   };
 
@@ -86,14 +90,14 @@ export default function SupportScreen({ navigation, route }: any) {
         <View style={styles.cardTop}>
           <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
           <View style={[styles.badge, { backgroundColor: st.bg }]}>
-            <Text style={[styles.badgeText, { color: st.text }]}>{STATUS_LABELS[item.status] ?? item.status}</Text>
+            <Text style={[styles.badgeText, { color: st.text }]}>{STATUS_LABEL_KEYS[item.status] ? t(STATUS_LABEL_KEYS[item.status]) : item.status}</Text>
           </View>
         </View>
         <Text style={styles.cardDesc} numberOfLines={2}>{item.description}</Text>
         {!!item.admin_note && (
           <View style={styles.answeredRow}>
             <Ionicons name="chatbubble-ellipses" size={13} color={colors.primaryDeep} />
-            <Text style={styles.answeredText}>Yanıtlandı</Text>
+            <Text style={styles.answeredText}>{t('support.answered')}</Text>
           </View>
         )}
       </TouchableOpacity>
@@ -107,13 +111,13 @@ export default function SupportScreen({ navigation, route }: any) {
           <Ionicons name="arrow-back" size={20} color={colors.ink} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text style={styles.headerTitle}>Destek & Şikayet</Text>
+          <Text style={styles.headerTitle}>{t('settings.support')}</Text>
           <Text style={styles.headerSub}>
-            {sourcePanel === 'seller' ? 'Satıcı paneli talepleri' : 'Müşteri paneli talepleri'}
+            {sourcePanel === 'seller' ? t('support.sellerTickets') : t('support.customerTickets')}
           </Text>
         </View>
         <TouchableOpacity style={styles.addButton} onPress={() => setCreateOpen(true)} activeOpacity={0.85}>
-          <Text style={styles.addButtonText}>+ Yeni</Text>
+          <Text style={styles.addButtonText}>{t('support.new')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -125,7 +129,7 @@ export default function SupportScreen({ navigation, route }: any) {
           keyExtractor={(i) => String(i.complaint_id)}
           contentContainerStyle={styles.list}
           renderItem={renderItem}
-          ListEmptyComponent={<Text style={styles.emptyText}>Henüz bir talebin yok. "+ Yeni" ile destek talebi oluşturabilirsin.</Text>}
+          ListEmptyComponent={<Text style={styles.emptyText}>{t('support.empty')}</Text>}
         />
       )}
 
@@ -133,32 +137,32 @@ export default function SupportScreen({ navigation, route }: any) {
         <KeyboardAvoidingView style={styles.modalWrap} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={styles.modalCard}>
             <ScrollView keyboardShouldPersistTaps="handled" bounces={false}>
-              <Text style={styles.modalTitle}>Yeni Destek Talebi</Text>
-              <Text style={styles.label}>Konu Türü</Text>
+              <Text style={styles.modalTitle}>{t('support.newTicket')}</Text>
+              <Text style={styles.label}>{t('support.topicType')}</Text>
               <View style={styles.chipRow}>
-                {TYPES.map((t) => {
-                  const active = type === t.key;
+                {TYPES.map((ty) => {
+                  const active = type === ty.key;
                   return (
-                    <TouchableOpacity key={t.key} style={[styles.chip, active && styles.chipActive]}
-                      onPress={() => setType(t.key)} activeOpacity={0.8}>
-                      <Text style={[styles.chipText, active && styles.chipTextActive]}>{t.label}</Text>
+                    <TouchableOpacity key={ty.key} style={[styles.chip, active && styles.chipActive]}
+                      onPress={() => setType(ty.key)} activeOpacity={0.8}>
+                      <Text style={[styles.chipText, active && styles.chipTextActive]}>{t(ty.labelKey)}</Text>
                     </TouchableOpacity>
                   );
                 })}
               </View>
-              <Text style={styles.label}>Başlık</Text>
+              <Text style={styles.label}>{t('support.titleLabel')}</Text>
               <TextInput style={styles.input} value={title} onChangeText={setTitle}
-                placeholder="Kısa bir başlık" placeholderTextColor={colors.muted2} />
-              <Text style={styles.label}>Açıklama</Text>
+                placeholder={t('support.titlePlaceholder')} placeholderTextColor={colors.muted2} />
+              <Text style={styles.label}>{t('support.descLabel')}</Text>
               <TextInput style={[styles.input, styles.inputMultiline]} value={description}
-                onChangeText={setDescription} placeholder="Sorunu detaylı anlat"
+                onChangeText={setDescription} placeholder={t('support.descPlaceholder')}
                 placeholderTextColor={colors.muted2} multiline />
               <View style={styles.modalActions}>
                 <TouchableOpacity style={styles.cancelBtn} onPress={() => setCreateOpen(false)} disabled={saving}>
-                  <Text style={styles.cancelText}>Vazgeç</Text>
+                  <Text style={styles.cancelText}>{t('common.cancel')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.saveBtn} onPress={submit} disabled={saving}>
-                  {saving ? <ActivityIndicator size="small" color={colors.white} /> : <Text style={styles.saveText}>Gönder</Text>}
+                  {saving ? <ActivityIndicator size="small" color={colors.white} /> : <Text style={styles.saveText}>{t('common.submit')}</Text>}
                 </TouchableOpacity>
               </View>
             </ScrollView>
@@ -175,14 +179,14 @@ export default function SupportScreen({ navigation, route }: any) {
 
               {!!detail?.user_reply && (
                 <View style={styles.bubbleUser}>
-                  <Text style={styles.bubbleLabel}>Ek açıklaman</Text>
+                  <Text style={styles.bubbleLabel}>{t('support.yourReply')}</Text>
                   <Text style={styles.bubbleText}>{detail.user_reply}</Text>
                 </View>
               )}
 
               {detail?.admin_note ? (
                 <View style={styles.bubbleAdmin}>
-                  <Text style={styles.bubbleLabelAdmin}>Destek ekibi yanıtı</Text>
+                  <Text style={styles.bubbleLabelAdmin}>{t('support.teamReply')}</Text>
                   <Text style={styles.bubbleTextAdmin}>{detail.admin_note}</Text>
                 </View>
               ) : null}
@@ -190,23 +194,23 @@ export default function SupportScreen({ navigation, route }: any) {
               {detail?.admin_note ? (
                 <View style={styles.lockedBox}>
                   <Ionicons name="lock-closed" size={14} color={colors.muted} />
-                  <Text style={styles.lockedText}>Bu talep yanıtlandı, yeni mesaj ekleyemezsin.</Text>
+                  <Text style={styles.lockedText}>{t('support.locked')}</Text>
                 </View>
               ) : (
                 <>
-                  <Text style={styles.label}>Ek açıklama ekle</Text>
+                  <Text style={styles.label}>{t('support.addReply')}</Text>
                   <TextInput style={[styles.input, styles.inputMultiline]} value={replyText}
-                    onChangeText={setReplyText} placeholder="Eklemek istediğin bir şey var mı?"
+                    onChangeText={setReplyText} placeholder={t('support.replyPlaceholder')}
                     placeholderTextColor={colors.muted2} multiline />
                   <TouchableOpacity style={[styles.saveBtn, { marginTop: spacing.sm }]}
                     onPress={sendReply} disabled={sendingReply || !replyText.trim()}>
-                    {sendingReply ? <ActivityIndicator size="small" color={colors.white} /> : <Text style={styles.saveText}>Gönder</Text>}
+                    {sendingReply ? <ActivityIndicator size="small" color={colors.white} /> : <Text style={styles.saveText}>{t('common.submit')}</Text>}
                   </TouchableOpacity>
                 </>
               )}
 
               <TouchableOpacity style={[styles.cancelBtn, { marginTop: spacing.md }]} onPress={() => setDetail(null)}>
-                <Text style={styles.cancelText}>Kapat</Text>
+                <Text style={styles.cancelText}>{t('market.close')}</Text>
               </TouchableOpacity>
             </ScrollView>
           </View>

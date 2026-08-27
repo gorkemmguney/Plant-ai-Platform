@@ -1,152 +1,204 @@
-# Plant AI Platform — Yapay Zeka Destekli Bitki Bakım ve E-Ticaret Asistanı
+# 🌿 Plant AI Platform — Yapay Zeka Destekli Bitki Bakım ve E-Ticaret Asistanı
 
-Plant AI Platform; kullanıcıların bitki satın alabildiği, siparişlerini takip
-edebildiği ve bitki sağlığını **fotoğrafla analiz ettirip** yapay zeka ile
-sohbet edebildiği uçtan uca bir mobil platformdur. Backend FastAPI (Python),
-istemci ise Expo / React Native (TypeScript) ile geliştirilmiştir.
+> 📖 **Resmi Kurulum & Mimari Dokümanı:** [📄 PLANT_AI_KURULUM_REHBERI.pdf](PLANT_AI_KURULUM_REHBERI.pdf) *(PDF formatında indirmek veya görüntülemek için tıklayın)*
 
----
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi)
+![React Native](https://img.shields.io/badge/React%20Native-Expo-61DAFB?logo=react)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?logo=typescript)
+![Supabase](https://img.shields.io/badge/Supabase-Auth%20%26%20DB-3ECF8E?logo=supabase)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14%2B-4169E1?logo=postgresql)
+![Gemini AI](https://img.shields.io/badge/Google%20Gemini-3.5%20Flash--Lite-8E44AD?logo=google)
 
-## 1. Temel Fonksiyonlar
-
-- **Görsel Bitki Analizi:** Kullanıcı bitkisinin fotoğrafını yükler; Google
-  Gemini Vision modeli görüntüyü analiz ederek sağlık durumu ve bakım önerileri
-  üretir (`POST /ai/analyze-image`).
-- **Yapay Zeka Sohbet:** Bitki bakımı hakkında doğal dilde soru-cevap; sohbet
-  geçmişini koruyan bir Gemini sohbet akışı (`POST /ai/chat`, `POST /ai/feedback`).
-- **Sipariş ve Ürün Yönetimi:** Ürün kataloğu, sipariş oluşturma, kendi
-  siparişlerini listeleme ve sipariş durumu güncelleme
-  (`/catalog/products`, `/orders`).
-- **Bildirimler:** Sipariş durumu değiştiğinde otomatik bildirim üretimi;
-  bildirimleri listeleme ve okundu işaretleme (`/notifications`).
-- **Rol Bazlı Yetkilendirme:** Firebase kimlik doğrulaması üzerine `admin`,
-  `seller` ve `customer` rolleri; mobil tarafta role göre farklı navigasyon.
+**Plant AI Platform**; kullanıcıların bitki satın alabildiği, sipariş takibi yapabildiği ve hastalıklı veya bakıma muhtaç bitkilerinin **fotoğrafını yükleyerek yapay zeka (Google Gemini Vision) ile anında teşhis ve bakım önerisi** alabildiği uçtan uca mobil e-ticaret ve akıllı botanik platformudur.
 
 ---
 
-## 2. Sistem Mimarisi
-
-| Katman | Teknoloji |
-|--------|-----------|
-| **İstemci (Mobile)** | Expo / React Native (TypeScript), React Navigation |
-| **Backend** | FastAPI (Python), SQLAlchemy (async), Alembic |
-| **Veri Tabanı** | PostgreSQL (app_user, cust, prod, cust_ord, ai_chat vb.) |
-| **Kimlik & Depolama** | Firebase Authentication, Firebase Storage, Firebase Cloud Messaging |
-| **Yapay Zeka Katmanı** | Google Gemini API (Vision + Chat) |
-| **Yetkilendirme** | Firebase ID token doğrulama + rol bazlı erişim (admin / seller / customer) |
-
-**İstek akışı:** Mobile → Firebase ID token → `Authorization: Bearer <token>` →
-`get_current_user` (token doğrulama + `app_user` senkronu) → `require_role(...)`
-→ router → service → repository/model → PostgreSQL.
+## 📑 İçindekiler
+- [✨ Öne Çıkan Özellikler](#-öne-çıkan-özellikler)
+- [🏗️ Sistem Mimarisi](#️-sistem-mimarisi)
+- [📁 Proje Klasör Yapısı](#-proje-klasör-yapısı)
+- [🔑 Rol Bazlı Yetkilendirme (RBAC)](#-rol-bazlı-yetkilendirme-rbac)
+- [🌐 API Uç Noktaları](#-api-uç-noktaları)
+- [🚀 Hızlı Başlangıç ve Otomatik Betikler](#-hızlı-başlangıç-ve-otomatik-betikler)
+- [👥 Geliştirici Ekibi](#-geliştirici-ekibi)
 
 ---
 
-## 3. Kullanıcı Senaryoları
+## ✨ Öne Çıkan Özellikler
 
-- **Görsel Analiz:** Kullanıcı solmuş bir bitkinin fotoğrafını yükler; sistem
-  olası nedenleri ve bakım adımlarını döndürür.
-- **Operasyonel İşlem:** "Siparişlerimi göster" veya yeni sipariş oluşturma;
-  satıcı/yönetici sipariş durumunu günceller.
-- **Proaktif Bildirim:** Sipariş durumu değiştiğinde müşteriye otomatik
-  bildirim düşer.
+- 📸 **Yapay Zeka Görsel Analiz (Gemini Vision):** Bitki fotoğrafını analiz ederek hastalık tanısı koyar, bakım tavsiyeleri ve sulama/ışık önerileri üretir (`POST /ai/analyze-image`).
+- 💬 **İnteraktif Bakım Asistanı (Gemini Chat):** Sohbet geçmişini koruyan akıllı bot ile bitki bakımı hakkında doğal dilde iletişim (`POST /ai/chat`).
+- 🛒 **E-Ticaret ve Sipariş Yönetimi:** Ürün kataloğu, sepete ekleme, sipariş oluşturma, sipariş adımları (Hazırlanıyor, Kargoda, Teslim Edildi) ve sipariş geçmişi (`/catalog`, `/orders`).
+- 🔔 **Otomatik Proaktif Bildirimler:** Sipariş durumu değiştiğinde ve önemli sistem hareketlerinde kullanıcıya özel bildirimler (`/notifications`).
+- 🎁 **Sadakat Programı ve Kampanyalar:** Kullanıcı puan sistemi, indirim kodları ve kampanya paketleri.
+- 🛡️ **Güvenli Kimlik Doğrulama:** Supabase Auth entegrasyonu, JWT Bearer Token güvenliği ve RBAC rol kontrolü.
 
 ---
 
-## 4. Proje Yapısı
+## 🏗️ Sistem Mimarisi
 
-Uygulama `plant-ai-platform` deposunda iki ana bölümden oluşur: FastAPI tabanlı
-**backend** ve Expo (React Native / TypeScript) tabanlı **mobile** istemci.
+```mermaid
+graph TD
+    subgraph Mobile ["Mobil İstemci (React Native / Expo)"]
+        UI["React Native UI (TypeScript)"]
+        AuthCtx["AuthContext & Navigation"]
+        SupabaseClient["Supabase JS Client"]
+        ApiClient["Axios API Client"]
+    end
+
+    subgraph SupabaseCloud ["Supabase Cloud Platform"]
+        SupabaseAuth["Supabase Auth (JWT)"]
+        SupabasePooler["Session Connection Pooler"]
+    end
+
+    subgraph BackendLayer ["Backend Katmanı (FastAPI)"]
+        FastAPI["FastAPI App (main.py)"]
+        RBAC["RBAC Middleware (Admin / Seller / Customer)"]
+        Services["Business Services (AI, Order, Catalog)"]
+    end
+
+    subgraph ExternalServices ["Harici Entegrasyonlar"]
+        Gemini["Google Gemini AI (Vision + Chat)"]
+        Resend["Resend E-posta API"]
+    end
+
+    subgraph DB ["Veritabanı Katmanı"]
+        PostgreSQL[("PostgreSQL Database (Supabase / Local)")]
+    end
+
+    UI --> AuthCtx
+    AuthCtx --> SupabaseClient
+    SupabaseClient --> SupabaseAuth
+    ApiClient -->|"Bearer Token (JWT)"| FastAPI
+    FastAPI --> RBAC
+    RBAC --> Services
+    Services --> SupabasePooler
+    SupabasePooler --> PostgreSQL
+    Services --> Gemini
+    Services --> Resend
+```
+
+### Teknolojik Stack
+
+| Katman | Teknolojiler |
+| :--- | :--- |
+| **Mobil Uygulama** | React Native, Expo, TypeScript, React Navigation, Axios |
+| **Backend API** | Python 3.10+, FastAPI, Async SQLAlchemy, Alembic, Pydantic |
+| **Veritabanı & Auth** | Supabase Cloud, PostgreSQL, Supabase Auth (JWT) |
+| **E-posta Servisi** | Resend API (OTP Doğrulama & Bildirimler) |
+| **Yapay Zeka Katmanı** | Google Gemini API (`gemini-3.5-flash-lite` Vision + Chat) |
+| **Canlı Sunucu** | Railway Cloud Deployment (PaaS) |
+
+---
+
+## 📁 Proje Klasör Yapısı
 
 ```
-plant-ai-platform/
-├── backend/                    # FastAPI + PostgreSQL + Firebase + Gemini
+Plant-ai-Platform/
+├── PLANT_AI_KURULUM_REHBERI.pdf  # Resmi Kurulum & Mimari Kılavuzu (PDF)
+├── backend/                     # FastAPI Backend Uygulaması
+│   ├── alembic/                 # Veritabanı Migration Dosyaları
 │   ├── app/
-│   │   ├── core/               # config, firebase, security (RBAC), storage
-│   │   ├── db/                 # session, base
-│   │   ├── models/             # SQLAlchemy modelleri (mevcut DB şemasıyla birebir)
-│   │   ├── schemas/            # Pydantic request/response şemaları
-│   │   ├── services/           # iş mantığı (order, ai, notification, customer)
-│   │   ├── routers/            # /auth /admin /catalog /orders /ai /notifications /customers
-│   │   ├── repositories/       # veri erişim katmanı
-│   │   ├── rbac/               # rol sabitleri (admin/seller/customer)
-│   │   └── main.py             # FastAPI uygulama girişi
-│   ├── alembic/                # veritabanı migration'ları
-│   ├── requirements.txt
-│   └── README.md               # backend kurulum ve mimari notları
+│   │   ├── core/                # config.py, supabase_auth.py, security.py (RBAC)
+│   │   ├── db/                  # Veritabanı Bağlantısı ve Session Yönetimi
+│   │   ├── models/              # SQLAlchemy Modelleri (SQL Tabloları)
+│   │   ├── schemas/             # Pydantic Şemaları (Request/Response)
+│   │   ├── services/            # İş Mantığı Katmanı (AI, Sipariş, Katalog)
+│   │   ├── routers/             # API Uç Noktaları (Endpoints)
+│   │   └── main.py              # FastAPI Başlangıç Noktası
+│   ├── manage_users.py          # Kullanıcı ve Rol Yönetim Betiği
+│   ├── requirements.txt         # Python Bağımlılıkları
+│   └── .env.example             # Ortam Değişkenleri Şablonu
 │
-├── mobile/                     # Expo / React Native (TypeScript)
+├── mobile/                      # Expo React Native İstemcisi
 │   ├── src/
-│   │   ├── context/            # AuthContext (oturum durumu)
-│   │   ├── firebase/           # Firebase JS SDK yapılandırması
-│   │   ├── navigation/         # rol bazlı stack'ler (Admin/Seller/Customer + Root)
-│   │   ├── screens/            # ekranlar (auth/Login, Home)
-│   │   └── services/           # apiClient (backend ile iletişim)
-│   ├── App.tsx
-│   ├── app.json
-│   └── package.json
+│   │   ├── context/             # AuthContext (Oturum & Rol Yönetimi)
+│   │   ├── lib/                 # supabaseClient.ts (Supabase JS)
+│   │   ├── navigation/          # Rol Bazlı Navigasyon (Admin/Seller/Customer)
+│   │   ├── screens/             # Ekranlar (Login, Home, AiChat, Orders vb.)
+│   │   └── services/            # API Servisi (apiClient)
+│   ├── App.tsx                  # Mobil Uygulama Kök Bileşeni
+│   └── package.json             # Node.js Bağımlılıkları
 │
-├── README.md                   # Bu dosya (proje genel tanımı)
-└── TODO.md                     # Görev / yapılacaklar listesi
+├── setup.bat                    # Windows: Otomatik Kurulum Betiği
+├── setup.sh                     # Linux/macOS: Otomatik Kurulum Betiği
+├── run-all.bat                  # Windows: Backend + Mobil Birlikte Başlatıcı
+├── run-backend.bat              # Windows: Sadece Backend Başlatıcı
+└── run-mobile.bat               # Windows: Sadece Mobil Başlatıcı
 ```
 
 ---
 
-## 5. API Uç Noktaları (özet)
+## 🔑 Rol Bazlı Yetkilendirme (RBAC)
 
-| Yöntem | Yol | Açıklama |
-|--------|-----|----------|
-| GET | `/auth/me` | Firebase token doğrula + `app_user` senkronu |
-| POST | `/admin/assign-role` | Kullanıcıya rol atama (admin) |
-| GET/POST | `/catalog/products` | Ürünleri listele / oluştur |
-| GET/PATCH/DELETE | `/catalog/products/{id}` | Ürün detay / güncelle / sil |
-| POST/GET | `/orders` | Sipariş oluştur / kendi siparişlerini listele |
-| PATCH | `/orders/{id}/status` | Sipariş durumu güncelle (+ otomatik bildirim) |
-| POST | `/ai/analyze-image` | Bitki fotoğrafı analizi (Gemini Vision) |
-| POST | `/ai/chat` | Yapay zeka sohbet |
-| POST | `/ai/feedback` | Sohbet geri bildirimi |
-| GET | `/notifications` | Bildirimleri listele |
-| POST | `/notifications/{id}/read` | Bildirimi okundu işaretle |
-| POST/GET | `/customers/me` | Müşteri profili oluştur / getir |
+Sistem 3 temel kullanıcı rolünü destekler:
 
-Swagger dokümantasyonu: `http://localhost:8000/docs`
+1. **Yönetici (Admin):** Tüm kullanıcıları listeleme, rol atama, sistem genelindeki tüm sipariş ve katalogları yönetme yetkisine sahiptir.
+2. **Satıcı (Seller):** Kendi ürünlerini ekleme, stok/fiyat güncelleme ve kendi ürünlerine gelen sipariş durumlarını güncelleme yetkisine sahiptir.
+3. **Müşteri (Customer):** Ürün kataloğunu inceleme, sipariş verme, yapay zeka ile bitki analizi yaptırma ve bot ile sohbet etme hakkına sahiptir.
 
 ---
 
-## 6. Başlangıç (Getting Started)
+## 🌐 API Uç Noktaları
 
-### Backend (FastAPI)
+Backend çalıştıktan sonra `http://localhost:8000/docs` adresinden **Interactive Swagger UI** dokümantasyonuna erişebilirsiniz.
 
-```bash
-cd backend
-python -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-cp .env.example .env            # DATABASE_URL, FIREBASE_CREDENTIALS_PATH, GEMINI_API_KEY doldurun
-alembic upgrade head            # veritabanı migration'ları
-uvicorn app.main:app --reload
-```
-
-Ayrıntılı kurulum ve mimari notları için `backend/README.md` dosyasına bakın.
-
-### Mobile (Expo / React Native)
-
-```bash
-cd mobile
-npm install
-npx expo start
-```
-
-`src/firebase/firebaseConfig.ts` içindeki Firebase yapılandırmasını ve
-`src/services/apiClient.ts` içindeki backend adresini kendi ortamınıza göre
-ayarlayın.
+| Yöntem | Endpoint | Açıklama | Yetki |
+| :--- | :--- | :--- | :--- |
+| **GET** | `/auth/me` | Giriş yapan kullanıcı profili & rol bilgisi | Tüm roller |
+| **POST** | `/admin/assign-role` | Kullanıcıya yeni rol tanımlama | Admin |
+| **GET** | `/catalog/products` | Ürün kataloğunu filtreli listeleme | Herkes |
+| **POST** | `/catalog/products` | Yeni ürün oluşturma | Admin / Seller |
+| **POST** | `/orders` | Yeni sipariş oluşturma | Customer |
+| **GET** | `/orders` | Sipariş geçmişini listeleme | Tüm roller |
+| **PATCH**| `/orders/{id}/status` | Sipariş durumunu güncelleme | Admin / Seller |
+| **POST** | `/ai/analyze-image` | Bitki görseli analizi (Gemini Vision) | Customer |
+| **POST** | `/ai/chat` | Yapay zeka ile bakım sohbeti | Customer |
+| **GET** | `/notifications` | Bildirimleri listeleme | Tüm roller |
 
 ---
 
-## 7. Yol Haritası (Roadmap)
+## 🚀 Hızlı Başlangıç ve Otomatik Betikler
 
-- **Faz 1:** Kimlik doğrulama (Firebase) ve rol bazlı navigasyon — **tamamlandı**.
-- **Faz 2:** Ürün kataloğu, sipariş ve müşteri modellemesi — **tamamlandı**.
-- **Faz 3:** Yapay zeka görsel analiz + sohbet (Gemini) — **tamamlandı**.
-- **Faz 4:** Bildirim sistemi (sipariş durumu → otomatik bildirim) — **tamamlandı**.
-- **Sonraki:** FCM push bildirimleri, kapsam dışı tabloların (favori/etkileşim,
-  zamanlanmış kampanya işleri) router/service katmanı, testler.
+Projede geliştirme ve test sürecini kolaylaştıran hazır çalıştırma betikleri bulunmaktadır:
+
+### 1️⃣ Otomatik Ortam Kurulumu
+
+- **Windows:** `setup.bat` dosyasına çift tıklayın veya terminalden çalıştırın:
+  ```cmd
+  setup.bat
+  ```
+- **Linux / macOS:**
+  ```bash
+  chmod +x setup.sh
+  ./setup.sh
+  ```
+
+### 2️⃣ Tek Tıkla Çalıştırma
+
+- **Tüm Sistemi Başlat (Backend + Mobil):**
+  ```cmd
+  run-all.bat
+  ```
+- **Sadece Backend'i Başlat:**
+  ```cmd
+  run-backend.bat
+  ```
+- **Sadece Mobil Uygulamayı Başlat:**
+  ```cmd
+  run-mobile.bat
+  ```
+
+---
+
+## 👥 Geliştirici Ekibi
+
+Bu proje, **3 kişilik bir ekip** tarafından ortaklaşa geliştirilmiştir:
+
+- 🌿 **Görkem Güney** — [@gorkemmguney](https://github.com/gorkemmguney)
+- 🌿 **Mert Kaplan** — [@mertkapl4n](https://github.com/mertkapl4n)
+- 🌿 **Burcu Dumanlı** — [@burcudumanl](https://github.com/burcudumanl)
+
+---
+© 2026 Plant AI Platform — Tüm Hakları Saklıdır.

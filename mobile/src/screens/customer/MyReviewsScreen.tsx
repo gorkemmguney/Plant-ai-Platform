@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -8,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useI18n } from '../../i18n';
 import { apiClient } from '../../services/apiClient';
 import { colors, fonts, radius, shadow, spacing } from '../../theme/theme';
 
@@ -32,6 +34,7 @@ function Stars({ value }: { value: number }) {
 }
 
 export default function MyReviewsScreen() {
+  const { t } = useI18n();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -43,7 +46,7 @@ export default function MyReviewsScreen() {
       const { data } = await apiClient.get<Review[]>('/reviews/mine');
       setReviews(data);
     } catch (err: any) {
-      setError(err?.response?.data?.detail ?? 'Değerlendirmeler yüklenemedi.');
+      setError(err?.response?.data?.detail ?? t('myReviews.loadFailed'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -60,14 +63,14 @@ export default function MyReviewsScreen() {
     return (
       <View style={styles.card}>
         <View style={styles.cardTop}>
-          <Text style={styles.prodName} numberOfLines={1}>{item.prod_name ?? `Ürün #${item.prod_id}`}</Text>
+          <Text style={styles.prodName} numberOfLines={1}>{item.prod_name ?? `${t('common.product')} #${item.prod_id}`}</Text>
           {!!dateText && <Text style={styles.date}>{dateText}</Text>}
         </View>
         <Stars value={item.rating} />
         {!!item.comment && <Text style={styles.comment}>{item.comment}</Text>}
         {!!item.seller_reply && (
           <View style={styles.replyBox}>
-            <Text style={styles.replyLabel}>Satıcı cevabı</Text>
+            <Text style={styles.replyLabel}>{t('myReviews.sellerReply')}</Text>
             <Text style={styles.replyText}>{item.seller_reply}</Text>
           </View>
         )}
@@ -78,8 +81,8 @@ export default function MyReviewsScreen() {
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Değerlendirmelerim</Text>
-        <Text style={styles.headerSub}>Yazdığın yorum ve puanlar</Text>
+        <Text style={styles.headerTitle}>{t('myReviews.title')}</Text>
+        <Text style={styles.headerSub}>{t('myReviews.sub')}</Text>
       </View>
 
       {loading ? (
@@ -90,7 +93,7 @@ export default function MyReviewsScreen() {
         <View style={styles.center}>
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={load} activeOpacity={0.85}>
-            <Text style={styles.retryText}>Tekrar dene</Text>
+            <Text style={styles.retryText}>{t('common.retry')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -109,7 +112,7 @@ export default function MyReviewsScreen() {
             />
           }
           ListEmptyComponent={
-            <Text style={styles.emptyText}>Henüz değerlendirme yazmadın. Siparişlerim'den ürünlerini puanlayabilirsin.</Text>
+            <Text style={styles.emptyText}>{t('myReviews.empty')}</Text>
           }
         />
       )}

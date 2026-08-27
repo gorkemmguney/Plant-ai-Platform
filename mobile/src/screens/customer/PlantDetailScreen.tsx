@@ -15,6 +15,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useI18n } from '../../i18n';
+import { specTypeLabel } from '../../i18n/specType';
 import { apiClient } from '../../services/apiClient';
 import { isPetToxic } from '../../utils/petToxic';
 import { colors, fonts, radius, shadow, spacing, badgeColors } from '../../theme/theme';
@@ -58,20 +60,29 @@ interface CustProd {
 }
 
 const HEALTH_STATUS_OPTIONS = [
-  { key: 'healthy', label: 'Sağlıklı 🌿', color: colors.primaryDeep },
-  { key: 'diseased', label: 'Hasta 🩺', color: colors.red },
-  { key: 'pest_damage', label: 'Zararlı Var 🐛', color: colors.amber },
+  { key: 'healthy', labelKey: 'plantDetail.healthHealthy', color: colors.primaryDeep },
+  { key: 'diseased', labelKey: 'plantDetail.healthSick', color: colors.red },
+  { key: 'pest_damage', labelKey: 'plantDetail.healthPest', color: colors.amber },
 ];
 
-const FORM_LOCATIONS = ['Salon', 'Mutfak', 'Yatak Odası', 'Balkon', 'Ofis', 'Bahçe'];
+// value = backend'e kaydedilen konum (değiştirme), labelKey = gösterilen çeviri.
+const FORM_LOCATIONS: { value: string; labelKey: string }[] = [
+  { value: 'Salon', labelKey: 'addPlant.locSalon' },
+  { value: 'Mutfak', labelKey: 'addPlant.locKitchen' },
+  { value: 'Yatak Odası', labelKey: 'addPlant.locBedroom' },
+  { value: 'Balkon', labelKey: 'addPlant.locBalcony' },
+  { value: 'Ofis', labelKey: 'addPlant.locOffice' },
+  { value: 'Bahçe', labelKey: 'addPlant.locGarden' },
+];
 
 const MOCK_TREATMENTS = [
-  { id: 1, name: 'Organik Sıvı Bitki Gübresi (Hızlı Büyüme)', price: '129.90 TL', seller: 'Yeşil Bahçe', emoji: '🧪' },
-  { id: 2, name: 'Mantar ve Küf Önleyici Doğal Bakır Spreyi', price: '145.00 TL', seller: 'Çiçek Evi', emoji: '🧴' },
-  { id: 3, name: 'Doğal Neem Yağı (Yaprak Koruyucu Sprey)', price: '98.50 TL', seller: 'Bahçe Market', emoji: '🌿' },
+  { id: 1, nameKey: 'plantDetail.treatment1', price: '129.90 TL', seller: 'Yeşil Bahçe', emoji: '🧪' },
+  { id: 2, nameKey: 'plantDetail.treatment2', price: '145.00 TL', seller: 'Çiçek Evi', emoji: '🧴' },
+  { id: 3, nameKey: 'plantDetail.treatment3', price: '98.50 TL', seller: 'Bahçe Market', emoji: '🌿' },
 ];
 
 export default function PlantDetailScreen({ route, navigation }: any) {
+  const { t, lang } = useI18n();
   const { custProdId } = route.params;
 
   const [plant, setPlant] = useState<CustProd | null>(null);
@@ -122,7 +133,7 @@ export default function PlantDetailScreen({ route, navigation }: any) {
       setEditHealth(data.health_status);
       setEditImageUrl(data.image_url);
     } catch (err: any) {
-      Alert.alert('Hata', 'Bitki detayları yüklenemedi.');
+      Alert.alert(t('common.error'), t('plantDetail.loadFailed'));
       navigation.goBack();
     } finally {
       setLoading(false);
@@ -139,9 +150,9 @@ export default function PlantDetailScreen({ route, navigation }: any) {
     try {
       const { data } = await apiClient.post<CustProd>(`/customer-products/${plant.cust_prod_id}/water`);
       setPlant(data);
-      Alert.alert('Harika!', `${data.name} sulandı! 💧`);
+      Alert.alert(t('garden.great'), `${data.name}${t('garden.wateredMsg')}`);
     } catch (err) {
-      Alert.alert('Hata', 'Sulama işlemi kaydedilemedi.');
+      Alert.alert(t('common.error'), t('garden.waterFailed'));
     } finally {
       setWatering(false);
     }
@@ -157,9 +168,9 @@ export default function PlantDetailScreen({ route, navigation }: any) {
       setPlant(data);
       setCustomCareNotes('');
       setShowCareForm(false);
-      Alert.alert('Başarılı', 'Bakım eylemi günlüğe eklendi! 🍃');
+      Alert.alert(t('createPost.success'), t('plantDetail.careLogged'));
     } catch (err) {
-      Alert.alert('Hata', 'Bakım eylemi kaydedilemedi.');
+      Alert.alert(t('common.error'), t('plantDetail.careLogFailed'));
     } finally {
       setLoggingCare(false);
     }
@@ -169,7 +180,7 @@ export default function PlantDetailScreen({ route, navigation }: any) {
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert('İzin Gerekli', 'Fotoğraf seçebilmek için galeri izni vermelisiniz.');
+        Alert.alert(t('imageAnalysis.permissionRequired'), t('createPost.libraryPermMsg'));
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -181,7 +192,7 @@ export default function PlantDetailScreen({ route, navigation }: any) {
         await uploadGrowthImage(result.assets[0].uri);
       }
     } catch (err) {
-      Alert.alert('Hata', 'Fotoğraf seçilemedi.');
+      Alert.alert(t('common.error'), t('addPlant.pickFailed'));
     }
   };
 
@@ -189,7 +200,7 @@ export default function PlantDetailScreen({ route, navigation }: any) {
     try {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert('İzin Gerekli', 'Fotoğraf çekebilmek için kamera izni vermelisiniz.');
+        Alert.alert(t('imageAnalysis.permissionRequired'), t('createPost.cameraPermMsg'));
         return;
       }
       const result = await ImagePicker.launchCameraAsync({
@@ -200,7 +211,7 @@ export default function PlantDetailScreen({ route, navigation }: any) {
         await uploadGrowthImage(result.assets[0].uri);
       }
     } catch (err) {
-      Alert.alert('Hata', 'Kamera açılamadı.');
+      Alert.alert(t('common.error'), t('addPlant.cameraFailed'));
     }
   };
 
@@ -224,7 +235,7 @@ export default function PlantDetailScreen({ route, navigation }: any) {
       });
       setNewGrowthUrl(data.image_url);
     } catch (err) {
-      Alert.alert('Hata', 'Fotoğraf yüklenemedi.');
+      Alert.alert(t('common.error'), t('plantDetail.photoUploadFailed'));
     } finally {
       setUploadingGrowth(false);
     }
@@ -232,7 +243,7 @@ export default function PlantDetailScreen({ route, navigation }: any) {
 
   const handleSaveGrowthLog = async () => {
     if (!newGrowthNote.trim()) {
-      Alert.alert('Eksik Bilgi', 'Lütfen gelişim notunuzu yazın.');
+      Alert.alert(t('createPost.missingInfo'), t('plantDetail.growthNoteReq'));
       return;
     }
     setSavingGrowth(true);
@@ -246,9 +257,9 @@ export default function PlantDetailScreen({ route, navigation }: any) {
       setNewGrowthUri(null);
       setNewGrowthUrl(null);
       setShowGrowthForm(false);
-      Alert.alert('Başarılı', 'Gelişim günlüğünüze yeni bir sayfa eklendi! 📝');
+      Alert.alert(t('createPost.success'), t('plantDetail.growthSaved'));
     } catch (err) {
-      Alert.alert('Hata', 'Günlük kaydedilemedi.');
+      Alert.alert(t('common.error'), t('plantDetail.growthSaveFailed'));
     } finally {
       setSavingGrowth(false);
     }
@@ -258,7 +269,7 @@ export default function PlantDetailScreen({ route, navigation }: any) {
     try {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert('İzin Gerekli', 'AI analizi için kamera izni vermelisiniz.');
+        Alert.alert(t('imageAnalysis.permissionRequired'), t('plantDetail.aiCameraPerm'));
         return;
       }
       const result = await ImagePicker.launchCameraAsync({
@@ -310,11 +321,11 @@ export default function PlantDetailScreen({ route, navigation }: any) {
       setPlant(updated);
 
       Alert.alert(
-        'AI Teşhis Sonucu',
-        `Durum: ${nextHealth === 'healthy' ? 'Sağlıklı 🌿' : 'Hasta / Bakıma Muhtaç 🩺'}\n\nDetay: ${diagnosisObj.diagnosis ?? 'Belirlenemedi'}\n\nÖneri: ${diagnosisObj.recommendation ?? 'Bakıma devam edin.'}`
+        t('plantDetail.aiResultTitle'),
+        `${t('plantDetail.aiStatus')}${nextHealth === 'healthy' ? t('plantDetail.aiHealthy') : t('plantDetail.aiSick')}\n\n${t('plantDetail.aiDetail')}${diagnosisObj.diagnosis ?? t('plantDetail.aiUndetermined')}\n\n${t('plantDetail.aiRec')}${diagnosisObj.recommendation ?? t('plantDetail.aiKeepCaring')}`
       );
     } catch (err) {
-      Alert.alert('Hata', 'AI analiz işlemi başarısız oldu.');
+      Alert.alert(t('common.error'), t('plantDetail.aiFailed'));
     } finally {
       setAnalyzing(false);
     }
@@ -322,7 +333,7 @@ export default function PlantDetailScreen({ route, navigation }: any) {
 
   const handleUpdate = async () => {
     if (!editName.trim()) {
-      Alert.alert('Eksik Bilgi', 'Bitki adı boş olamaz.');
+      Alert.alert(t('createPost.missingInfo'), t('plantDetail.nameReq'));
       return;
     }
     const waterDays = parseInt(editWatering, 10);
@@ -330,7 +341,7 @@ export default function PlantDetailScreen({ route, navigation }: any) {
     const repotDays = parseInt(editRepotting, 10);
 
     if (isNaN(waterDays) || waterDays <= 0) {
-      Alert.alert('Hata', 'Geçerli bir sulama aralığı girin.');
+      Alert.alert(t('common.error'), t('plantDetail.wateringReq'));
       return;
     }
 
@@ -347,28 +358,28 @@ export default function PlantDetailScreen({ route, navigation }: any) {
       });
       setPlant(data);
       setIsEditing(false);
-      Alert.alert('Başarılı', 'Bitki detayları güncellendi!');
+      Alert.alert(t('createPost.success'), t('plantDetail.updated'));
     } catch (err) {
-      Alert.alert('Hata', 'Güncelleme işlemi başarısız oldu.');
+      Alert.alert(t('common.error'), t('plantDetail.updateFailed'));
     }
   };
 
   const handleDelete = () => {
     Alert.alert(
-      'Bitkiyi Sil',
-      'Bu bitkiyi bahçenizden tamamen silmek istediğinize emin misiniz?',
+      t('plantDetail.deleteTitle'),
+      t('plantDetail.deleteMsg'),
       [
-        { text: 'Vazgeç', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Sil',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
               await apiClient.delete(`/customer-products/${custProdId}`);
-              Alert.alert('Silindi', 'Bitkiniz bahçenizden kaldırıldı.');
+              Alert.alert(t('postDetail.deleted'), t('plantDetail.deletedMsg'));
               navigation.navigate('MyGarden');
             } catch (err) {
-              Alert.alert('Hata', 'Silme işlemi başarısız.');
+              Alert.alert(t('common.error'), t('plantDetail.deleteFailed'));
             }
           },
         },
@@ -379,8 +390,8 @@ export default function PlantDetailScreen({ route, navigation }: any) {
   const handleShareToCommunity = () => {
     if (!plant) return;
     navigation.navigate('CreatePost', {
-      prefilledTitle: `Benim Bahçemden: ${plant.name} 🌿`,
-      prefilledContent: `Merhaba doğaseverler! Bahçemde özenle büyüttüğüm ${plant.species_name} türündeki bitkim "${plant.name}". ${plant.description ? '\n\nNotlarım: ' + plant.description : ''}`,
+      prefilledTitle: `${t('plantDetail.shareTitlePre')}${plant.name}${t('plantDetail.shareTitlePost')}`,
+      prefilledContent: `${t('plantDetail.shareContentA')}${specTypeLabel(plant.species_name, lang)}${t('plantDetail.shareContentB')}${plant.name}${t('plantDetail.shareContentC')}${plant.description ? t('plantDetail.shareNotes') + plant.description : ''}`,
       prefilledImageUrl: plant.image_url,
       prefilledTag: 'general',
     });
@@ -389,8 +400,8 @@ export default function PlantDetailScreen({ route, navigation }: any) {
   const handleShareGrowthToCommunity = (log: GrowthLog) => {
     if (!plant) return;
     navigation.navigate('CreatePost', {
-      prefilledTitle: `${plant.name} - Gelişim Günlüğü Güncellemesi 📸`,
-      prefilledContent: `Bitkim "${plant.name}" için son gelişim günlüğüm:\n\n"${log.note}"`,
+      prefilledTitle: `${plant.name}${t('plantDetail.growthShareTitle')}`,
+      prefilledContent: `${t('plantDetail.growthShareA')}${plant.name}${t('plantDetail.growthShareB')}${log.note}"`,
       prefilledImageUrl: log.image_url || plant.image_url,
       prefilledTag: 'general',
     });
@@ -407,13 +418,13 @@ export default function PlantDetailScreen({ route, navigation }: any) {
   const getSeasonalTip = () => {
     const month = new Date().getMonth(); // 0-11
     if (month >= 2 && month <= 4) {
-      return 'İlkbahar Dönemi: Bitkinizin aktif büyüme dönemi başladı! Gübreleme sıklığını artırabilir ve toprağını havalandırabilirsiniz.';
+      return t('plantDetail.tipSpring');
     } else if (month >= 5 && month <= 7) {
-      return 'Yaz Dönemi: Sıcaklar nedeniyle toprağı daha hızlı kuruyabilir. Sulamayı kontrol etmeyi ihmal etmeyin ve direkt yakıcı güneşten koruyun.';
+      return t('plantDetail.tipSummer');
     } else if (month >= 8 && month <= 10) {
-      return 'Sonbahar Dönemi: Havaların serinlemesiyle bitkinin gelişim hızı düşer. Saksı değişimi için son şansınızdır, sulamayı yavaş yavaş azaltın.';
+      return t('plantDetail.tipAutumn');
     } else {
-      return 'Kış Dönemi: Bitkiniz dinlenme (uyku) evresinde. Sulamayı en aza indirin, gübre vermeyin ve soğuk cereyanlardan uzak sıcak bir köşede tutun.';
+      return t('plantDetail.tipWinter');
     }
   };
 
@@ -425,7 +436,8 @@ export default function PlantDetailScreen({ route, navigation }: any) {
     );
   }
 
-  const health = HEALTH_STATUS_OPTIONS.find((o) => o.key === plant.health_status) || { label: 'Bilinmiyor', color: colors.muted };
+  const healthOpt = HEALTH_STATUS_OPTIONS.find((o) => o.key === plant.health_status);
+  const health = { label: healthOpt ? t(healthOpt.labelKey) : t('imageAnalysis.unknownStatus'), color: healthOpt?.color ?? colors.muted };
   const waterLeft = getDaysLeft(plant.last_watered_at, plant.watering_interval_days);
   const fertLeft = getDaysLeft(plant.last_fertilized_at, plant.fertilizing_interval_days);
   const repotLeft = getDaysLeft(plant.last_repotted_at, plant.repotting_interval_days);
@@ -440,8 +452,17 @@ export default function PlantDetailScreen({ route, navigation }: any) {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={colors.ink} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{isEditing ? 'Profili Düzenle' : plant.name}</Text>
+        <Text style={styles.headerTitle}>{isEditing ? t('plantDetail.editProfile') : plant.name}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          {!isEditing && (
+            <TouchableOpacity
+              style={styles.editButton}
+              onPress={handleDelete}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="trash-outline" size={20} color={colors.red} />
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
             style={styles.editButton}
             onPress={handleShareToCommunity}
@@ -507,7 +528,7 @@ export default function PlantDetailScreen({ route, navigation }: any) {
               
               {/* Bottom Gradient Overlay on Image */}
               <LinearGradient colors={['transparent', 'rgba(0,0,0,0.85)']} style={styles.imageOverlayGradient}>
-                <Text style={styles.overlayPlantSpecies}>{plant.species_name}</Text>
+                <Text style={styles.overlayPlantSpecies}>{specTypeLabel(plant.species_name, lang)}</Text>
                 {plant.location && (
                   <View style={styles.overlayLocationBadge}>
                     <Text style={styles.overlayLocationText}>📍 {plant.location}</Text>
@@ -522,10 +543,8 @@ export default function PlantDetailScreen({ route, navigation }: any) {
           <View style={styles.petWarnBanner}>
             <Text style={styles.petWarnBannerIcon}>⚠️</Text>
             <View style={{ flex: 1 }}>
-              <Text style={styles.petWarnBannerTitle}>Evcil hayvana zararlı</Text>
-              <Text style={styles.petWarnBannerText}>
-                Bu bitki kedi/köpekler için toksik olabilir. Evcil dostunun erişemeyeceği bir yerde tut.
-              </Text>
+              <Text style={styles.petWarnBannerTitle}>{t('plantDetail.petToxicTitle')}</Text>
+              <Text style={styles.petWarnBannerText}>{t('plantDetail.petToxicText')}</Text>
             </View>
           </View>
         )}
@@ -533,33 +552,33 @@ export default function PlantDetailScreen({ route, navigation }: any) {
         {isEditing ? (
           /* EDIT MODE FORM */
           <View style={styles.form}>
-            <Text style={styles.label}>Bitki Takma Adı</Text>
+            <Text style={styles.label}>{t('plantDetail.nameLabel')}</Text>
             <TextInput
               style={styles.input}
               value={editName}
               onChangeText={setEditName}
-              placeholder="Takma ad girin"
+              placeholder={t('plantDetail.namePlaceholder')}
             />
 
-            <Text style={styles.label}>Bitki Konumu / Odası</Text>
+            <Text style={styles.label}>{t('addPlant.locationLabel')}</Text>
             <View style={styles.locationPills}>
               {FORM_LOCATIONS.map((loc) => {
-                const active = editLocation === loc;
+                const active = editLocation === loc.value;
                 return (
                   <TouchableOpacity
-                    key={loc}
+                    key={loc.value}
                     style={[styles.locationPill, active && styles.locationPillActive]}
-                    onPress={() => setEditLocation(active ? null : loc)}
+                    onPress={() => setEditLocation(active ? null : loc.value)}
                   >
                     <Text style={[styles.locationPillText, active && styles.locationPillTextActive]}>
-                      {loc}
+                      {t(loc.labelKey)}
                     </Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
 
-            <Text style={styles.label}>Bitki Sağlığı</Text>
+            <Text style={styles.label}>{t('plantDetail.healthLabel')}</Text>
             <View style={styles.healthOptions}>
               {HEALTH_STATUS_OPTIONS.map((opt) => {
                 const active = editHealth === opt.key;
@@ -571,14 +590,14 @@ export default function PlantDetailScreen({ route, navigation }: any) {
                     activeOpacity={0.8}
                   >
                     <Text style={[styles.healthChipText, active && { color: colors.white, fontFamily: fonts.sansBold }]}>
-                      {opt.label}
+                      {t(opt.labelKey)}
                     </Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
 
-            <Text style={styles.label}>Sulama Aralığı (Gün)</Text>
+            <Text style={styles.label}>{t('plantDetail.wateringLabel')}</Text>
             <TextInput
               style={styles.input}
               value={editWatering}
@@ -587,7 +606,7 @@ export default function PlantDetailScreen({ route, navigation }: any) {
               maxLength={3}
             />
 
-            <Text style={styles.label}>Gübreleme Aralığı (Gün)</Text>
+            <Text style={styles.label}>{t('plantDetail.fertilizingLabel')}</Text>
             <TextInput
               style={styles.input}
               value={editFertilizing}
@@ -596,7 +615,7 @@ export default function PlantDetailScreen({ route, navigation }: any) {
               maxLength={3}
             />
 
-            <Text style={styles.label}>Saksı Değişim Aralığı (Gün)</Text>
+            <Text style={styles.label}>{t('plantDetail.repottingLabel')}</Text>
             <TextInput
               style={styles.input}
               value={editRepotting}
@@ -605,7 +624,7 @@ export default function PlantDetailScreen({ route, navigation }: any) {
               maxLength={4}
             />
 
-            <Text style={styles.label}>Açıklama / Bakım Notları</Text>
+            <Text style={styles.label}>{t('plantDetail.descLabel')}</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
               value={editDescription}
@@ -616,7 +635,7 @@ export default function PlantDetailScreen({ route, navigation }: any) {
 
             <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete} activeOpacity={0.85}>
               <Ionicons name="trash-outline" size={18} color={colors.red} style={{ marginRight: 6 }} />
-              <Text style={styles.deleteBtnText}>Bu Bitkiyi Bahçemden Kaldır</Text>
+              <Text style={styles.deleteBtnText}>{t('plantDetail.removeBtn')}</Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -630,21 +649,21 @@ export default function PlantDetailScreen({ route, navigation }: any) {
                   onPress={() => setActiveTab('details')}
                   activeOpacity={0.85}
                 >
-                  <Text style={[styles.segmentBtnText, activeTab === 'details' && styles.segmentBtnTextActive]}>Detaylar</Text>
+                  <Text style={[styles.segmentBtnText, activeTab === 'details' && styles.segmentBtnTextActive]}>{t('plantDetail.tabDetails')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.segmentBtn, activeTab === 'care' && styles.segmentBtnActive]}
                   onPress={() => setActiveTab('care')}
                   activeOpacity={0.85}
                 >
-                  <Text style={[styles.segmentBtnText, activeTab === 'care' && styles.segmentBtnTextActive]}>Bakım</Text>
+                  <Text style={[styles.segmentBtnText, activeTab === 'care' && styles.segmentBtnTextActive]}>{t('plantDetail.tabCare')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.segmentBtn, activeTab === 'growth' && styles.segmentBtnActive]}
                   onPress={() => setActiveTab('growth')}
                   activeOpacity={0.85}
                 >
-                  <Text style={[styles.segmentBtnText, activeTab === 'growth' && styles.segmentBtnTextActive]}>Günlük</Text>
+                  <Text style={[styles.segmentBtnText, activeTab === 'growth' && styles.segmentBtnTextActive]}>{t('plantDetail.tabGrowth')}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -655,8 +674,8 @@ export default function PlantDetailScreen({ route, navigation }: any) {
                 {/* Meta health summary card */}
                 <View style={styles.statusMetaCard}>
                   <View>
-                    <Text style={styles.statusMetaTitle}>Bitki Sağlığı</Text>
-                    <Text style={styles.statusMetaText}>Gemini AI ile analiz edilen durum</Text>
+                    <Text style={styles.statusMetaTitle}>{t('plantDetail.healthLabel')}</Text>
+                    <Text style={styles.statusMetaText}>{t('plantDetail.healthMetaSub')}</Text>
                   </View>
                   <View style={[styles.badge, { backgroundColor: plant.health_status === 'healthy' ? badgeColors.green.bg : badgeColors.red.bg }]}>
                     <Text style={[styles.badgeText, { color: plant.health_status === 'healthy' ? badgeColors.green.text : badgeColors.red.text }]}>
@@ -678,7 +697,7 @@ export default function PlantDetailScreen({ route, navigation }: any) {
                     ) : (
                       <>
                         <Ionicons name="sparkles" size={18} color={colors.white} style={{ marginRight: 8 }} />
-                        <Text style={styles.checkupBtnText}>Anlık AI Sağlık Check-up'ı Yap</Text>
+                        <Text style={styles.checkupBtnText}>{t('plantDetail.aiCheckupBtn')}</Text>
                       </>
                     )}
                   </LinearGradient>
@@ -691,10 +710,10 @@ export default function PlantDetailScreen({ route, navigation }: any) {
                   activeOpacity={0.9}
                 >
                   <Ionicons name="people" size={18} color={colors.white} style={{ marginRight: 8 }} />
-                  <Text style={styles.shareBannerBtnText}>Bu Bitkimi Toplulukta Paylaş 👥</Text>
+                  <Text style={styles.shareBannerBtnText}>{t('plantDetail.shareBtn')}</Text>
                 </TouchableOpacity>
 
-                <Text style={styles.sectionTitle}>Bakım Programı</Text>
+                <Text style={styles.sectionTitle}>{t('addPlant.careProgram')}</Text>
                 
                 {/* Routine Card 1: Water */}
                 <View style={[styles.careCard, { backgroundColor: '#f0f9ff', borderColor: '#bae6fd' }]}>
@@ -703,17 +722,17 @@ export default function PlantDetailScreen({ route, navigation }: any) {
                       <Ionicons name="water" size={22} color="#0284c7" />
                     </View>
                     <View style={{ marginLeft: 12 }}>
-                      <Text style={styles.careCardTitle}>Sulama Periyodu</Text>
-                      <Text style={styles.careCardSub}>Her {plant.watering_interval_days} günde bir</Text>
+                      <Text style={styles.careCardTitle}>{t('plantDetail.wateringPeriod')}</Text>
+                      <Text style={styles.careCardSub}>{t('plantDetail.everyPre')}{plant.watering_interval_days}{t('plantDetail.everyPost')}</Text>
                     </View>
                   </View>
                   <View style={{ alignItems: 'flex-end', gap: 6 }}>
                     <Text style={[styles.daysText, waterLeft !== null && waterLeft <= 0 && { color: colors.red }]}>
                       {waterLeft !== null
                         ? waterLeft <= 0
-                          ? 'Günü Geçti ⚠️'
-                          : `${waterLeft} gün kaldı`
-                        : 'Belirlenmedi'}
+                          ? t('plantDetail.overdue')
+                          : `${waterLeft} ${t('plantDetail.daysLeft')}`
+                        : t('plantDetail.notSet')}
                     </Text>
                     <TouchableOpacity
                       style={[styles.routineWaterBtn, { backgroundColor: '#0284c7' }]}
@@ -723,7 +742,7 @@ export default function PlantDetailScreen({ route, navigation }: any) {
                       {watering ? (
                         <ActivityIndicator size="small" color={colors.white} />
                       ) : (
-                        <Text style={styles.waterActionBtnText}>Sulandı</Text>
+                        <Text style={styles.waterActionBtnText}>{t('plantDetail.wateredBtn')}</Text>
                       )}
                     </TouchableOpacity>
                   </View>
@@ -737,23 +756,23 @@ export default function PlantDetailScreen({ route, navigation }: any) {
                         <Ionicons name="flask" size={20} color="#16a34a" />
                       </View>
                       <View style={{ marginLeft: 12 }}>
-                        <Text style={styles.careCardTitle}>Gübreleme Periyodu</Text>
-                        <Text style={styles.careCardSub}>Her {plant.fertilizing_interval_days} günde bir</Text>
+                        <Text style={styles.careCardTitle}>{t('plantDetail.fertilizingPeriod')}</Text>
+                        <Text style={styles.careCardSub}>{t('plantDetail.everyPre')}{plant.fertilizing_interval_days}{t('plantDetail.everyPost')}</Text>
                       </View>
                     </View>
                     <View style={{ alignItems: 'flex-end', gap: 6 }}>
                       <Text style={[styles.daysText, fertLeft !== null && fertLeft <= 0 && { color: colors.amber }]}>
                         {fertLeft !== null
                           ? fertLeft <= 0
-                            ? 'Besleme Zamanı!'
-                            : `${fertLeft} gün kaldı`
-                          : 'Gübrelenmedi'}
+                            ? t('plantDetail.feedTime')
+                            : `${fertLeft} ${t('plantDetail.daysLeft')}`
+                          : t('plantDetail.notFertilized')}
                       </Text>
                       <TouchableOpacity
                         style={[styles.routineWaterBtn, { backgroundColor: '#16a34a' }]}
-                        onPress={() => handleLogCare('fertilize', 'Gübrelendi')}
+                        onPress={() => handleLogCare('fertilize', t('plantDetail.fertilizedNote'))}
                       >
-                        <Text style={styles.waterActionBtnText}>Gübrele</Text>
+                        <Text style={styles.waterActionBtnText}>{t('plantDetail.fertilizeBtn')}</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -767,23 +786,23 @@ export default function PlantDetailScreen({ route, navigation }: any) {
                         <Ionicons name="basket" size={20} color="#b45309" />
                       </View>
                       <View style={{ marginLeft: 12 }}>
-                        <Text style={styles.careCardTitle}>Saksı Değişimi</Text>
-                        <Text style={styles.careCardSub}>Her {plant.repotting_interval_days} günde bir</Text>
+                        <Text style={styles.careCardTitle}>{t('plantDetail.repottingPeriod')}</Text>
+                        <Text style={styles.careCardSub}>{t('plantDetail.everyPre')}{plant.repotting_interval_days}{t('plantDetail.everyPost')}</Text>
                       </View>
                     </View>
                     <View style={{ alignItems: 'flex-end', gap: 6 }}>
                       <Text style={[styles.daysText, repotLeft !== null && repotLeft <= 0 && { color: colors.amber }]}>
                         {repotLeft !== null
                           ? repotLeft <= 0
-                            ? 'Saksı Zamanı!'
-                            : `${repotLeft} gün kaldı`
-                          : 'Değiştirilmedi'}
+                            ? t('plantDetail.repotTime')
+                            : `${repotLeft} ${t('plantDetail.daysLeft')}`
+                          : t('plantDetail.notRepotted')}
                       </Text>
                       <TouchableOpacity
                         style={[styles.routineWaterBtn, { backgroundColor: '#b45309' }]}
-                        onPress={() => handleLogCare('repot', 'Saksı Değiştirildi')}
+                        onPress={() => handleLogCare('repot', t('plantDetail.repottedNote'))}
                       >
-                        <Text style={styles.waterActionBtnText}>Değiştir</Text>
+                        <Text style={styles.waterActionBtnText}>{t('plantDetail.repotBtn')}</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -798,22 +817,22 @@ export default function PlantDetailScreen({ route, navigation }: any) {
                 {/* Product Suggestions Loop for Diseased Plants */}
                 {(plant.health_status === 'diseased' || plant.health_status === 'pest_damage') && (
                   <View style={styles.marketplaceLoop}>
-                    <Text style={styles.loopTitle}>🩺 Bitkiniz İçin Önerilen Çözümler</Text>
-                    <Text style={styles.loopSubtitle}>Pazaryerindeki satıcılardan bitki sağlığı ürünleri:</Text>
+                    <Text style={styles.loopTitle}>{t('plantDetail.solutionsTitle')}</Text>
+                    <Text style={styles.loopSubtitle}>{t('plantDetail.solutionsSub')}</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.loopScroll}>
                       {MOCK_TREATMENTS.map((item) => (
                         <View key={item.id} style={styles.treatmentCard}>
                           <Text style={{ fontSize: 24, marginBottom: 4 }}>{item.emoji}</Text>
-                          <Text style={styles.treatmentName} numberOfLines={2}>{item.name}</Text>
+                          <Text style={styles.treatmentName} numberOfLines={2}>{t(item.nameKey)}</Text>
                           <Text style={styles.treatmentPrice}>{item.price}</Text>
                           <TouchableOpacity
                             style={styles.buyBtn}
                             onPress={() => {
-                              Alert.alert('Bilgi', 'Pazaryerinde aratılıyor...');
+                              Alert.alert(t('plantDetail.info'), t('plantDetail.searchingMarket'));
                               navigation.navigate('Tabs', { screen: 'Marketplace' });
                             }}
                           >
-                            <Text style={styles.buyBtnText}>Satın Al</Text>
+                            <Text style={styles.buyBtnText}>{t('plantDetail.buyBtn')}</Text>
                           </TouchableOpacity>
                         </View>
                       ))}
@@ -824,7 +843,7 @@ export default function PlantDetailScreen({ route, navigation }: any) {
                 {/* Notes Display */}
                 {plant.description && (
                   <View style={styles.notesContainer}>
-                    <Text style={styles.notesTitle}>Bitki Hakkında Notlar</Text>
+                    <Text style={styles.notesTitle}>{t('plantDetail.notesTitle')}</Text>
                     <Text style={styles.notesText}>{plant.description}</Text>
                   </View>
                 )}
@@ -841,39 +860,39 @@ export default function PlantDetailScreen({ route, navigation }: any) {
                 >
                   <Ionicons name={showCareForm ? 'close' : 'add'} size={20} color={colors.white} />
                   <Text style={styles.addLogToggleText}>
-                    {showCareForm ? 'Vazgeç' : 'Manuel Eylem Kaydet'}
+                    {showCareForm ? t('common.cancel') : t('plantDetail.logManual')}
                   </Text>
                 </TouchableOpacity>
 
                 {showCareForm && (
                   <View style={styles.careForm}>
-                    <Text style={styles.label}>Eylem Türü</Text>
+                    <Text style={styles.label}>{t('plantDetail.actionType')}</Text>
                     <View style={styles.careFormTypes}>
-                      {['water', 'fertilize', 'repot', 'prune'].map((t) => {
-                        const active = customCareType === t;
+                      {['water', 'fertilize', 'repot', 'prune'].map((careType) => {
+                        const active = customCareType === careType;
                         const labelMap: Record<string, string> = {
-                          water: 'Sulama 💧',
-                          fertilize: 'Gübre 🧪',
-                          repot: 'Saksı 🪴',
-                          prune: 'Budama ✂️',
+                          water: t('plantDetail.actWater'),
+                          fertilize: t('plantDetail.actFert'),
+                          repot: t('plantDetail.actRepot'),
+                          prune: t('plantDetail.actPrune'),
                         };
                         return (
                           <TouchableOpacity
-                            key={t}
+                            key={careType}
                             style={[styles.careFormTypeChip, active && styles.careFormTypeChipActive]}
-                            onPress={() => setCustomCareType(t)}
+                            onPress={() => setCustomCareType(careType)}
                           >
                             <Text style={[styles.careFormTypeChipText, active && styles.careFormTypeChipTextActive]}>
-                              {labelMap[t]}
+                              {labelMap[careType]}
                             </Text>
                           </TouchableOpacity>
                         );
                       })}
                     </View>
-                    <Text style={styles.label}>Özel Notlar</Text>
+                    <Text style={styles.label}>{t('plantDetail.customNotes')}</Text>
                     <TextInput
                       style={styles.input}
-                      placeholder="Eyleme dair not (Örn: Sararan yapraklar budandı)"
+                      placeholder={t('plantDetail.careNotePlaceholder')}
                       value={customCareNotes}
                       onChangeText={setCustomCareNotes}
                     />
@@ -882,12 +901,12 @@ export default function PlantDetailScreen({ route, navigation }: any) {
                       onPress={() => handleLogCare(customCareType, customCareNotes)}
                       disabled={loggingCare}
                     >
-                      <Text style={styles.saveLogBtnText}>Kaydet</Text>
+                      <Text style={styles.saveLogBtnText}>{t('settings.save')}</Text>
                     </TouchableOpacity>
                   </View>
                 )}
 
-                <Text style={styles.sectionTitle}>Bakım Zaman Tüneli</Text>
+                <Text style={styles.sectionTitle}>{t('plantDetail.careTimeline')}</Text>
                 
                 {plant.care_logs && plant.care_logs.length > 0 ? (
                   <View style={styles.timelineContainer}>
@@ -910,7 +929,7 @@ export default function PlantDetailScreen({ route, navigation }: any) {
                             {!isLast && <View style={styles.timelineLine} />}
                           </View>
                           <View style={styles.timelineRightColumn}>
-                            <Text style={styles.logTitle}>{log.notes || 'Bakım eylemi uygulandı.'}</Text>
+                            <Text style={styles.logTitle}>{log.notes || t('plantDetail.careApplied')}</Text>
                             <Text style={styles.logDate}>{formatDate(log.created_at)}</Text>
                           </View>
                         </View>
@@ -918,7 +937,7 @@ export default function PlantDetailScreen({ route, navigation }: any) {
                     })}
                   </View>
                 ) : (
-                  <Text style={styles.emptyText}>Henüz bir bakım kaydı girilmedi.</Text>
+                  <Text style={styles.emptyText}>{t('plantDetail.noCareLogs')}</Text>
                 )}
               </View>
             )}
@@ -933,13 +952,13 @@ export default function PlantDetailScreen({ route, navigation }: any) {
                 >
                   <Ionicons name={showGrowthForm ? 'close' : 'images'} size={20} color={colors.white} />
                   <Text style={styles.addLogToggleText}>
-                    {showGrowthForm ? 'Vazgeç' : 'Fotoğraflı Günlük Sayfası Ekle'}
+                    {showGrowthForm ? t('common.cancel') : t('plantDetail.addGrowthPage')}
                   </Text>
                 </TouchableOpacity>
 
                 {showGrowthForm && (
                   <View style={styles.careForm}>
-                    <Text style={styles.label}>Bitkinin Güncel Fotoğrafı</Text>
+                    <Text style={styles.label}>{t('plantDetail.currentPhoto')}</Text>
                     {newGrowthUri ? (
                       <View style={styles.growthFormImageContainer}>
                         <Image source={{ uri: newGrowthUri }} style={styles.growthFormImage} />
@@ -956,19 +975,19 @@ export default function PlantDetailScreen({ route, navigation }: any) {
                       <View style={styles.photoOptions}>
                         <TouchableOpacity style={styles.photoCard} onPress={handleTakeGrowthImage}>
                           <Ionicons name="camera" size={24} color={colors.primaryDeep} />
-                          <Text style={styles.photoText}>Kamera</Text>
+                          <Text style={styles.photoText}>{t('plantDetail.camera')}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.photoCard} onPress={handlePickGrowthImage}>
                           <Ionicons name="images" size={24} color={colors.primaryDeep} />
-                          <Text style={styles.photoText}>Galeri</Text>
+                          <Text style={styles.photoText}>{t('plantDetail.gallery')}</Text>
                         </TouchableOpacity>
                       </View>
                     )}
 
-                    <Text style={styles.label}>Gelişim Notunuz *</Text>
+                    <Text style={styles.label}>{t('plantDetail.growthNoteLabel')}</Text>
                     <TextInput
                       style={[styles.input, styles.textArea]}
-                      placeholder="Boyu ne kadar uzadı? Yeni bir yaprak mı verdi? Gözlemlerinizi buraya not edin..."
+                      placeholder={t('plantDetail.growthNotePlaceholder')}
                       value={newGrowthNote}
                       onChangeText={setNewGrowthNote}
                       multiline
@@ -983,13 +1002,13 @@ export default function PlantDetailScreen({ route, navigation }: any) {
                       {savingGrowth ? (
                         <ActivityIndicator color={colors.white} />
                       ) : (
-                        <Text style={styles.saveLogBtnText}>Günlüğe Ekle</Text>
+                        <Text style={styles.saveLogBtnText}>{t('plantDetail.addToDiary')}</Text>
                       )}
                     </TouchableOpacity>
                   </View>
                 )}
 
-                <Text style={styles.sectionTitle}>Gelişim Hikayesi</Text>
+                <Text style={styles.sectionTitle}>{t('plantDetail.growthStory')}</Text>
 
                 {plant.growth_logs && plant.growth_logs.length > 0 ? (
                   plant.growth_logs.map((log) => (
@@ -1007,14 +1026,14 @@ export default function PlantDetailScreen({ route, navigation }: any) {
                             activeOpacity={0.8}
                           >
                             <Ionicons name="people-outline" size={14} color={colors.primaryDeep} style={{ marginRight: 4 }} />
-                            <Text style={styles.growthShareBtnText}>Toplulukta Paylaş</Text>
+                            <Text style={styles.growthShareBtnText}>{t('plantDetail.shareToCommunity')}</Text>
                           </TouchableOpacity>
                         </View>
                       </View>
                     </View>
                   ))
                 ) : (
-                  <Text style={styles.emptyText}>Henüz bir gelişim günlüğü girilmedi.</Text>
+                  <Text style={styles.emptyText}>{t('plantDetail.noGrowthLogs')}</Text>
                 )}
               </View>
             )}
@@ -1211,7 +1230,7 @@ const styles = StyleSheet.create({
     borderColor: colors.borderSoft,
     padding: spacing.md,
     marginBottom: spacing.md,
-    ...shadow.xs,
+    ...shadow.sm,
   },
   statusMetaTitle: { fontFamily: fonts.sansBold, fontSize: 14.5, color: colors.ink },
   statusMetaText: { fontFamily: fonts.sans, fontSize: 11, color: colors.muted, marginTop: 1 },

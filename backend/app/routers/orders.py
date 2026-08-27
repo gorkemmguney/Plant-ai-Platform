@@ -1,34 +1,34 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
-from app.core.security import get_user_roles, require_role, resolve_role_id
+from app.core.security import get_current_user, get_user_roles, require_role
 from app.db.session import get_db
 from app.models.campaign import UserCoupon
 from app.models.catalog import Prod
-from app.models.customer import Cust
-from app.models.misc import BsnInter, BsnSpec
 from app.models.order import CustOrd, CustOrdItem
 from app.models.user import AppUser
 from app.rbac.roles import RoleName
-from app.schemas.order import OrderCreateIn, OrderOut, OrderStatusUpdateIn, OrderVisibilityUpdateIn
-from app.services.notification_service import create_notification
-from app.services.order_service import attach_hidden_flags, create_order, set_order_hidden, update_order_status
 
-router = APIRouter(prefix="/orders", tags=["orders"])
+from app.schemas.order import (
+    OrderCreateIn,
+    OrderOut,
+    OrderStatusUpdateIn,
+    OrderVisibilityUpdateIn,
+)
+from app.services.order_service import (
+    attach_hidden_flags,
+    create_order,
+    set_order_hidden,
+    update_order_status,
+)
+
+router = APIRouter(prefix="/orders", tags=["Orders"])
 
 # Müşterinin iptal edebileceği durumlar (Alındı, Hazırlanıyor); sonrası iptal edilemez
 CANCELLABLE_STATUSES = {5, 6}
 CANCELLED_STATUS = 9
-
-
-async def _get_cust_id(user: AppUser, db: AsyncSession) -> int:
-    result = await db.execute(select(Cust).where(Cust.user_id == user.user_id))
-    cust = result.scalar_one_or_none()
-    if cust is None:
-        raise HTTPException(status_code=400, detail="Bu kullanıcı için müşteri profili bulunamadı")
-    return cust.cust_id
 
 
 @router.post("", response_model=list[OrderOut])
@@ -37,10 +37,7 @@ async def create_new_order(
     db: AsyncSession = Depends(get_db),
     user: AppUser = Depends(require_role(RoleName.CUSTOMER, RoleName.ADMIN)),
 ):
-    cust_id = await _get_cust_id(user, db)
-    # Sepet birden fazla satıcının ürününü içeriyorsa, burada satıcı başına
-    # ayrı bir sipariş oluşur — bu yüzden dönüş değeri her zaman bir listedir.
-    orders = await create_order(db, cust_id, payload)
+    orders = await create_order(db, user.user_id, payload)
 
     # Kupon seçildiyse: sadece kuponun ait olduğu mağazanın siparişine indirim uygula
     if payload.coupon_id is not None:
@@ -49,51 +46,45 @@ async def create_new_order(
                 select(UserCoupon).where(
                     UserCoupon.coupon_id == payload.coupon_id,
                     UserCoupon.user_id == user.user_id,
+                    UserCoupon.is_used == False,
                 )
             )
         ).scalar_one_or_none()
-        if coupon is None or coupon.is_used:
-            raise HTTPException(status_code=400, detail="Kupon geçersiz veya zaten kullanılmış")
 
-        # Her sipariş tek bir satıcıya ait — kuponun mağazasına ait olanı bul
-        target = None
-        for o in orders:
-            prod_ids = [it.prod_id for it in o.items if it.prod_id is not None]
-            if not prod_ids:
-                continue
-            seller_id = (
-                await db.execute(select(Prod.seller_id).where(Prod.prod_id == prod_ids[0]))
-            ).scalar_one_or_none()
-            if seller_id == coupon.seller_id:
-                target = o
-                break
-        if target is None:
-            raise HTTPException(
-                status_code=400,
-                detail="Bu kupon sadece kendi mağazasında geçerli; sepette o mağazadan ürün yok",
-            )
+        if coupon is not None:
+            coupon_campaign = await coupon.awaitable_attrs.campaign if hasattr(coupon, "awaitable_attrs") else None
+            seller_id_for_coupon = coupon_campaign.seller_id if coupon_campaign else None
 
-        discount = float(coupon.discount_amount)
-        target.total_price = max(0.0, float(target.total_price) - discount)
-        coupon.is_used = True
-        await db.commit()
+            applied_order = None
+            if seller_id_for_coupon is not None:
+                for o in orders:
+                    first_item = o.items[0] if o.items else None
+                    if first_item:
+                        prod = (await db.execute(select(Prod).where(Prod.prod_id == first_item.prod_id))).scalar_one_or_none()
+                        if prod and prod.seller_id == seller_id_for_coupon:
+                            applied_order = o
+                            break
+            if applied_order is None and orders:
+                applied_order = orders[0]
 
-    # Oyunlaştırma: harcanan her ₺ için 1 puan kazandır (indirim sonrası tutar üzerinden)
-    earned = int(sum(float(o.total_price) for o in orders))
-    if earned > 0:
-        user.points = (user.points or 0) + earned
-        await db.commit()
+            if applied_order is not None:
+                applied_order.total_price = max(0, applied_order.total_price - coupon.discount_amount)
+                coupon.is_used = True
+                await db.commit()
+
     return orders
 
 
-@router.get("", response_model=list[OrderOut])
+@router.get("/my", response_model=list[OrderOut])
 async def list_my_orders(
     db: AsyncSession = Depends(get_db),
     user: AppUser = Depends(require_role(RoleName.CUSTOMER, RoleName.ADMIN)),
 ):
-    cust_id = await _get_cust_id(user, db)
     result = await db.execute(
-        select(CustOrd).options(selectinload(CustOrd.items)).where(CustOrd.cust_id == cust_id)
+        select(CustOrd)
+        .options(selectinload(CustOrd.items))
+        .where(CustOrd.user_id == user.user_id)
+        .order_by(CustOrd.order_date.desc())
     )
     orders = list(result.scalars().all())
     await attach_hidden_flags(db, orders)
@@ -105,11 +96,6 @@ async def list_all_orders(
     db: AsyncSession = Depends(get_db),
     user: AppUser = Depends(require_role(RoleName.SELLER, RoleName.ADMIN)),
 ):
-    # NOT: Bu endpoint "satıcının kendi mağaza siparişleri" ekranını besler.
-    # Admin rolü olsa bile burada HER ZAMAN sadece kullanıcının kendi
-    # ürünlerini içeren siparişler döner — admin'in platform genelinde tüm
-    # siparişleri görebileceği ayrı bir endpoint şu an mevcut değil,
-    # istenirse /admin altına ayrıca eklenebilir.
     query = (
         select(CustOrd)
         .options(selectinload(CustOrd.items))
@@ -161,15 +147,13 @@ async def update_order_visibility(
     db: AsyncSession = Depends(get_db),
     user: AppUser = Depends(require_role(RoleName.CUSTOMER, RoleName.ADMIN)),
 ):
-    
-    cust_id = await _get_cust_id(user, db)
     result = await db.execute(
         select(CustOrd).options(selectinload(CustOrd.items)).where(CustOrd.cust_ord_id == cust_ord_id)
     )
     order = result.scalar_one_or_none()
     if order is None:
         raise HTTPException(status_code=404, detail="Sipariş bulunamadı")
-    if order.cust_id != cust_id:
+    if order.user_id != user.user_id:
         raise HTTPException(status_code=403, detail="Bu sipariş size ait değil")
 
     await set_order_hidden(db, order.cust_ord_id, payload.is_hidden)
@@ -185,14 +169,13 @@ async def cancel_my_order(
     db: AsyncSession = Depends(get_db),
     user: AppUser = Depends(require_role(RoleName.CUSTOMER, RoleName.ADMIN)),
 ):
-    cust_id = await _get_cust_id(user, db)
     result = await db.execute(
         select(CustOrd).options(selectinload(CustOrd.items)).where(CustOrd.cust_ord_id == cust_ord_id)
     )
     order = result.scalar_one_or_none()
     if order is None:
         raise HTTPException(status_code=404, detail="Sipariş bulunamadı")
-    if order.cust_id != cust_id:
+    if order.user_id != user.user_id:
         raise HTTPException(status_code=403, detail="Bu sipariş size ait değil")
     if order.gnl_st_id not in CANCELLABLE_STATUSES:
         raise HTTPException(status_code=400, detail="Bu sipariş artık iptal edilemez")
@@ -205,42 +188,6 @@ async def cancel_my_order(
             prod.stock += item.quantity
 
     order.gnl_st_id = CANCELLED_STATUS
-    # Sipariş için kazanılan puanı geri al (0'ın altına düşürme)
-    refunded_points = int(float(order.total_price))
-    user.points = max(0, (user.points or 0) - refunded_points)
-
-    # Her sipariş kalemi için ayrı bir PROD_CANCEL log'u — rolü sabit "customer" yazmak yerine
-    # kullanıcının gerçekte sahip olduğu role göre çözüyoruz (bu endpoint CUSTOMER/ADMIN alıyor).
-    cancel_spec_result = await db.execute(
-        select(BsnSpec).where(BsnSpec.srt_code == "PROD_CANCEL", BsnSpec.is_active.is_(True))
-    )
-    cancel_spec = cancel_spec_result.scalar_one_or_none()
-    if cancel_spec is not None:
-        actor_role_id = await resolve_role_id(user, db, [RoleName.CUSTOMER, RoleName.ADMIN])
-        for _item in order.items:
-            db.add(
-                BsnInter(
-                    bsn_spec_id=cancel_spec.bsn_spec_id,
-                    app_user_id=user.user_id,
-                    actor_role_id=actor_role_id,
-                    sale_cnl_id=order.sale_cnl_id,
-                )
-            )
-
-    # İptal de bir sipariş aşamasıdır — bildirim olarak da düşsün
-    await create_notification(
-        db, user.user_id, "❌ Sipariş İptal Edildi", f"#{order.cust_ord_id} — Siparişiniz iptal edildi."
-    )
-
     await db.commit()
-
-    # NOT: commit sonrası db.refresh(order) sadece siparişin kendi kolonlarını
-    # tazeler — item.char_values gibi iç içe ilişkiler "expired" kalır ve
-    # response serileştirilirken senkron/greenlet dışı erişim hatası verir
-    # (MissingGreenlet). Bunun yerine tam ağacı eager-load ile yeniden çekiyoruz.
-    result = await db.execute(
-        select(CustOrd).options(selectinload(CustOrd.items)).where(CustOrd.cust_ord_id == cust_ord_id)
-    )
-    cancelled_order = result.scalar_one()
-    await attach_hidden_flags(db, [cancelled_order])
-    return cancelled_order
+    await db.refresh(order, attribute_names=["items"])
+    return order

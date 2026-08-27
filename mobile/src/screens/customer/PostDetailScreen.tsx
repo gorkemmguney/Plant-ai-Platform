@@ -15,6 +15,7 @@ import {
 import { apiClient } from '../../services/apiClient';
 import { colors, fonts, radius, shadow, spacing } from '../../theme/theme';
 import { useAuth } from '../../context/AuthContext';
+import { useI18n } from '../../i18n';
 import { Alert } from 'react-native';
 
 interface Comment {
@@ -45,6 +46,7 @@ interface Post {
 export default function PostDetailScreen({ route, navigation }: any) {
   const { postId } = route.params;
   const { userId, roles } = useAuth();
+  const { t } = useI18n();
 
   const [post, setPost] = useState<Post | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -54,20 +56,20 @@ export default function PostDetailScreen({ route, navigation }: any) {
 
   const handleDeletePost = () => {
     Alert.alert(
-      'Gönderiyi Sil',
-      'Bu gönderiyi topluluktan tamamen silmek istediğinize emin misiniz?',
+      t('postDetail.deleteTitle'),
+      t('postDetail.deleteMsg'),
       [
-        { text: 'Vazgeç', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Sil',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
               await apiClient.delete(`/community/posts/${postId}`);
-              Alert.alert('Silindi', 'Gönderiniz başarıyla silindi.');
+              Alert.alert(t('postDetail.deleted'), t('postDetail.deletedMsg'));
               navigation.goBack();
             } catch (err) {
-              Alert.alert('Hata', 'Gönderi silinirken bir hata oluştu.');
+              Alert.alert(t('common.error'), t('postDetail.deleteFailed'));
             }
           },
         },
@@ -156,7 +158,7 @@ export default function PostDetailScreen({ route, navigation }: any) {
   return (
     <KeyboardAvoidingView
       style={styles.screen}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={0}
     >
       {/* Header */}
@@ -182,7 +184,15 @@ export default function PostDetailScreen({ route, navigation }: any) {
         ListHeaderComponent={
           <View style={styles.postCard}>
             {/* Post Author info */}
-            <View style={styles.authorRow}>
+            <TouchableOpacity
+              style={styles.authorRow}
+              activeOpacity={0.7}
+              onPress={() => {
+                if (post.user_id) {
+                  navigation.navigate('PublicProfile', { userId: post.user_id, authorName: post.author_name });
+                }
+              }}
+            >
               <View style={styles.avatarWrap}>
                 <Text style={styles.avatarText}>{post.author_name.charAt(0).toUpperCase()}</Text>
               </View>
@@ -190,7 +200,8 @@ export default function PostDetailScreen({ route, navigation }: any) {
                 <Text style={styles.authorName}>{post.author_name}</Text>
                 <Text style={styles.postDate}>{formattedDate}</Text>
               </View>
-            </View>
+              <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+            </TouchableOpacity>
 
             {/* Title & Body */}
             <Text style={styles.postTitle}>{post.title}</Text>
@@ -210,17 +221,17 @@ export default function PostDetailScreen({ route, navigation }: any) {
                   color={post.is_liked_by_me ? colors.red : colors.muted}
                 />
                 <Text style={[styles.actionText, post.is_liked_by_me && { color: colors.red }]}>
-                  {post.like_count} Beğeni
+                  {post.like_count} {t('postDetail.likes')}
                 </Text>
               </TouchableOpacity>
 
               <View style={styles.actionBtn}>
                 <Ionicons name="chatbubble-outline" size={20} color={colors.muted} />
-                <Text style={styles.actionText}>{post.comment_count} Yorum</Text>
+                <Text style={styles.actionText}>{post.comment_count} {t('postDetail.comments')}</Text>
               </View>
             </View>
 
-            <Text style={styles.commentsSectionTitle}>Yorumlar ({comments.length})</Text>
+            <Text style={styles.commentsSectionTitle}>{t('postDetail.commentsTitle')} ({comments.length})</Text>
           </View>
         }
         renderItem={({ item }) => {
@@ -248,7 +259,7 @@ export default function PostDetailScreen({ route, navigation }: any) {
                 </View>
                 {isAI && (
                   <View style={styles.aiBadge}>
-                    <Text style={styles.aiBadgeText}>AI Uzmanı</Text>
+                    <Text style={styles.aiBadgeText}>{t('postDetail.aiExpert')}</Text>
                   </View>
                 )}
               </View>
@@ -258,7 +269,7 @@ export default function PostDetailScreen({ route, navigation }: any) {
         }}
         ListEmptyComponent={
           <View style={styles.emptyComments}>
-            <Text style={styles.emptyCommentsText}>Henüz yorum yapılmamış. İlk yorumu sen yaz!</Text>
+            <Text style={styles.emptyCommentsText}>{t('postDetail.noComments')}</Text>
           </View>
         }
       />
@@ -267,7 +278,7 @@ export default function PostDetailScreen({ route, navigation }: any) {
       <View style={styles.inputBar}>
         <TextInput
           style={styles.input}
-          placeholder="Yorumunuzu yazın..."
+          placeholder={t('postDetail.commentPlaceholder')}
           placeholderTextColor={colors.muted2}
           value={commentText}
           onChangeText={setCommentText}

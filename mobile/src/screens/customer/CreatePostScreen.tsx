@@ -15,17 +15,19 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useI18n } from '../../i18n';
 import { apiClient } from '../../services/apiClient';
 import { colors, fonts, radius, shadow, spacing } from '../../theme/theme';
 
 const TAG_OPTIONS = [
-  { key: 'general', label: '🌿 Genel' },
-  { key: 'care', label: '💧 Bakım Önerisi' },
-  { key: 'disease', label: '🩺 AI Teşhis / Hastalık' },
-  { key: 'swap', label: '🔄 Bitki Takası' },
+  { key: 'general', labelKey: 'community.filterGeneral' },
+  { key: 'care', labelKey: 'community.filterCare' },
+  { key: 'disease', labelKey: 'community.filterDisease' },
+  { key: 'swap', labelKey: 'community.filterSwap' },
 ];
 
 export default function CreatePostScreen({ route, navigation }: any) {
+  const { t } = useI18n();
   const { prefilledTitle, prefilledContent, prefilledImageUrl, prefilledTag } = route.params || {};
 
   const [title, setTitle] = useState(prefilledTitle || '');
@@ -39,7 +41,7 @@ export default function CreatePostScreen({ route, navigation }: any) {
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert('İzin Gerekli', 'Fotoğraf seçebilmek için galeri izni vermelisiniz.');
+        Alert.alert(t('imageAnalysis.permissionRequired'), t('createPost.libraryPermMsg'));
         return;
       }
 
@@ -61,7 +63,7 @@ export default function CreatePostScreen({ route, navigation }: any) {
     try {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert('İzin Gerekli', 'Fotoğraf çekebilmek için kamera izni vermelisiniz.');
+        Alert.alert(t('imageAnalysis.permissionRequired'), t('createPost.cameraPermMsg'));
         return;
       }
 
@@ -80,7 +82,7 @@ export default function CreatePostScreen({ route, navigation }: any) {
 
   const handleCreatePost = async () => {
     if (!title.trim() || !content.trim()) {
-      Alert.alert('Eksik Bilgi', 'Lütfen gönderi başlığı ve detaylı açıklama girin.');
+      Alert.alert(t('createPost.missingInfo'), t('createPost.missingInfoMsg'));
       return;
     }
 
@@ -111,11 +113,11 @@ export default function CreatePostScreen({ route, navigation }: any) {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      Alert.alert('Başarılı', 'Gönderiniz başarıyla toplulukta paylaşıldı!');
+      Alert.alert(t('createPost.success'), t('createPost.successMsg'));
       navigation.goBack();
     } catch (err: any) {
       console.log('[CreatePost] Post error:', err);
-      Alert.alert('Hata', err?.response?.data?.detail ?? 'Gönderi oluşturulurken bir hata meydana geldi.');
+      Alert.alert(t('common.error'), err?.response?.data?.detail ?? t('createPost.createFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -131,7 +133,7 @@ export default function CreatePostScreen({ route, navigation }: any) {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} activeOpacity={0.7}>
           <Ionicons name="close" size={22} color={colors.ink} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Yeni Gönderi Oluştur</Text>
+        <Text style={styles.headerTitle}>{t('createPost.title')}</Text>
         <TouchableOpacity
           style={[styles.publishBtn, (!title.trim() || !content.trim() || submitting) && styles.publishBtnDisabled]}
           onPress={handleCreatePost}
@@ -141,24 +143,24 @@ export default function CreatePostScreen({ route, navigation }: any) {
           {submitting ? (
             <ActivityIndicator size="small" color="#ffffff" />
           ) : (
-            <Text style={styles.publishBtnText}>Paylaş</Text>
+            <Text style={styles.publishBtnText}>{t('createPost.publish')}</Text>
           )}
         </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {/* Title Input */}
-        <Text style={styles.label}>Başlık</Text>
+        <Text style={styles.label}>{t('createPost.titleLabel')}</Text>
         <TextInput
           style={styles.inputTitle}
-          placeholder="Örn: Monstera yaprağımda sararma var"
+          placeholder={t('createPost.titlePlaceholder')}
           placeholderTextColor={colors.muted2}
           value={title}
           onChangeText={setTitle}
         />
 
         {/* Category Tag Selection */}
-        <Text style={styles.label}>Kategori / Etiket</Text>
+        <Text style={styles.label}>{t('createPost.categoryLabel')}</Text>
         <View style={styles.tagsRow}>
           {TAG_OPTIONS.map((tag) => {
             const isSelected = selectedTag === tag.key;
@@ -173,7 +175,7 @@ export default function CreatePostScreen({ route, navigation }: any) {
                 activeOpacity={0.8}
               >
                 <Text style={[styles.tagOptionText, isSelected && styles.tagOptionTextActive]}>
-                  {tag.label}
+                  {t(tag.labelKey)}
                 </Text>
               </TouchableOpacity>
             );
@@ -181,10 +183,10 @@ export default function CreatePostScreen({ route, navigation }: any) {
         </View>
 
         {/* Content Input */}
-        <Text style={styles.label}>Açıklama & Detaylar</Text>
+        <Text style={styles.label}>{t('createPost.contentLabel')}</Text>
         <TextInput
           style={styles.inputContent}
-          placeholder="Bitkinizin durumu, ne sıklıkla suladığınız veya sormak istediğiniz sorular..."
+          placeholder={t('createPost.contentPlaceholder')}
           placeholderTextColor={colors.muted2}
           value={content}
           onChangeText={setContent}
@@ -194,7 +196,7 @@ export default function CreatePostScreen({ route, navigation }: any) {
         />
 
         {/* Photo Attachment Section */}
-        <Text style={styles.label}>Görsel Ekle (İsteğe Bağlı)</Text>
+        <Text style={styles.label}>{t('createPost.imageLabel')}</Text>
         {imageUri ? (
           <View style={styles.imagePreviewWrap}>
             <Image source={{ uri: imageUri }} style={styles.imagePreview} resizeMode="cover" />
@@ -206,11 +208,11 @@ export default function CreatePostScreen({ route, navigation }: any) {
           <View style={styles.photoActionRow}>
             <TouchableOpacity style={styles.photoBtn} onPress={handlePickImage} activeOpacity={0.8}>
               <Ionicons name="images-outline" size={22} color={colors.primaryDeep} />
-              <Text style={styles.photoBtnText}>Galeriden Seç</Text>
+              <Text style={styles.photoBtnText}>{t('createPost.pickGallery')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.photoBtn} onPress={handleTakeImage} activeOpacity={0.8}>
               <Ionicons name="camera-outline" size={22} color={colors.primaryDeep} />
-              <Text style={styles.photoBtnText}>Fotoğraf Çek</Text>
+              <Text style={styles.photoBtnText}>{t('createPost.takePhoto')}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -220,11 +222,9 @@ export default function CreatePostScreen({ route, navigation }: any) {
           <View style={styles.aiToggleTextWrap}>
             <View style={styles.aiTitleRow}>
               <Ionicons name="sparkles" size={18} color={colors.primaryDeep} />
-              <Text style={styles.aiToggleTitle}>AI Uzmanı Yanıtı İste</Text>
+              <Text style={styles.aiToggleTitle}>{t('createPost.askAiTitle')}</Text>
             </View>
-            <Text style={styles.aiToggleSub}>
-              Açık olduğunda, Gemini AI Uzmanı gönderinize saniyeler içinde özel tavsiye yorumu yazar.
-            </Text>
+            <Text style={styles.aiToggleSub}>{t('createPost.askAiSub')}</Text>
           </View>
           <Switch
             value={askAi}

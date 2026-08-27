@@ -18,13 +18,14 @@ class Settings(BaseSettings):
     SUPABASE_PUBLISHABLE_KEY: str = ""  
     SUPABASE_SECRET_KEY: str = ""  
 
-    
+    RESEND_API_KEY: str = ""
+
     FIREBASE_CREDENTIALS_PATH: str = "./firebase-service-account.json"
     FIREBASE_PROJECT_ID: str = ""
 
     GEMINI_API_KEY: str = ""
-    GEMINI_VISION_MODEL: str = "gemini-3.1-flash-lite"
-    GEMINI_CHAT_MODEL: str = "gemini-3.1-flash-lite"
+    GEMINI_VISION_MODEL: str = "gemini-3.5-flash-lite"
+    GEMINI_CHAT_MODEL: str = "gemini-3.5-flash-lite"
 
     CORS_ORIGINS: str = "*"
     DEFAULT_ROLE: str = "customer"

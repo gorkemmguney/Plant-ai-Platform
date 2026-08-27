@@ -1,26 +1,40 @@
 {
+  "plantai": {
+    "version": "v1.0.3",
+    "description": "Plantai mobile app"
+  },
   "expo": {
-    "name": "mobile",
+    "name": "PlantOra",
     "slug": "mobile",
-    "version": "1.0.0",
+    "version": "1.0.1",
+    "scheme": "plantai",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
+      "buildNumber": "2",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Hava durumu bilgisini gösterebilmek için konumunuzu kullanıyoruz."
       }
     },
     "android": {
+      "package": "com.mertkapl4nn.mobile",
+      "versionCode": 2,
+      "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#FEFAF8",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"]
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -28,11 +42,26 @@
     "plugins": [
       "expo-font",
       [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#FEFAF8"
+        }
+      ],
+      [
         "expo-location",
         {
           "locationWhenInUsePermission": "Hava durumu bilgisini gösterebilmek için konumunuzu kullanıyoruz."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "c9a62ddd-2f64-4820-ba3a-9b79a3826bfd"
+      }
+    },
+    "owner": "grkem272"
   }
 }

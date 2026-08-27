@@ -9,6 +9,7 @@ from app.models.misc import Notification
 from app.models.order import CustOrd
 from app.models.complaint import Complaint
 from app.models.user import AppUser
+from app.models.customer import Ind, Org
 from app.rbac.roles import RoleName
 from app.schemas.complaint import ComplaintAdminUpdate, ComplaintCreate, ComplaintOut, ComplaintUserReply
 
@@ -31,17 +32,28 @@ async def _to_complaint_out(complaint: Complaint, db: AsyncSession) -> Complaint
     order_price = None
     order_date = None
 
-    user_res = await db.execute(select(AppUser).where(AppUser.user_id == complaint.user_id))
-    user = user_res.scalar_one_or_none()
-    if user:
-        user_name = f"{user.first_name} {user.last_name}".strip()
-        user_email = user.email
+    ind_res = await db.execute(select(Ind).where(Ind.user_id == complaint.user_id))
+    ind = ind_res.scalar_one_or_none()
+    org_res = await db.execute(select(Org).where(Org.user_id == complaint.user_id))
+    org = org_res.scalar_one_or_none()
+    
+    if ind:
+        user_name = f"{ind.first_name or ''} {ind.last_name or ''}".strip() or ind.username
+        user_email = ind.email
+    elif org:
+        user_name = org.store_name or org.company_name
+        user_email = org.email
+        
+    if not user_name:
+        user_name = f"Kullanıcı #{complaint.user_id}"
 
     if complaint.reported_seller_id:
-        seller_res = await db.execute(select(AppUser).where(AppUser.user_id == complaint.reported_seller_id))
-        seller = seller_res.scalar_one_or_none()
-        if seller:
-            reported_seller_name = f"{seller.first_name} {seller.last_name}".strip()
+        seller_org_res = await db.execute(select(Org).where(Org.user_id == complaint.reported_seller_id))
+        seller_org = seller_org_res.scalar_one_or_none()
+        if seller_org:
+            reported_seller_name = seller_org.store_name or seller_org.company_name
+        else:
+            reported_seller_name = f"Satıcı #{complaint.reported_seller_id}"
 
     if complaint.prod_id:
         prod_res = await db.execute(select(Prod).where(Prod.prod_id == complaint.prod_id))

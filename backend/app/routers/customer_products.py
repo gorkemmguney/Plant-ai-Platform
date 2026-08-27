@@ -6,7 +6,6 @@ from sqlalchemy.orm import selectinload
 
 from app.core.security import get_current_user, require_role
 from app.db.session import get_db
-from app.models.customer import Cust
 from app.models.catalog import ProdSpec
 from app.models.customer_product import CustProd, CustProdCareLog, CustProdGrowthLog
 from app.models.user import AppUser
@@ -24,17 +23,6 @@ from app.schemas.customer_product import (
 router = APIRouter(prefix="/customer-products", tags=["customer-products"])
 
 
-async def _get_cust_id(user: AppUser, db: AsyncSession) -> int:
-    result = await db.execute(select(Cust).where(Cust.user_id == user.user_id))
-    cust = result.scalar_one_or_none()
-    if cust is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Bu kullanıcı için müşteri profili bulunamadı"
-        )
-    return cust.cust_id
-
-
 def _map_to_out(cp: CustProd) -> CustProdOut:
     # Sort logs by created_at descending
     sorted_care = sorted(cp.care_logs, key=lambda l: l.created_at, reverse=True) if cp.care_logs else []
@@ -42,7 +30,8 @@ def _map_to_out(cp: CustProd) -> CustProdOut:
 
     return CustProdOut(
         cust_prod_id=cp.cust_prod_id,
-        cust_id=cp.cust_id,
+        user_id=cp.user_id,
+        cust_id=cp.user_id,
         prod_spec_id=cp.prod_spec_id,
         name=cp.name,
         description=cp.description,
@@ -69,9 +58,6 @@ async def create_customer_product(
     db: AsyncSession = Depends(get_db),
     user: AppUser = Depends(require_role(RoleName.CUSTOMER, RoleName.ADMIN))
 ):
-    cust_id = await _get_cust_id(user, db)
-    
-    # Verify prod_spec exists
     spec_res = await db.execute(select(ProdSpec).where(ProdSpec.prod_spec_id == payload.prod_spec_id))
     spec = spec_res.scalar_one_or_none()
     if not spec:
@@ -81,7 +67,7 @@ async def create_customer_product(
         )
 
     new_prod = CustProd(
-        cust_id=cust_id,
+        user_id=user.user_id,
         prod_spec_id=payload.prod_spec_id,
         name=payload.name.strip(),
         description=payload.description.strip() if payload.description else None,
@@ -95,7 +81,6 @@ async def create_customer_product(
     db.add(new_prod)
     await db.commit()
     
-    # Reload with specification and log relationships
     res = await db.execute(
         select(CustProd)
         .options(
@@ -114,8 +99,6 @@ async def list_customer_products(
     db: AsyncSession = Depends(get_db),
     user: AppUser = Depends(require_role(RoleName.CUSTOMER, RoleName.ADMIN))
 ):
-    cust_id = await _get_cust_id(user, db)
-    
     res = await db.execute(
         select(CustProd)
         .options(
@@ -123,7 +106,7 @@ async def list_customer_products(
             selectinload(CustProd.care_logs),
             selectinload(CustProd.growth_logs)
         )
-        .where(CustProd.cust_id == cust_id)
+        .where(CustProd.user_id == user.user_id)
         .order_by(CustProd.created_at.desc())
     )
     cps = res.scalars().all()
@@ -136,8 +119,6 @@ async def get_customer_product_detail(
     db: AsyncSession = Depends(get_db),
     user: AppUser = Depends(require_role(RoleName.CUSTOMER, RoleName.ADMIN))
 ):
-    cust_id = await _get_cust_id(user, db)
-    
     res = await db.execute(
         select(CustProd)
         .options(
@@ -145,7 +126,7 @@ async def get_customer_product_detail(
             selectinload(CustProd.care_logs),
             selectinload(CustProd.growth_logs)
         )
-        .where(CustProd.cust_prod_id == cust_prod_id, CustProd.cust_id == cust_id)
+        .where(CustProd.cust_prod_id == cust_prod_id, CustProd.user_id == user.user_id)
     )
     cp = res.scalar_one_or_none()
     if not cp:
@@ -163,8 +144,6 @@ async def update_customer_product(
     db: AsyncSession = Depends(get_db),
     user: AppUser = Depends(require_role(RoleName.CUSTOMER, RoleName.ADMIN))
 ):
-    cust_id = await _get_cust_id(user, db)
-    
     res = await db.execute(
         select(CustProd)
         .options(
@@ -172,7 +151,7 @@ async def update_customer_product(
             selectinload(CustProd.care_logs),
             selectinload(CustProd.growth_logs)
         )
-        .where(CustProd.cust_prod_id == cust_prod_id, CustProd.cust_id == cust_id)
+        .where(CustProd.cust_prod_id == cust_prod_id, CustProd.user_id == user.user_id)
     )
     cp = res.scalar_one_or_none()
     if not cp:
@@ -201,10 +180,8 @@ async def delete_customer_product(
     db: AsyncSession = Depends(get_db),
     user: AppUser = Depends(require_role(RoleName.CUSTOMER, RoleName.ADMIN))
 ):
-    cust_id = await _get_cust_id(user, db)
-    
     res = await db.execute(
-        select(CustProd).where(CustProd.cust_prod_id == cust_prod_id, CustProd.cust_id == cust_id)
+        select(CustProd).where(CustProd.cust_prod_id == cust_prod_id, CustProd.user_id == user.user_id)
     )
     cp = res.scalar_one_or_none()
     if not cp:
@@ -224,8 +201,6 @@ async def water_customer_product(
     db: AsyncSession = Depends(get_db),
     user: AppUser = Depends(require_role(RoleName.CUSTOMER, RoleName.ADMIN))
 ):
-    cust_id = await _get_cust_id(user, db)
-    
     res = await db.execute(
         select(CustProd)
         .options(
@@ -233,7 +208,7 @@ async def water_customer_product(
             selectinload(CustProd.care_logs),
             selectinload(CustProd.growth_logs)
         )
-        .where(CustProd.cust_prod_id == cust_prod_id, CustProd.cust_id == cust_id)
+        .where(CustProd.cust_prod_id == cust_prod_id, CustProd.user_id == user.user_id)
     )
     cp = res.scalar_one_or_none()
     if not cp:
@@ -245,7 +220,6 @@ async def water_customer_product(
     now_time = datetime.now(timezone.utc)
     cp.last_watered_at = now_time
     
-    # Log care action
     db.add(
         CustProdCareLog(
             cust_prod_id=cust_prod_id,
@@ -265,8 +239,6 @@ async def add_care_log(
     db: AsyncSession = Depends(get_db),
     user: AppUser = Depends(require_role(RoleName.CUSTOMER, RoleName.ADMIN))
 ):
-    cust_id = await _get_cust_id(user, db)
-    
     res = await db.execute(
         select(CustProd)
         .options(
@@ -274,7 +246,7 @@ async def add_care_log(
             selectinload(CustProd.care_logs),
             selectinload(CustProd.growth_logs)
         )
-        .where(CustProd.cust_prod_id == cust_prod_id, CustProd.cust_id == cust_id)
+        .where(CustProd.cust_prod_id == cust_prod_id, CustProd.user_id == user.user_id)
     )
     cp = res.scalar_one_or_none()
     if not cp:
@@ -291,7 +263,6 @@ async def add_care_log(
     elif payload.care_type == "repot":
         cp.last_repotted_at = now_time
 
-    # Add log
     db.add(
         CustProdCareLog(
             cust_prod_id=cust_prod_id,
@@ -311,8 +282,6 @@ async def add_growth_log(
     db: AsyncSession = Depends(get_db),
     user: AppUser = Depends(require_role(RoleName.CUSTOMER, RoleName.ADMIN))
 ):
-    cust_id = await _get_cust_id(user, db)
-    
     res = await db.execute(
         select(CustProd)
         .options(
@@ -320,7 +289,7 @@ async def add_growth_log(
             selectinload(CustProd.care_logs),
             selectinload(CustProd.growth_logs)
         )
-        .where(CustProd.cust_prod_id == cust_prod_id, CustProd.cust_id == cust_id)
+        .where(CustProd.cust_prod_id == cust_prod_id, CustProd.user_id == user.user_id)
     )
     cp = res.scalar_one_or_none()
     if not cp:

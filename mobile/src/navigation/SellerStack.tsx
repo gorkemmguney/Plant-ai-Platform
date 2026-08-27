@@ -9,6 +9,12 @@ import SellerAIReportScreen from '../screens/seller/SellerAIReportScreen';
 import SellerReviewsScreen from '../screens/seller/SellerReviewsScreen';
 import SettingsScreen from '../screens/seller/SettingsScreen';
 import SupportScreen from '../screens/shared/SupportScreen';
+import AppSettingsScreen from '../screens/shared/AppSettingsScreen';
+import SellerChatListScreen from '../screens/customer/SellerChatListScreen';
+import SellerChatDetailScreen from '../screens/customer/SellerChatDetailScreen';
+import UserProfileScreen from '../screens/shared/UserProfileScreen';
+import PublicProfileScreen from '../screens/shared/PublicProfileScreen';
+import { useI18n } from '../i18n';
 import { colors, fonts } from '../theme/theme';
 
 export type SellerTabParamList = {
@@ -22,6 +28,16 @@ export type SellerTabParamList = {
 export type SellerStackParamList = {
   Tabs: undefined;
   Support: { sourcePanel?: 'customer' | 'seller' } | undefined;
+  AppSettings: undefined;
+  SellerChatList: undefined;
+  SellerChatDetail: {
+    interactionId: number;
+    partnerName: string;
+    prodName?: string;
+    prodImage?: string;
+  };
+  UserProfile: undefined;
+  PublicProfile: { userId: number };
 };
 
 const Tab = createBottomTabNavigator<SellerTabParamList>();
@@ -35,15 +51,23 @@ const icons: Record<keyof SellerTabParamList, { active: any; inactive: any }> = 
   Settings: { active: 'settings', inactive: 'settings-outline' },
 };
 
-const labels: Record<keyof SellerTabParamList, string> = {
-  Products: 'Ürünler',
-  Orders: 'Siparişler',
-  Reviews: 'Yorumlar',
-  AIReport: 'AI Rapor',
-  Settings: 'Ayarlar',
+const labelKeys: Record<keyof SellerTabParamList, string> = {
+  Products: 'sellerTab.products',
+  Orders: 'sellerTab.orders',
+  Reviews: 'sellerTab.reviews',
+  AIReport: 'sellerTab.aiReport',
+  Settings: 'sellerTab.settings',
 };
 
 function SellerTabNavigator() {
+  const { t } = useI18n();
+  const labels: Record<keyof SellerTabParamList, string> = {
+    Products: t(labelKeys.Products),
+    Orders: t(labelKeys.Orders),
+    Reviews: t(labelKeys.Reviews),
+    AIReport: t(labelKeys.AIReport),
+    Settings: t(labelKeys.Settings),
+  };
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -79,6 +103,11 @@ export default function SellerStack() {
     <Stack.Navigator screenOptions={{ headerBackButtonDisplayMode: 'minimal' }}>
       <Stack.Screen name="Tabs" component={SellerTabNavigator} options={{ headerShown: false }} />
       <Stack.Screen name="Support" component={SupportScreen} options={{ headerShown: false }} initialParams={{ sourcePanel: 'seller' }} />
+      <Stack.Screen name="AppSettings" component={AppSettingsScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="SellerChatList" component={SellerChatListScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="SellerChatDetail" component={SellerChatDetailScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="UserProfile" component={UserProfileScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="PublicProfile" component={PublicProfileScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }

@@ -5,8 +5,8 @@ import { createClient } from '@supabase/supabase-js';
 // Bu "publishable key" bir gizli anahtar DEĞİLDİR — Firebase'deki apiKey gibi,
 // istemci tarafında bulunması güvenlidir. Gerçek yetkilendirme Supabase'in
 // Row Level Security + backend'deki JWT doğrulaması ile sağlanır.
-const SUPABASE_URL = 'https://pbxlbqjbmdnxbrhvscev.supabase.co';
-const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_rGKK5sn8zPcoHHRPLmhG3A_tOPwWzVo';
+export const SUPABASE_URL = 'https://pbxlbqjbmdnxbrhvscev.supabase.co';
+export const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_rGKK5sn8zPcoHHRPLmhG3A_tOPwWzVo';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {

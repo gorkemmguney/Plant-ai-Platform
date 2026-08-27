@@ -16,6 +16,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PENDING_ROLE_PREFIX } from '../../constants/auth';
 import { useAuth } from '../../context/AuthContext';
+import { useI18n } from '../../i18n';
 import { supabase } from '../../lib/supabaseClient';
 import { apiClient } from '../../services/apiClient';
 import { colors, fonts, radius, spacing } from '../../theme/theme';
@@ -26,52 +27,91 @@ type AccountType = 'customer' | 'seller';
 
 export default function RegisterScreen({ navigation }: any) {
   const { refreshProfile } = useAuth();
+  const { t } = useI18n();
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [phone, setPhone] = useState('');
+  const [storeName, setStoreName] = useState('');
+  const [storeAddress, setStoreAddress] = useState('');
+  const [bankIban, setBankIban] = useState('');
   const [role, setRole] = useState<AccountType>('customer');
   const [loading, setLoading] = useState(false);
 
   const handleRegister = async () => {
+    // Müşteride ad/soyad, satıcıda mağaza adı zorunlu
+    if (role === 'customer' && (!firstName.trim() || !lastName.trim())) {
+      Alert.alert(t('register.failed'), t('register.nameRequired'));
+      return;
+    }
+    if (role === 'seller' && !storeName.trim()) {
+      Alert.alert(t('register.failed'), t('register.storeNameRequired'));
+      return;
+    }
+    if (!email.trim() && !phone.trim()) {
+      Alert.alert(t('register.failed'), t('register.emailOrPhoneRequired'));
+      return;
+    }
     setLoading(true);
     try {
       const trimmedEmail = email.trim();
-      const { data, error } = await supabase.auth.signUp({ email: trimmedEmail, password });
+      const { data, error } = await supabase.auth.signUp({
+        email: trimmedEmail,
+        password,
+        options: {
+          data: {
+            first_name: firstName.trim(),
+            last_name: lastName.trim(),
+            phone_number: phone.trim(),
+            store_name: storeName.trim(),
+            store_address: storeAddress.trim(),
+            bank_iban: bankIban.trim(),
+          },
+        },
+      });
       if (error) throw error;
 
       if (data.session) {
-        // "Confirm email" kapalı — hesap anında aktif, rolü şimdi bildirebiliriz.
         try {
+          await supabase.auth.setSession(data.session);
           await apiClient.post('/auth/select-role', { role_name: role });
+          await apiClient.patch('/auth/me', {
+            first_name: firstName.trim(),
+            last_name: lastName.trim(),
+            email: trimmedEmail,
+            phone_number: phone.trim(),
+            store_name: storeName.trim(),
+            store_address: storeAddress.trim(),
+            bank_iban: bankIban.trim(),
+          }).catch(() => {});
+
           if (role === 'seller') {
-            Alert.alert(
-              'Satıcı başvurun alındı',
-              'Hesabın oluşturuldu. Satıcı paneline erişebilmen için başvurunun bir admin tarafından onaylanması gerekiyor. Onaya kadar müşteri olarak devam edebilirsin.'
-            );
+            Alert.alert(t('register.sellerApplied'), t('register.sellerAppliedMsg'));
           }
           await refreshProfile();
         } catch (roleErr: any) {
-          console.log('[Register] rol seçimi gönderilemedi:', roleErr?.message ?? roleErr);
+          console.log('[Register] rol seçimi ve profil senkronize edilemedi:', roleErr?.message ?? roleErr);
         }
-      } else {
-        // "Confirm email" açık — henüz oturum yok. Seçilen rolü cihazda sakla,
-        // kullanıcı e-postasını onaylayıp ilk kez giriş yaptığında
-        // AuthContext bu rolü otomatik olarak backend'e bildirecek.
+      }
+
+ else {
         await AsyncStorage.setItem(`${PENDING_ROLE_PREFIX}${trimmedEmail.toLowerCase()}`, role);
         Alert.alert(
-          'E-postanı onayla',
-          `${trimmedEmail} adresine bir onay bağlantısı gönderdik. Onayladıktan sonra giriş yapabilirsin.`
+          t('register.confirmEmail'),
+          `${t('register.confirmEmailPre')}${trimmedEmail}${t('register.confirmEmailPost')}`
         );
         navigation.navigate('Login');
       }
     } catch (err: any) {
-      Alert.alert('Kayıt başarısız', err.message);
+      Alert.alert(t('register.failed'), err.message);
     } finally {
       setLoading(false);
     }
   };
 
   const handleMicrosoftLogin = () => {
-    Alert.alert('Yakında', 'Microsoft ile giriş entegrasyonu ekleniyor.');
+    Alert.alert(t('login.soon'), t('login.soonMsg'));
   };
 
   return (
@@ -85,34 +125,13 @@ export default function RegisterScreen({ navigation }: any) {
             <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} activeOpacity={0.7}>
               <Text style={styles.backIcon}>‹</Text>
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Kayıt Ol</Text>
+            <Text style={styles.headerTitle}>{t('register.header')}</Text>
             <View style={styles.backButton} />
           </View>
 
-          <Text style={styles.title}>Hesabını oluştur</Text>
+          <Text style={styles.title}>{t('register.title')}</Text>
 
-          <Text style={styles.label}>E-posta adresi</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="ornek@email.com"
-            placeholderTextColor={colors.muted2}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            value={email}
-            onChangeText={setEmail}
-          />
-
-          <Text style={styles.label}>Şifre</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="En az 6 karakter"
-            placeholderTextColor={colors.muted2}
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-          />
-
-          <Text style={styles.label}>Hesap türü</Text>
+          <Text style={styles.label}>{t('register.accountType')}</Text>
           <View style={styles.roleRow}>
             {(['customer', 'seller'] as AccountType[]).map((r) => {
               const active = role === r;
@@ -124,37 +143,125 @@ export default function RegisterScreen({ navigation }: any) {
                   activeOpacity={0.8}
                 >
                   <Text style={[styles.roleOptionText, active && styles.roleOptionTextActive]}>
-                    {r === 'customer' ? 'Müşteri' : 'Satıcı'}
+                    {r === 'customer' ? t('register.customer') : t('register.seller')}
                   </Text>
                   <Text style={[styles.roleOptionSub, active && styles.roleOptionSubActive]}>
-                    {r === 'customer' ? 'Ürün satın al' : 'Ürün sat (onay gerekir)'}
+                    {r === 'customer' ? t('register.customerSub') : t('register.sellerSub')}
                   </Text>
                 </TouchableOpacity>
               );
             })}
           </View>
 
+          {/* Müşteride ad/soyad, satıcıda mağaza bilgileri gösterilir */}
+          {role === 'customer' ? (
+            <View style={styles.nameRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.label}>{t('register.firstNameLabel')}</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder={t('register.firstNamePlaceholder')}
+                  placeholderTextColor={colors.muted2}
+                  value={firstName}
+                  onChangeText={setFirstName}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.label}>{t('register.lastNameLabel')}</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder={t('register.lastNamePlaceholder')}
+                  placeholderTextColor={colors.muted2}
+                  value={lastName}
+                  onChangeText={setLastName}
+                />
+              </View>
+            </View>
+          ) : (
+            <View>
+              <Text style={styles.label}>{t('register.storeNameLabel')} *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder={t('register.storeNamePlaceholder')}
+                placeholderTextColor={colors.muted2}
+                value={storeName}
+                onChangeText={setStoreName}
+              />
+
+              <Text style={styles.label}>{t('register.storeAddressLabel')}</Text>
+              <TextInput
+                style={styles.input}
+                placeholder={t('register.storeAddressPlaceholder')}
+                placeholderTextColor={colors.muted2}
+                value={storeAddress}
+                onChangeText={setStoreAddress}
+              />
+
+              <Text style={styles.label}>{t('register.bankIbanLabel')}</Text>
+              <TextInput
+                style={styles.input}
+                placeholder={t('register.bankIbanPlaceholder')}
+                placeholderTextColor={colors.muted2}
+                autoCapitalize="characters"
+                value={bankIban}
+                onChangeText={setBankIban}
+              />
+            </View>
+          )}
+
+          <Text style={styles.label}>{t('register.emailLabel')}</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="ornek@email.com"
+            placeholderTextColor={colors.muted2}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            value={email}
+            onChangeText={setEmail}
+          />
+
+          <Text style={styles.label}>{t('register.phoneLabel')}</Text>
+          <TextInput
+            style={styles.input}
+            placeholder={t('register.phonePlaceholder')}
+            placeholderTextColor={colors.muted2}
+            keyboardType="phone-pad"
+            value={phone}
+            onChangeText={setPhone}
+          />
+
+          <Text style={styles.label}>{t('register.passwordLabel')}</Text>
+          <TextInput
+            style={styles.input}
+            placeholder={t('register.passwordPlaceholder')}
+            placeholderTextColor={colors.muted2}
+            secureTextEntry
+            value={password}
+            onChangeText={setPassword}
+          />
+
+
           {loading ? (
             <ActivityIndicator color={colors.buttonPrimary} style={{ marginTop: spacing.lg }} />
           ) : (
             <TouchableOpacity style={styles.primaryButton} onPress={handleRegister} activeOpacity={0.85}>
-              <Text style={styles.primaryButtonText}>Devam Et</Text>
+              <Text style={styles.primaryButtonText}>{t('register.continue')}</Text>
             </TouchableOpacity>
           )}
 
           <View style={styles.dividerRow}>
             <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>veya</Text>
+            <Text style={styles.dividerText}>{t('common.or')}</Text>
             <View style={styles.dividerLine} />
           </View>
 
           <TouchableOpacity style={styles.oauthButton} onPress={handleMicrosoftLogin} activeOpacity={0.85}>
-            <Text style={styles.oauthButtonText}>Microsoft ile devam et</Text>
+            <Text style={styles.oauthButtonText}>{t('register.microsoft')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.footerLink} onPress={() => navigation.navigate('Login')}>
             <Text style={styles.footerLinkText}>
-              Zaten hesabın var mı? <Text style={styles.footerLinkBold}>Giriş yap</Text>
+              {t('register.haveAccount')}<Text style={styles.footerLinkBold}>{t('register.signIn')}</Text>
             </Text>
           </TouchableOpacity>
         </ScrollView>
@@ -165,7 +272,7 @@ export default function RegisterScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  hero: { height: height * 0.26, paddingTop: 56, paddingHorizontal: spacing.lg },
+  hero: { height: height * 0.15, paddingTop: 56, paddingHorizontal: spacing.lg },
   logoRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   logoMark: {
     width: 24,
@@ -202,6 +309,7 @@ const styles = StyleSheet.create({
   backIcon: { fontSize: 20, color: colors.ink, marginTop: -2 },
   headerTitle: { fontFamily: fonts.sansBold, fontSize: 15, color: colors.ink },
   title: { fontFamily: fonts.display, fontSize: 26, color: colors.ink, marginBottom: spacing.xl },
+  nameRow: { flexDirection: 'row', gap: spacing.sm },
   label: { fontFamily: fonts.sansMedium, fontSize: 12.5, color: colors.muted, marginBottom: spacing.xs },
   input: {
     borderWidth: 1,
@@ -216,7 +324,22 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
   },
   roleRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
+  sellerBox: {
+    backgroundColor: colors.bgAlt,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  sectionTitle: {
+    fontFamily: fonts.sansBold,
+    fontSize: 14,
+    color: colors.ink,
+    marginBottom: spacing.md,
+  },
   roleOption: {
+
     flex: 1,
     borderWidth: 1,
     borderColor: colors.border,

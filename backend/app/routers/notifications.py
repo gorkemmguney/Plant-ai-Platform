@@ -6,8 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import get_current_user
 from app.db.session import get_db
-from app.models.customer import Cust
 from app.models.customer_product import CustProd
+
 from app.models.misc import Notification
 from app.models.user import AppUser
 from app.schemas.notification import NotificationOut
@@ -18,13 +18,10 @@ router = APIRouter(prefix="/notifications", tags=["notifications"])
 async def _generate_care_reminders(db: AsyncSession, user: AppUser) -> None:
     """Kullanıcının bahçesinde sulama/gübreleme vakti gelmiş bitkiler için bildirim
     oluşturur. Aynı bildirim aynı gün tekrar üretilmez (mükerrer engellenir)."""
-    cust = (await db.execute(select(Cust).where(Cust.user_id == user.user_id))).scalar_one_or_none()
-    if cust is None:
-        return
-
-    plants = (await db.execute(select(CustProd).where(CustProd.cust_id == cust.cust_id))).scalars().all()
+    plants = (await db.execute(select(CustProd).where(CustProd.user_id == user.user_id))).scalars().all()
     if not plants:
         return
+
 
     now = datetime.now(timezone.utc)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)

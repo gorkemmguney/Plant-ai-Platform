@@ -11,7 +11,8 @@ class CustomerAddress(Base):
     __tablename__ = "customer_address"
 
     address_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    cust_id: Mapped[int] = mapped_column(ForeignKey("cust.cust_id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("app_user.user_id", ondelete="CASCADE"), nullable=False)
+
     title: Mapped[str] = mapped_column(String(50), nullable=False)  # "Ev", "İş" vb.
     il_id: Mapped[int] = mapped_column(ForeignKey("il.il_id"), nullable=False)
     ilce_id: Mapped[int] = mapped_column(ForeignKey("ilce.ilce_id"), nullable=False)

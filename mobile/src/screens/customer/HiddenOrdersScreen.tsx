@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useI18n } from '../../i18n';
 import { apiClient } from '../../services/apiClient';
 import { colors, fonts, radius, shadow, spacing } from '../../theme/theme';
 
@@ -22,15 +23,16 @@ interface Order {
   items: { quantity: number }[];
 }
 
-const statusLabels: Record<number, string> = {
-  5: 'Alındı',
-  6: 'Hazırlanıyor',
-  7: 'Kargoda',
-  8: 'Teslim edildi',
-  9: 'İptal edildi',
+const statusKeys: Record<number, string> = {
+  5: 'orderStatus.5',
+  6: 'orderStatus.6',
+  7: 'orderStatus.7',
+  8: 'orderStatus.8',
+  9: 'orderStatus.9',
 };
 
 export default function HiddenOrdersScreen({ navigation }: any) {
+  const { t } = useI18n();
   const [unlocked, setUnlocked] = useState(false);
   const [password, setPassword] = useState('');
   const [verifying, setVerifying] = useState(false);
@@ -52,10 +54,10 @@ export default function HiddenOrdersScreen({ navigation }: any) {
   const loadHidden = useCallback(async () => {
     setLoadingOrders(true);
     try {
-      const { data } = await apiClient.get<Order[]>('/orders');
+      const { data } = await apiClient.get<Order[]>('/orders/my');
       setOrders(data.filter((o) => o.is_hidden));
     } catch (err: any) {
-      Alert.alert('Hata', err?.response?.data?.detail ?? 'Siparişler yüklenemedi.');
+      Alert.alert(t('common.error'), err?.response?.data?.detail ?? t('orders.loadFailed'));
     } finally {
       setLoadingOrders(false);
     }
@@ -63,7 +65,7 @@ export default function HiddenOrdersScreen({ navigation }: any) {
 
   const handleUnlock = async () => {
     if (!password) {
-      Alert.alert('Şifre gerekli', 'Devam etmek için hesap şifreni gir.');
+      Alert.alert(t('hidden.passwordRequired'), t('hidden.passwordRequiredMsg'));
       return;
     }
     setVerifying(true);
@@ -73,7 +75,7 @@ export default function HiddenOrdersScreen({ navigation }: any) {
       setUnlocked(true);
       await loadHidden();
     } catch (err: any) {
-      Alert.alert('Doğrulanamadı', err?.response?.data?.detail ?? 'Şifre yanlış.');
+      Alert.alert(t('hidden.verifyFailed'), err?.response?.data?.detail ?? t('hidden.wrongPassword'));
     } finally {
       setVerifying(false);
     }
@@ -85,7 +87,7 @@ export default function HiddenOrdersScreen({ navigation }: any) {
       await apiClient.patch(`/orders/${id}/visibility`, { is_hidden: false });
       setOrders((prev) => prev.filter((o) => o.cust_ord_id !== id));
     } catch (err: any) {
-      Alert.alert('İşlem başarısız', err?.response?.data?.detail ?? 'Sipariş geri getirilemedi.');
+      Alert.alert(t('orders.actionFailed'), err?.response?.data?.detail ?? t('hidden.restoreFailed'));
     } finally {
       setRestoringId(null);
     }
@@ -98,14 +100,14 @@ export default function HiddenOrdersScreen({ navigation }: any) {
           <View style={styles.lockIconWrap}>
             <Ionicons name="lock-closed" size={28} color={colors.primaryDeep} />
           </View>
-          <Text style={styles.lockTitle}>Kimlik Doğrulama</Text>
-          <Text style={styles.lockSub}>Gizlenmiş siparişleri görüntülemek için hesap şifreni gir.</Text>
+          <Text style={styles.lockTitle}>{t('hidden.authTitle')}</Text>
+          <Text style={styles.lockSub}>{t('hidden.authSub')}</Text>
 
           <TextInput
             style={styles.input}
             value={password}
             onChangeText={setPassword}
-            placeholder="Şifren"
+            placeholder={t('hidden.passwordPlaceholder')}
             placeholderTextColor={colors.muted2}
             secureTextEntry
             autoFocus
@@ -116,7 +118,7 @@ export default function HiddenOrdersScreen({ navigation }: any) {
             {verifying ? (
               <ActivityIndicator size="small" color={colors.buttonPrimaryText} />
             ) : (
-              <Text style={styles.unlockBtnText}>Doğrula ve Görüntüle</Text>
+              <Text style={styles.unlockBtnText}>{t('hidden.verifyAndView')}</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -127,8 +129,8 @@ export default function HiddenOrdersScreen({ navigation }: any) {
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Gizli Siparişler</Text>
-        <Text style={styles.headerSub}>Bu ekrandan çıktığında tekrar şifre istenecek.</Text>
+        <Text style={styles.headerTitle}>{t('hidden.title')}</Text>
+        <Text style={styles.headerSub}>{t('hidden.headerSub')}</Text>
       </View>
 
       {loadingOrders ? (
@@ -140,7 +142,7 @@ export default function HiddenOrdersScreen({ navigation }: any) {
           data={orders}
           keyExtractor={(item) => String(item.cust_ord_id)}
           contentContainerStyle={styles.list}
-          ListEmptyComponent={<Text style={styles.emptyText}>Gizlenmiş siparişin yok.</Text>}
+          ListEmptyComponent={<Text style={styles.emptyText}>{t('orders.emptyHidden')}</Text>}
           renderItem={({ item }) => {
             const date = new Date(item.order_date);
             const dateText = Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('tr-TR');
@@ -148,13 +150,13 @@ export default function HiddenOrdersScreen({ navigation }: any) {
             return (
               <View style={styles.card}>
                 <View style={styles.cardTop}>
-                  <Text style={styles.orderId}>Sipariş #{item.cust_ord_id}</Text>
+                  <Text style={styles.orderId}>{t('orders.orderPrefix')}#{item.cust_ord_id}</Text>
                   <Text style={styles.total}>₺{Number(item.total_price).toFixed(2)}</Text>
                 </View>
                 <Text style={styles.meta}>
                   {dateText}
                   {dateText ? ' · ' : ''}
-                  {itemCount} ürün · {statusLabels[item.gnl_st_id] ?? 'Durum bilinmiyor'}
+                  {itemCount} {t('common.items')} · {statusKeys[item.gnl_st_id] ? t(statusKeys[item.gnl_st_id]) : t('orders.statusUnknown')}
                 </Text>
                 <TouchableOpacity
                   style={styles.restoreBtn}
@@ -165,7 +167,7 @@ export default function HiddenOrdersScreen({ navigation }: any) {
                   {restoringId === item.cust_ord_id ? (
                     <ActivityIndicator size="small" color={colors.buttonPrimaryText} />
                   ) : (
-                    <Text style={styles.restoreBtnText}>↩︎ Geri Getir</Text>
+                    <Text style={styles.restoreBtnText}>{t('orders.restore')}</Text>
                   )}
                 </TouchableOpacity>
               </View>

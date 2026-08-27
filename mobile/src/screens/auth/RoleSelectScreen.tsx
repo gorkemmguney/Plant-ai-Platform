@@ -3,24 +3,26 @@ import { supabase } from '../../lib/supabaseClient';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
+import { useI18n } from '../../i18n';
 import { colors, fonts, radius, shadow, spacing } from '../../theme/theme';
 
 type Role = 'admin' | 'seller' | 'customer';
 
-const roleInfo: Record<Role, { title: string; subtitle: string; icon: keyof typeof Ionicons.glyphMap }> = {
-  admin: { title: 'Admin Paneli', subtitle: 'Kullanıcılar, onaylar, AI teşhis ve raporlar', icon: 'shield-checkmark' },
-  seller: { title: 'Satıcı Paneli', subtitle: 'Ürünlerini ve siparişlerini yönet', icon: 'storefront' },
-  customer: { title: 'Müşteri', subtitle: 'Alışveriş yap, AI ile bitkini analiz et', icon: 'leaf' },
+const roleInfo: Record<Role, { titleKey: string; subKey: string; icon: keyof typeof Ionicons.glyphMap }> = {
+  admin: { titleKey: 'roleSelect.adminTitle', subKey: 'roleSelect.adminSub', icon: 'shield-checkmark' },
+  seller: { titleKey: 'roleSelect.sellerTitle', subKey: 'roleSelect.sellerSub', icon: 'storefront' },
+  customer: { titleKey: 'roleSelect.customerTitle', subKey: 'roleSelect.customerSub', icon: 'leaf' },
 };
 
 export default function RoleSelectScreen() {
   const { roles, chooseRole } = useAuth();
+  const { t } = useI18n();
 
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
-        <Text style={styles.title}>Hangi panelle devam edelim?</Text>
-        <Text style={styles.subtitle}>Birden fazla hesap türün var. Dilediğin zaman ayarlardan panel değiştirebilirsin.</Text>
+        <Text style={styles.title}>{t('roleSelect.title')}</Text>
+        <Text style={styles.subtitle}>{t('roleSelect.sub')}</Text>
       </View>
 
       <View style={styles.list}>
@@ -38,8 +40,8 @@ export default function RoleSelectScreen() {
                 <Ionicons name={info.icon} size={22} color={colors.buttonPrimaryText} />
               </View>
               <View style={styles.cardText}>
-                <Text style={styles.cardTitle}>{info.title}</Text>
-                <Text style={styles.cardSubtitle}>{info.subtitle}</Text>
+                <Text style={styles.cardTitle}>{t(info.titleKey)}</Text>
+                <Text style={styles.cardSubtitle}>{t(info.subKey)}</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color={colors.muted2} />
             </TouchableOpacity>
@@ -48,7 +50,7 @@ export default function RoleSelectScreen() {
       </View>
 
       <TouchableOpacity style={styles.logoutLink} onPress={() => supabase.auth.signOut()} activeOpacity={0.7}>
-        <Text style={styles.logoutText}>Çıkış Yap</Text>
+        <Text style={styles.logoutText}>{t('settings.logout')}</Text>
       </TouchableOpacity>
     </View>
   );

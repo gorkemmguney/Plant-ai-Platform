@@ -12,19 +12,20 @@ async def main():
         if not users:
             print("Kullanıcı bulunamadı. Deneme kullanıcıları oluşturuluyor...")
             cust = AppUser(
-                firebase_uid="dummy_customer_uid_123",
+                supabase_uid="dummy_customer_uid_123",
                 first_name="Görkem",
                 last_name="Müşteri",
                 email="gorkem_customer@example.com",
                 is_active=True
             )
             admin = AppUser(
-                firebase_uid="dummy_admin_uid_456",
+                supabase_uid="dummy_admin_uid_456",
                 first_name="Hakan",
                 last_name="Yönetici",
                 email="hakan_admin@example.com",
                 is_active=True
             )
+
             db.add(cust)
             db.add(admin)
             await db.commit()

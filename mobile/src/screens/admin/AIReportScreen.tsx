@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useI18n } from '../../i18n';
 import { apiClient } from '../../services/apiClient';
 import { colors, fonts, radius, shadow, spacing, gradients } from '../../theme/theme';
 
@@ -27,11 +28,7 @@ interface ContentModerationResult {
   risk_score: number;
 }
 
-const PERIOD_OPTIONS = [
-  { label: '7 Gün', value: 7 },
-  { label: '30 Gün', value: 30 },
-  { label: '90 Gün', value: 90 },
-];
+const PERIOD_VALUES = [7, 30, 90];
 
 const verdictConfig: Record<string, { bg: string; text: string; border: string; icon: any }> = {
   ok:        { bg: '#e3f3ea', text: '#3d8f66', border: '#3d8f6640', icon: 'checkmark-circle' },
@@ -40,6 +37,7 @@ const verdictConfig: Record<string, { bg: string; text: string; border: string; 
 };
 
 export default function AIReportScreen() {
+  const { t } = useI18n();
   const [selectedPeriod, setSelectedPeriod] = useState(7);
   const [report, setReport] = useState<PeriodReport | null>(null);
   const [loadingReport, setLoadingReport] = useState(false);
@@ -66,7 +64,7 @@ export default function AIReportScreen() {
       const { data } = await apiClient.get<PeriodReport>(`/admin/ai/period-report?period=${selectedPeriod}`);
       setReport(data);
     } catch (err: any) {
-      Alert.alert('Hata', err?.response?.data?.detail ?? 'Rapor oluşturulamadı.');
+      Alert.alert(t('common.error'), err?.response?.data?.detail ?? t('sellerReport.loadFailed'));
     } finally {
       setLoadingReport(false);
     }
@@ -74,7 +72,7 @@ export default function AIReportScreen() {
 
   const handleContentModeration = async () => {
     if (!modTitle.trim()) {
-      Alert.alert('Hata', 'Lütfen ürün başlığını girin.');
+      Alert.alert(t('common.error'), t('aiReport.titleReq'));
       return;
     }
     setLoadingMod(true);
@@ -86,7 +84,7 @@ export default function AIReportScreen() {
       });
       setModResult(data);
     } catch (err: any) {
-      Alert.alert('Hata', err?.response?.data?.detail ?? 'İçerik denetimi yapılamadı.');
+      Alert.alert(t('common.error'), err?.response?.data?.detail ?? t('aiReport.modFailed'));
     } finally {
       setLoadingMod(false);
     }
@@ -100,9 +98,9 @@ export default function AIReportScreen() {
     try {
       const { data } = await apiClient.post('/admin/ai/trigger-campaign');
       setCampaignResult(data);
-      Alert.alert('Başarılı', `Akıllı kampanya tetiklendi! ${data.users_notified_count} kullanıcıya bildirim gönderildi.`);
+      Alert.alert(t('createPost.success'), `${t('aiReport.campaignTriggeredPre')}${data.users_notified_count}${t('aiReport.campaignTriggeredPost')}`);
     } catch (err: any) {
-      Alert.alert('Hata', err?.response?.data?.detail ?? 'Kampanya tetiklenemedi.');
+      Alert.alert(t('common.error'), err?.response?.data?.detail ?? t('aiReport.campaignFailed'));
     } finally {
       setLoadingCampaign(false);
     }
@@ -111,8 +109,8 @@ export default function AIReportScreen() {
   return (
     <View style={styles.screen}>
       <LinearGradient colors={gradients.header} style={styles.header}>
-        <Text style={styles.headerTitle}>AI Rapor & Denetim</Text>
-        <Text style={styles.headerSub}>Dönem raporları ve içerik moderasyonu</Text>
+        <Text style={styles.headerTitle}>{t('aiReport.title')}</Text>
+        <Text style={styles.headerSub}>{t('aiReport.sub')}</Text>
       </LinearGradient>
 
       <ScrollView
@@ -127,21 +125,21 @@ export default function AIReportScreen() {
             <LinearGradient colors={['#0288d1', '#0263a0']} style={styles.sectionIconBox}>
               <Ionicons name="document-text" size={14} color="#fff" />
             </LinearGradient>
-            <Text style={styles.sectionTitle}>Dönem Raporu</Text>
+            <Text style={styles.sectionTitle}>{t('aiReport.periodReport')}</Text>
           </View>
-          <Text style={styles.sectionSub}>Gemini, seçili dönem verilerini analiz eder ve yönetici özeti oluşturur.</Text>
+          <Text style={styles.sectionSub}>{t('aiReport.periodReportSub')}</Text>
 
           {/* Period Selector */}
           <View style={styles.periodRow}>
-            {PERIOD_OPTIONS.map((opt) => (
+            {PERIOD_VALUES.map((value) => (
               <TouchableOpacity
-                key={opt.value}
-                style={[styles.periodBtn, selectedPeriod === opt.value && styles.periodBtnActive]}
-                onPress={() => setSelectedPeriod(opt.value)}
+                key={value}
+                style={[styles.periodBtn, selectedPeriod === value && styles.periodBtnActive]}
+                onPress={() => setSelectedPeriod(value)}
                 activeOpacity={0.8}
               >
-                <Text style={[styles.periodBtnText, selectedPeriod === opt.value && styles.periodBtnTextActive]}>
-                  {opt.label}
+                <Text style={[styles.periodBtnText, selectedPeriod === value && styles.periodBtnTextActive]}>
+                  {value} {t('aiReport.days')}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -158,14 +156,14 @@ export default function AIReportScreen() {
             ) : (
               <>
                 <Ionicons name="sparkles" size={16} color={colors.white} />
-                <Text style={styles.actionButtonText}>Rapor Oluştur</Text>
+                <Text style={styles.actionButtonText}>{t('aiReport.generate')}</Text>
               </>
             )}
           </TouchableOpacity>
 
           {loadingReport && (
             <View style={styles.loadingHint}>
-              <Text style={styles.loadingHintText}>Gemini {selectedPeriod} günlük verilerinizi analiz ediyor...</Text>
+              <Text style={styles.loadingHintText}>{t('aiReport.analyzingPre')}{selectedPeriod}{t('aiReport.analyzingPost')}</Text>
             </View>
           )}
 
@@ -175,17 +173,17 @@ export default function AIReportScreen() {
               <View style={styles.statsRow}>
                 <View style={styles.statItem}>
                   <Text style={[styles.statNum, { color: '#0288d1' }]}>{report.stats.new_users ?? 0}</Text>
-                  <Text style={styles.statLbl}>Yeni Üye</Text>
+                  <Text style={styles.statLbl}>{t('aiReport.newUsers')}</Text>
                 </View>
                 <View style={styles.statDivider} />
                 <View style={styles.statItem}>
                   <Text style={[styles.statNum, { color: '#7c4dff' }]}>{report.stats.recent_analyses ?? 0}</Text>
-                  <Text style={styles.statLbl}>AI Teşhis</Text>
+                  <Text style={styles.statLbl}>{t('aiReport.aiAnalyses')}</Text>
                 </View>
                 <View style={styles.statDivider} />
                 <View style={styles.statItem}>
                   <Text style={[styles.statNum, { color: '#3d8f66' }]}>{report.stats.total_products ?? 0}</Text>
-                  <Text style={styles.statLbl}>Ürün</Text>
+                  <Text style={styles.statLbl}>{t('aiReport.product')}</Text>
                 </View>
               </View>
               <View style={styles.reportDivider} />
@@ -200,11 +198,9 @@ export default function AIReportScreen() {
             <LinearGradient colors={['#7c4dff', '#5c35cc']} style={styles.sectionIconBox}>
               <Ionicons name="sparkles" size={14} color="#fff" />
             </LinearGradient>
-            <Text style={styles.sectionTitle}>AI Akıllı Kampanya Sihirbazı</Text>
+            <Text style={styles.sectionTitle}>{t('aiReport.campaignWizard')}</Text>
           </View>
-          <Text style={styles.sectionSub}>
-            Gemini veritabanındaki son bitki teşhislerini tarar, en yaygın bitki hastalığını tespit eder ve bu probleme sahip tüm üyelere hedeflenmiş akıllı indirim bildirimleri tetikler.
-          </Text>
+          <Text style={styles.sectionSub}>{t('aiReport.campaignWizardSub')}</Text>
 
           <TouchableOpacity
             style={[styles.actionButton, { backgroundColor: '#7c4dff' }, loadingCampaign && { opacity: 0.6 }]}
@@ -217,14 +213,14 @@ export default function AIReportScreen() {
             ) : (
               <>
                 <Ionicons name="rocket-outline" size={16} color={colors.white} />
-                <Text style={styles.actionButtonText}>Otomatik AI Kampanyası Başlat</Text>
+                <Text style={styles.actionButtonText}>{t('aiReport.startCampaign')}</Text>
               </>
             )}
           </TouchableOpacity>
 
           {loadingCampaign && (
             <View style={styles.loadingHint}>
-              <Text style={styles.loadingHintText}>Gemini verileri analiz ediyor ve kişiye özel bildirimleri hazırlıyor...</Text>
+              <Text style={styles.loadingHintText}>{t('aiReport.campaignLoading')}</Text>
             </View>
           )}
 
@@ -232,30 +228,30 @@ export default function AIReportScreen() {
             <View style={[styles.reportCard, { backgroundColor: '#f5efff', borderColor: '#d8c8ff' }]}>
               <View style={styles.verdictHeader}>
                 <Ionicons name="sparkles" size={20} color="#7c4dff" />
-                <Text style={[styles.verdictLabel, { color: '#5c35cc' }]}>Aktif Kampanya Raporu</Text>
+                <Text style={[styles.verdictLabel, { color: '#5c35cc' }]}>{t('aiReport.activeCampaignReport')}</Text>
               </View>
-              
+
               <View style={styles.campaignMetaRow}>
-                <Text style={styles.campaignMetaLabel}>Tespit Edilen En Yaygın Hastalık:</Text>
+                <Text style={styles.campaignMetaLabel}>{t('aiReport.mostCommonDisease')}</Text>
                 <Text style={styles.campaignMetaValue}>{campaignResult.campaign_disease}</Text>
               </View>
 
               <View style={styles.campaignMetaRow}>
-                <Text style={styles.campaignMetaLabel}>Önerilen Kampanya Ürünü:</Text>
+                <Text style={styles.campaignMetaLabel}>{t('aiReport.recommendedProduct')}</Text>
                 <Text style={styles.campaignMetaValue}>{campaignResult.recommended_product}</Text>
               </View>
 
               <View style={styles.campaignMetaRow}>
-                <Text style={styles.campaignMetaLabel}>Bildirim Alıcı Sayısı:</Text>
-                <Text style={styles.campaignMetaValue}>{campaignResult.users_notified_count} Aktif Üye</Text>
+                <Text style={styles.campaignMetaLabel}>{t('aiReport.recipientCount')}</Text>
+                <Text style={styles.campaignMetaValue}>{campaignResult.users_notified_count} {t('aiReport.activeMembers')}</Text>
               </View>
 
               <View style={styles.reportDivider} />
 
-              <Text style={[styles.campaignTemplateTitle, { color: '#5c35cc' }]}>Gönderilen Bildirim Şablonu:</Text>
-              
+              <Text style={[styles.campaignTemplateTitle, { color: '#5c35cc' }]}>{t('aiReport.sentTemplate')}</Text>
+
               <View style={styles.campaignTemplateBox}>
-                <Text style={styles.campaignTemplateSubject}>Başlık: {campaignResult.notification_title}</Text>
+                <Text style={styles.campaignTemplateSubject}>{t('aiReport.subjectLabel')} {campaignResult.notification_title}</Text>
                 <Text style={styles.campaignTemplateBody}>{campaignResult.notification_template}</Text>
               </View>
             </View>
@@ -268,19 +264,19 @@ export default function AIReportScreen() {
             <LinearGradient colors={['#e67e22', '#c0392b']} style={styles.sectionIconBox}>
               <Ionicons name="shield-checkmark" size={14} color="#fff" />
             </LinearGradient>
-            <Text style={styles.sectionTitle}>AI İçerik Denetimi</Text>
+            <Text style={styles.sectionTitle}>{t('aiReport.contentMod')}</Text>
           </View>
-          <Text style={styles.sectionSub}>Bir ürün ilanını yapay zeka ile politika ihlallerine karşı denetle.</Text>
+          <Text style={styles.sectionSub}>{t('aiReport.contentModSub')}</Text>
 
           <TextInput
-            placeholder="Ürün Başlığı (zorunlu)"
+            placeholder={t('aiReport.titlePlaceholder')}
             placeholderTextColor={colors.muted2}
             value={modTitle}
             onChangeText={setModTitle}
             style={styles.input}
           />
           <TextInput
-            placeholder="Ürün Açıklaması (opsiyonel)..."
+            placeholder={t('aiReport.descPlaceholder')}
             placeholderTextColor={colors.muted2}
             value={modDesc}
             onChangeText={setModDesc}
@@ -299,7 +295,7 @@ export default function AIReportScreen() {
             ) : (
               <>
                 <Ionicons name="search" size={16} color={colors.white} />
-                <Text style={styles.actionButtonText}>İçerik Denetle</Text>
+                <Text style={styles.actionButtonText}>{t('aiReport.moderate')}</Text>
               </>
             )}
           </TouchableOpacity>
@@ -311,7 +307,7 @@ export default function AIReportScreen() {
                 <Ionicons name={vConfig.icon} size={22} color={vConfig.text} />
                 <Text style={[styles.verdictLabel, { color: vConfig.text }]}>{modResult.verdict_label}</Text>
                 <View style={styles.riskBadge}>
-                  <Text style={[styles.riskBadgeText, { color: vConfig.text }]}>Risk: {modResult.risk_score}/100</Text>
+                  <Text style={[styles.riskBadgeText, { color: vConfig.text }]}>{t('aiReport.risk')}: {modResult.risk_score}/100</Text>
                 </View>
               </View>
               {/* Risk Bar */}

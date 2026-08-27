@@ -2,6 +2,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React from 'react';
 import { CartProvider } from '../context/CartContext';
+import { useI18n } from '../i18n';
 import AIChatScreen from '../screens/customer/AIChatScreen';
 import AIChatHistoryScreen from '../screens/customer/AIChatHistoryScreen';
 import CartScreen from '../screens/customer/CartScreen';
@@ -10,6 +11,7 @@ import MarketplaceScreen from '../screens/customer/MarketplaceScreen';
 import NotificationsScreen from '../screens/customer/NotificationsScreen';
 import OrdersScreen from '../screens/customer/OrdersScreen';
 import SettingsScreen from '../screens/customer/SettingsScreen';
+import AppSettingsScreen from '../screens/shared/AppSettingsScreen';
 import StoreProductsScreen from '../screens/customer/StoreProductsScreen';
 import StoresScreen from '../screens/customer/StoresScreen';
 import ImageAnalysisScreen from '../screens/customer/ImageAnalysisScreen';
@@ -25,6 +27,10 @@ import MyGardenScreen from '../screens/customer/MyGardenScreen';
 import AddPlantScreen from '../screens/customer/AddPlantScreen';
 import PlantDetailScreen from '../screens/customer/PlantDetailScreen';
 import SupportScreen from '../screens/shared/SupportScreen';
+import SellerChatListScreen from '../screens/customer/SellerChatListScreen';
+import SellerChatDetailScreen from '../screens/customer/SellerChatDetailScreen';
+import UserProfileScreen from '../screens/shared/UserProfileScreen';
+import PublicProfileScreen from '../screens/shared/PublicProfileScreen';
 import CustomTabBar from './CustomTabBar';
 
 export type CustomerTabParamList = {
@@ -63,6 +69,16 @@ export type CustomerStackParamList = {
   MyGarden: undefined;
   AddPlant: { prefilledData?: { prodSpecId: number; species: string; healthStatus: string; imageUrl?: string } };
   PlantDetail: { custProdId: number };
+  AppSettings: undefined;
+  SellerChatList: undefined;
+  SellerChatDetail: {
+    interactionId: number;
+    partnerName: string;
+    prodName?: string;
+    prodImage?: string;
+  };
+  UserProfile: undefined;
+  PublicProfile: { userId: number };
 };
 
 const Tab = createBottomTabNavigator<CustomerTabParamList>();
@@ -76,15 +92,23 @@ const icons: Record<keyof CustomerTabParamList, { active: any; inactive: any }> 
   Settings: { active: 'settings', inactive: 'settings-outline' },
 };
 
-const labels: Record<keyof CustomerTabParamList, string> = {
-  Home: 'Ana Sayfa',
-  Marketplace: 'Ürünler',
-  Stores: 'Mağazalar',
-  AIChat: 'AI Chat',
-  Settings: 'Ayarlar',
+const labelKeys: Record<keyof CustomerTabParamList, string> = {
+  Home: 'tab.home',
+  Marketplace: 'tab.marketplace',
+  Stores: 'tab.stores',
+  AIChat: 'tab.aichat',
+  Settings: 'tab.settings',
 };
 
 function CustomerTabNavigator() {
+  const { t } = useI18n();
+  const labels: Record<keyof CustomerTabParamList, string> = {
+    Home: t(labelKeys.Home),
+    Marketplace: t(labelKeys.Marketplace),
+    Stores: t(labelKeys.Stores),
+    AIChat: t(labelKeys.AIChat),
+    Settings: t(labelKeys.Settings),
+  };
   return (
     <Tab.Navigator
       screenOptions={{ headerShown: false }}
@@ -110,16 +134,17 @@ function CustomerTabNavigator() {
 }
 
 export default function CustomerStack() {
+  const { t } = useI18n();
   return (
     <CartProvider>
       <Stack.Navigator screenOptions={{ headerBackButtonDisplayMode: 'minimal' }}>
         <Stack.Screen name="Tabs" component={CustomerTabNavigator} options={{ headerShown: false }} />
-        <Stack.Screen name="Cart" component={CartScreen} options={{ title: 'Sepetim' }} />
-        <Stack.Screen name="Orders" component={OrdersScreen} options={{ title: 'Siparişlerim' }} />
-        <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Bildirimler' }} />
-        <Stack.Screen name="StoreProducts" component={StoreProductsScreen} options={{ title: 'Mağaza' }} />
-        <Stack.Screen name="MyReviews" component={MyReviewsScreen} options={{ title: 'Değerlendirmelerim' }} />
-        <Stack.Screen name="Campaigns" component={CampaignsScreen} options={{ title: 'Kampanyalar' }} />
+        <Stack.Screen name="Cart" component={CartScreen} options={{ title: t('nav.cart') }} />
+        <Stack.Screen name="Orders" component={OrdersScreen} options={{ title: t('nav.orders') }} />
+        <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: t('nav.notifications') }} />
+        <Stack.Screen name="StoreProducts" component={StoreProductsScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="MyReviews" component={MyReviewsScreen} options={{ title: t('nav.myReviews') }} />
+        <Stack.Screen name="Campaigns" component={CampaignsScreen} options={{ title: t('nav.campaigns') }} />
         <Stack.Screen name="AddressScreen" component={AddressScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Support" component={SupportScreen} options={{ headerShown: false }} initialParams={{ sourcePanel: 'customer' }} />
         <Stack.Screen name="Checkout" component={CheckoutScreen} options={{ headerShown: false }} />
@@ -133,6 +158,11 @@ export default function CustomerStack() {
         <Stack.Screen name="MyGarden" component={MyGardenScreen} options={{ headerShown: false }} />
         <Stack.Screen name="AddPlant" component={AddPlantScreen} options={{ headerShown: false }} />
         <Stack.Screen name="PlantDetail" component={PlantDetailScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="AppSettings" component={AppSettingsScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="SellerChatList" component={SellerChatListScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="SellerChatDetail" component={SellerChatDetailScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="UserProfile" component={UserProfileScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="PublicProfile" component={PublicProfileScreen} options={{ headerShown: false }} />
       </Stack.Navigator>
     </CartProvider>
   );

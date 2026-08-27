@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+
 // NOT: Anahtar isimleri (primary, secondary, buttonPrimary vb.) bilinçli olarak
 // KORUNDU — böylece uygulamadaki hiçbir ekrana dokunmadan, sadece bu dosyadaki
 // değerleri değiştirerek tüm temayı yeşile çevirebiliyoruz.
@@ -14,8 +16,6 @@ export const colors = {
   border: '#eef3ef',
   borderSoft: '#f4f8f5',
 
-  // Ana vurgu: mockup'taki canlı "büyüyen bitki" yeşili — nötr arka planlar
-  // üzerinde tek, net vurgu rengi olarak kullanılır (durum rozetleri, aktif sekme).
   primary: '#1DAA63',
   primaryDeep: '#178A50',
   primarySoft: 'rgba(29,170,99,0.12)',
@@ -27,7 +27,6 @@ export const colors = {
   buttonPrimary: '#1DAA63',
   buttonPrimaryText: '#ffffff',
 
-  // "Şeffaf/cam" kartlar için — BlurView ile birlikte kullanılır
   glass: 'rgba(255,255,255,0.75)',
   glassOnDark: 'rgba(255,255,255,0.16)',
   glassBorder: 'rgba(255,255,255,0.5)',
@@ -44,7 +43,6 @@ export const gradients = {
   primaryButton: [colors.buttonPrimary, colors.primaryDeep] as const,
   softCard: [colors.card, colors.cardAlt] as const,
   hero: [colors.secondary, colors.secondaryDeep] as const,
-  // Ana ekranın tam sayfa arka planı: mint -> beyaz yumuşak geçiş
   screenBg: ['#F4FAF6', '#FAFDFB', '#ffffff'] as const,
 };
 
@@ -60,6 +58,7 @@ export const fonts = {
 };
 
 export const radius = {
+  xs: 6,
   sm: 12,
   md: 16,
   lg: 22,
@@ -75,28 +74,23 @@ export const spacing = {
   xxl: 32,
 };
 
+// iOS'un shadow* özellikleriyle Android'in elevation'ını aynı View'da birlikte
+// tanımlamak, Android'de köşe yuvarlamasına uymayan, kutunun kenarından taşan
+// bir dikdörtgen gölgeye sebep oluyor (bkz. HomeScreen "Quick Access" hatası).
+// Bunu tek yerde çözüyoruz — ...shadow.sm/md/glow kullanan HER ekran otomatik
+// düzeliyor, tek tek dokunmaya gerek yok.
+const makeShadow = (shadowColor: string, offsetHeight: number, shadowOpacity: number, shadowRadius: number, elevation: number) =>
+  Platform.select({
+    ios: { shadowColor, shadowOffset: { width: 0, height: offsetHeight }, shadowOpacity, shadowRadius },
+    android: { elevation },
+    default: { shadowColor, shadowOffset: { width: 0, height: offsetHeight }, shadowOpacity, shadowRadius, elevation },
+  });
+
 export const shadow = {
-  sm: {
-    shadowColor: '#0F2A1F',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  md: {
-    shadowColor: '#0F2A1F',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.10,
-    shadowRadius: 20,
-    elevation: 6,
-  },
-  glow: {
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 5,
-  },
+  xs: makeShadow('#0F2A1F', 1, 0.04, 4, 1),
+  sm: makeShadow('#0F2A1F', 2, 0.06, 8, 2),
+  md: makeShadow('#0F2A1F', 8, 0.10, 20, 6),
+  glow: makeShadow(colors.primary, 0, 0.35, 12, 5),
 };
 
 export const badgeColors = {

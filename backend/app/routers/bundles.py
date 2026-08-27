@@ -6,7 +6,9 @@ from sqlalchemy.orm import selectinload
 from app.db.session import get_db
 from app.models.bundle import Bundle
 from app.models.catalog import Prod
+from app.models.customer import Ind, Org
 from app.models.user import AppUser
+
 from app.schemas.bundle import BundleItemOut, BundleOut
 
 router = APIRouter(prefix="/bundles", tags=["bundles"])
@@ -33,13 +35,15 @@ async def list_bundles(db: AsyncSession = Depends(get_db)):
     if prod_ids:
         rows = (
             await db.execute(
-                select(Prod, AppUser.store_name, AppUser.first_name, AppUser.last_name)
-                .outerjoin(AppUser, AppUser.user_id == Prod.seller_id)
+                select(Prod, Org.store_name, Org.company_name, Ind.first_name, Ind.last_name)
+                .outerjoin(Org, Org.user_id == Prod.seller_id)
+                .outerjoin(Ind, Ind.user_id == Prod.seller_id)
                 .where(Prod.prod_id.in_(prod_ids))
             )
         ).all()
-        for prod, store_name, first, last in rows:
-            prod_map[prod.prod_id] = (prod, _store_name(store_name, first, last))
+        for prod, store_name, company_name, first, last in rows:
+            prod_map[prod.prod_id] = (prod, _store_name(store_name or company_name, first, last))
+
 
     result: list[BundleOut] = []
     for b in bundles:

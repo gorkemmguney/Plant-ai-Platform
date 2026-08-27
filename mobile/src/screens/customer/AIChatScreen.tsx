@@ -6,6 +6,7 @@ import {
   Alert,
   FlatList,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -17,6 +18,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCart } from '../../context/CartContext';
+import { useI18n } from '../../i18n';
 import { apiClient } from '../../services/apiClient';
 import { colors, fonts, radius, shadow, spacing } from '../../theme/theme';
 
@@ -33,21 +35,6 @@ interface ChatMessage {
   } | null;
 }
 
-const WELCOME_MESSAGE: ChatMessage = {
-  id: 'welcome',
-  role: 'assistant',
-  message: 'Merhaba! Ben senin AI bitki ve kişisel bahçe asistanınım. Bitkilerin, bakım kayıtların veya verdiğin siparişlerin hakkında ne öğrenmek istersin?',
-};
-
-const QUICK_ACTION_CHIPS = [
-  { label: '💧 Sulama Zamanı Gelenler', prompt: 'Bahçemde sulama zamanı yaklaşan veya geçen bitkilerim hangileri?' },
-  { label: '📦 Son Sipariş Durumum', prompt: 'Son siparişlerimin durumu nedir?' },
-  { label: '🎁 Puanlarım & Kuponlarım', prompt: 'Kaç birikmiş puanım var ve hangi kuponları kullanabilirim?' },
-  { label: '🌿 Bahçemdeki Bitkiler', prompt: 'Bahçemdeki kayıtlı bitkilerimi ve sağlık durumlarını özetle.' },
-  { label: '🩺 Bitkim Neden Sarardı?', prompt: 'Bitkimin yaprakları sararıyor, ne yapmalıyım?' },
-  { label: '🧪 Gübreleme Önerisi', prompt: 'Bitkilerimi ne zaman ve nasıl gübrelemeliyim?' },
-];
-
 const cleanMarkdownText = (text: string) => {
   if (!text) return '';
   return text
@@ -60,15 +47,47 @@ const cleanMarkdownText = (text: string) => {
 
 export default function AIChatScreen({ navigation, route }: any) {
   const insets = useSafeAreaInsets();
+  const { t } = useI18n();
   const { addToCart } = useCart();
   const resumeChatId: number | undefined = route?.params?.chatId;
 
-  const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
+  const welcomeMessage: ChatMessage = { id: 'welcome', role: 'assistant', message: t('aiChat.welcome') };
+  const quickChips = [
+    { label: t('aiChat.chip1Label'), prompt: t('aiChat.chip1Prompt') },
+    { label: t('aiChat.chip2Label'), prompt: t('aiChat.chip2Prompt') },
+    { label: t('aiChat.chip3Label'), prompt: t('aiChat.chip3Prompt') },
+    { label: t('aiChat.chip4Label'), prompt: t('aiChat.chip4Prompt') },
+    { label: t('aiChat.chip5Label'), prompt: t('aiChat.chip5Prompt') },
+    { label: t('aiChat.chip6Label'), prompt: t('aiChat.chip6Prompt') },
+  ];
+
+  const [messages, setMessages] = useState<ChatMessage[]>([welcomeMessage]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(!!resumeChatId);
   const chatIdRef = useRef<number | null>(resumeChatId ?? null);
   const listRef = useRef<FlatList>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    // Klavye yüksekliğini manuel olarak takip ediyoruz; Android'de edge-to-edge
+    // mod nedeniyle KeyboardAvoidingView'in native davranışı güvenilir çalışmıyor.
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      setKeyboardHeight(e.endCoordinates?.height ?? 0);
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 50);
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   useEffect(() => {
     if (!resumeChatId) return;
@@ -85,16 +104,26 @@ export default function AIChatScreen({ navigation, route }: any) {
           }))
         );
       } catch {
-        Alert.alert('Sohbet yüklenemedi', 'Bu sohbet geçmişi açılamadı, yeni bir sohbet başlatabilirsin.');
+        Alert.alert(t('aiChat.loadFailed'), t('aiChat.loadFailedMsg'));
       } finally {
         setLoadingHistory(false);
       }
     })();
   }, [resumeChatId]);
 
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => {
+        setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 50);
+      }
+    );
+    return () => showSub.remove();
+  }, []);
+
   const startNewChat = () => {
     chatIdRef.current = null;
-    setMessages([WELCOME_MESSAGE]);
+    setMessages([welcomeMessage]);
   };
 
   const sendMessage = async (text: string) => {
@@ -122,8 +151,8 @@ export default function AIChatScreen({ navigation, route }: any) {
       };
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (err: any) {
-      const detail = err?.response?.data?.detail ?? 'Bağlantı hatası oluştu, tekrar deneyin.';
-      Alert.alert('AI Asistan', detail);
+      const detail = err?.response?.data?.detail ?? t('aiChat.connError');
+      Alert.alert(t('aiChat.assistant'), detail);
     } finally {
       setSending(false);
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
@@ -133,11 +162,7 @@ export default function AIChatScreen({ navigation, route }: any) {
   const handleSend = () => sendMessage(input.trim());
 
   return (
-    <KeyboardAvoidingView
-      style={styles.screen}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-    >
+    <View style={styles.screen}>
       <LinearGradient colors={[colors.secondary, colors.secondaryDeep]} style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} activeOpacity={0.7}>
           <Ionicons name="arrow-back" size={20} color={colors.white} />
@@ -146,8 +171,8 @@ export default function AIChatScreen({ navigation, route }: any) {
           <Ionicons name="sparkles" size={20} color={colors.primary} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={styles.headerTitle}>AI Akıllı Asistan</Text>
-          <Text style={styles.headerSub}>Sorularını sor, verilerini yönet</Text>
+          <Text style={styles.headerTitle}>{t('aiChat.headerTitle')}</Text>
+          <Text style={styles.headerSub}>{t('aiChat.headerSub')}</Text>
         </View>
         <TouchableOpacity style={styles.backButton} onPress={startNewChat} activeOpacity={0.7}>
           <Ionicons name="add" size={20} color={colors.white} />
@@ -170,6 +195,7 @@ export default function AIChatScreen({ navigation, route }: any) {
           ref={listRef}
           data={messages}
           keyExtractor={(item) => item.id}
+          style={{ flex: 1 }}
           contentContainerStyle={styles.messageList}
           onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
           renderItem={({ item }) => (
@@ -193,7 +219,7 @@ export default function AIChatScreen({ navigation, route }: any) {
 
                 {item.recommended_products && item.recommended_products.length > 0 && (
                   <View style={styles.productsContainer}>
-                    <Text style={styles.productsTitle}>🛒 Önerilen Mağaza Ürünleri:</Text>
+                    <Text style={styles.productsTitle}>{t('aiChat.recommendedProducts')}</Text>
                     <View style={styles.productsRow}>
                       {item.recommended_products.map((prod: any) => (
                         <View key={prod.prod_id} style={styles.productCard}>
@@ -215,11 +241,11 @@ export default function AIChatScreen({ navigation, route }: any) {
                                 price: prod.price,
                                 stock: prod.stock ?? 10,
                               });
-                              Alert.alert('Sepete Eklendi 🛒', `${prod.name} sepetinize eklendi!`);
+                              Alert.alert(t('aiChat.addedToCart'), `${prod.name}${t('aiChat.addedToCartMsg')}`);
                             }}
                           >
                             <Ionicons name="cart" size={13} color={colors.white} style={{ marginRight: 4 }} />
-                            <Text style={styles.addToCartText}>Sepete Ekle</Text>
+                            <Text style={styles.addToCartText}>{t('common.addToCart')}</Text>
                           </TouchableOpacity>
                         </View>
                       ))}
@@ -237,13 +263,13 @@ export default function AIChatScreen({ navigation, route }: any) {
           <View style={styles.typingDots}>
             <ActivityIndicator size="small" color={colors.muted} />
           </View>
-          <Text style={styles.typingText}>Yazıyor...</Text>
+          <Text style={styles.typingText}>{t('aiChat.typing')}</Text>
         </View>
       )}
 
       <View style={styles.chipsBar}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsScroll}>
-          {QUICK_ACTION_CHIPS.map((chip) => (
+          {quickChips.map((chip) => (
             <TouchableOpacity
               key={chip.label}
               style={styles.chipBtn}
@@ -257,10 +283,15 @@ export default function AIChatScreen({ navigation, route }: any) {
         </ScrollView>
       </View>
 
-      <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
+      <View
+        style={[
+          styles.inputBar,
+          { paddingBottom: keyboardHeight > 0 ? spacing.md : Math.max(insets.bottom, spacing.md) },
+        ]}
+      >
         <TextInput
           style={styles.input}
-          placeholder="Bir soru sor veya 'Suladım' de..."
+          placeholder={t('aiChat.inputPlaceholder')}
           placeholderTextColor={colors.muted2}
           value={input}
           onChangeText={setInput}
@@ -276,7 +307,10 @@ export default function AIChatScreen({ navigation, route }: any) {
           <Ionicons name="arrow-up" size={19} color={colors.buttonPrimaryText} />
         </TouchableOpacity>
       </View>
-    </KeyboardAvoidingView>
+
+      {/* Klavye açıkken alt kısmı yukarı iten boşluk (adjustResize'i manuel taklit eder) */}
+      {keyboardHeight > 0 && <View style={{ height: keyboardHeight }} />}
+    </View>
   );
 }
 

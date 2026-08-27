@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useI18n } from '../../i18n';
 import { apiClient } from '../../services/apiClient';
 import { colors, fonts, radius, shadow, spacing } from '../../theme/theme';
 
@@ -38,42 +39,32 @@ interface Complaint {
   order_date: string | null;
 }
 
-const statusMapping: Record<string, { label: string; bg: string; text: string; icon: string }> = {
-  pending: { label: 'Beklemede', bg: '#fef3c7', text: '#d97706', icon: 'time-outline' },
-  in_progress: { label: 'İnceleniyor', bg: '#eff6ff', text: '#2563eb', icon: 'sync-outline' },
-  resolved: { label: 'Çözüldü', bg: '#ecfdf5', text: '#059669', icon: 'checkmark-circle-outline' },
-  rejected: { label: 'Reddedildi', bg: '#fef2f2', text: '#dc2626', icon: 'close-circle-outline' },
+const statusMapping: Record<string, { labelKey: string; bg: string; text: string; icon: string }> = {
+  pending: { labelKey: 'support.statusPending', bg: '#fef3c7', text: '#d97706', icon: 'time-outline' },
+  in_progress: { labelKey: 'support.statusInProgress', bg: '#eff6ff', text: '#2563eb', icon: 'sync-outline' },
+  resolved: { labelKey: 'support.statusResolved', bg: '#ecfdf5', text: '#059669', icon: 'checkmark-circle-outline' },
+  rejected: { labelKey: 'support.statusRejected', bg: '#fef2f2', text: '#dc2626', icon: 'close-circle-outline' },
 };
 
-const sentimentMapping: Record<string, { label: string; bg: string; text: string }> = {
-  angry: { label: 'Kızgın 😠', bg: '#fde8e8', text: '#e02424' },
-  sad: { label: 'Üzgün 😢', bg: '#e1effe', text: '#1e429f' },
-  neutral: { label: 'Sakin 😐', bg: '#f3f4f6', text: '#374151' },
-};
-
-const urgencyMapping: Record<string, { label: string; bg: string; text: string }> = {
-  high: { label: 'Yüksek 🚨', bg: '#fde8e8', text: '#e02424' },
-  medium: { label: 'Orta ⚠️', bg: '#fef3c7', text: '#d97706' },
-  low: { label: 'Düşük 💡', bg: '#edfcf2', text: '#0e7043' },
-};
-
-const typeMapping: Record<string, { label: string; icon: string }> = {
-  general: { label: 'Genel Destek', icon: 'help-circle-outline' },
-  order: { label: 'Sipariş Şikayeti', icon: 'receipt-outline' },
-  product: { label: 'Ürün Şikayeti', icon: 'leaf-outline' },
-  seller: { label: 'Satıcı Şikayeti', icon: 'business-outline' },
+const typeMapping: Record<string, { labelKey: string; icon: string }> = {
+  general: { labelKey: 'adminComplaints.typeGeneral', icon: 'help-circle-outline' },
+  order: { labelKey: 'adminComplaints.typeOrder', icon: 'receipt-outline' },
+  product: { labelKey: 'adminComplaints.typeProduct', icon: 'leaf-outline' },
+  seller: { labelKey: 'adminComplaints.typeSeller', icon: 'business-outline' },
+  suggestion: { labelKey: 'adminComplaints.typeSuggestion', icon: 'bulb-outline' },
 };
 
 const filters = [
-  { key: 'all', label: 'Tümü' },
-  { key: 'pending', label: 'Bekleyen' },
-  { key: 'in_progress', label: 'İncelenen' },
-  { key: 'resolved', label: 'Çözülen' },
-  { key: 'rejected', label: 'Reddedilen' },
+  { key: 'all', labelKey: 'adminComplaints.filterAll' },
+  { key: 'pending', labelKey: 'adminComplaints.filterPending' },
+  { key: 'in_progress', labelKey: 'adminComplaints.filterInProgress' },
+  { key: 'resolved', labelKey: 'adminComplaints.filterResolved' },
+  { key: 'rejected', labelKey: 'adminComplaints.filterRejected' },
 ];
 
 export default function AdminComplaintsScreen() {
   const navigation = useNavigation<any>();
+  const { t } = useI18n();
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -97,7 +88,7 @@ export default function AdminComplaintsScreen() {
       const { data } = await apiClient.get<Complaint[]>(url);
       setComplaints(data);
     } catch (err: any) {
-      setError(err?.response?.data?.detail ?? 'Şikayetler yüklenemezken hata oluştu.');
+      setError(err?.response?.data?.detail ?? t('adminComplaints.loadFailed'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -132,8 +123,14 @@ export default function AdminComplaintsScreen() {
   };
 
   const renderItem = ({ item }: { item: Complaint }) => {
-    const statusInfo = statusMapping[item.status] || { label: item.status, bg: colors.borderSoft, text: colors.muted, icon: 'help-outline' };
-    const typeInfo = typeMapping[item.complaint_type] || { label: 'Bilinmeyen', icon: 'help-outline' };
+    const statusInfo = statusMapping[item.status];
+    const statusLabel = statusInfo ? t(statusInfo.labelKey) : item.status;
+    const statusBg = statusInfo?.bg ?? colors.borderSoft;
+    const statusText = statusInfo?.text ?? colors.muted;
+    const statusIcon = (statusInfo?.icon ?? 'help-outline') as any;
+    const typeInfo = typeMapping[item.complaint_type];
+    const typeLabel = typeInfo ? t(typeInfo.labelKey) : t('adminComplaints.unknown');
+    const typeIcon = (typeInfo?.icon ?? 'help-outline') as any;
 
     return (
       <TouchableOpacity
@@ -143,12 +140,12 @@ export default function AdminComplaintsScreen() {
       >
         <View style={styles.cardHeader}>
           <View style={styles.typeTag}>
-            <Ionicons name={typeInfo.icon as any} size={15} color={colors.primaryDeep} style={{ marginRight: 4 }} />
-            <Text style={styles.typeTagText}>{typeInfo.label}</Text>
+            <Ionicons name={typeIcon} size={15} color={colors.primaryDeep} style={{ marginRight: 4 }} />
+            <Text style={styles.typeTagText}>{typeLabel}</Text>
           </View>
-          <View style={[styles.statusBadge, { backgroundColor: statusInfo.bg }]}>
-            <Ionicons name={statusInfo.icon as any} size={13} color={statusInfo.text} style={{ marginRight: 3 }} />
-            <Text style={[styles.statusBadgeText, { color: statusInfo.text }]}>{statusInfo.label}</Text>
+          <View style={[styles.statusBadge, { backgroundColor: statusBg }]}>
+            <Ionicons name={statusIcon} size={13} color={statusText} style={{ marginRight: 3 }} />
+            <Text style={[styles.statusBadgeText, { color: statusText }]}>{statusLabel}</Text>
           </View>
         </View>
 
@@ -158,7 +155,7 @@ export default function AdminComplaintsScreen() {
         <View style={styles.cardFooter}>
           <View style={styles.userInfo}>
             <Ionicons name="person-outline" size={13} color={colors.muted2} style={{ marginRight: 4 }} />
-            <Text style={styles.userText}>{item.user_name || item.user_email || 'Kullanıcı'}</Text>
+            <Text style={styles.userText}>{item.user_name || item.user_email || t('adminComplaints.user')}</Text>
           </View>
           <Text style={styles.dateText}>{formatDate(item.created_at)}</Text>
         </View>
@@ -170,14 +167,14 @@ export default function AdminComplaintsScreen() {
     <View style={styles.container}>
       <View style={styles.panelTabs}>
         {([
-          { key: 'customer', label: '👤 Müşteri Talepleri' },
-          { key: 'seller', label: '🏪 Satıcı Talepleri' },
-        ] as { key: 'customer' | 'seller'; label: string }[]).map((t) => {
-          const active = activePanel === t.key;
+          { key: 'customer', labelKey: 'adminComplaints.customerRequests' },
+          { key: 'seller', labelKey: 'adminComplaints.sellerRequests' },
+        ] as { key: 'customer' | 'seller'; labelKey: string }[]).map((tab) => {
+          const active = activePanel === tab.key;
           return (
-            <TouchableOpacity key={t.key} style={[styles.panelTab, active && styles.panelTabActive]}
-              onPress={() => setActivePanel(t.key)} activeOpacity={0.8}>
-              <Text style={[styles.panelTabText, active && styles.panelTabTextActive]}>{t.label}</Text>
+            <TouchableOpacity key={tab.key} style={[styles.panelTab, active && styles.panelTabActive]}
+              onPress={() => setActivePanel(tab.key)} activeOpacity={0.8}>
+              <Text style={[styles.panelTabText, active && styles.panelTabTextActive]}>{t(tab.labelKey)}</Text>
             </TouchableOpacity>
           );
         })}
@@ -205,7 +202,7 @@ export default function AdminComplaintsScreen() {
                   activeFilter === item.key && styles.filterChipTextActive,
                 ]}
               >
-                {item.label}
+                {t(item.labelKey)}
               </Text>
             </TouchableOpacity>
           )}
@@ -216,20 +213,20 @@ export default function AdminComplaintsScreen() {
       {loading ? (
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color={colors.buttonPrimary} />
-          <Text style={styles.loadingText}>Şikayetler yükleniyor...</Text>
+          <Text style={styles.loadingText}>{t('adminComplaints.loading')}</Text>
         </View>
       ) : error ? (
         <View style={styles.centerContainer}>
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={() => fetchComplaints()}>
-            <Text style={styles.retryText}>Tekrar Dene</Text>
+            <Text style={styles.retryText}>{t('common.retry')}</Text>
           </TouchableOpacity>
         </View>
       ) : complaints.length === 0 ? (
         <View style={styles.centerContainer}>
           <Text style={styles.emptyEmoji}>📬</Text>
-          <Text style={styles.emptyTitle}>Şikayet Bulunmuyor</Text>
-          <Text style={styles.emptyText}>Bu filtreye uygun herhangi bir şikayet bulunmamaktadır.</Text>
+          <Text style={styles.emptyTitle}>{t('adminComplaints.emptyTitle')}</Text>
+          <Text style={styles.emptyText}>{t('adminComplaints.emptyText')}</Text>
         </View>
       ) : (
         <FlatList

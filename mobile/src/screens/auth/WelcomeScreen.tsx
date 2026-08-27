@@ -1,11 +1,13 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import { Dimensions, ImageBackground, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useI18n } from '../../i18n';
 import { colors, fonts, radius, spacing } from '../../theme/theme';
 
 const { height } = Dimensions.get('window');
 
 export default function WelcomeScreen({ navigation }: any) {
+  const { t } = useI18n();
   return (
     <View style={styles.screen}>
       <ImageBackground
@@ -34,7 +36,7 @@ export default function WelcomeScreen({ navigation }: any) {
           activeOpacity={0.85}
           onPress={() => navigation.navigate('Login')}
         >
-          <Text style={styles.primaryButtonText}>Giriş Yap</Text>
+          <Text style={styles.primaryButtonText}>{t('welcome.login')}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -42,13 +44,15 @@ export default function WelcomeScreen({ navigation }: any) {
           activeOpacity={0.85}
           onPress={() => navigation.navigate('Register')}
         >
-          <Text style={styles.secondaryButtonText}>Kayıt Ol</Text>
+          <Text style={styles.secondaryButtonText}>{t('welcome.register')}</Text>
         </TouchableOpacity>
 
         <Text style={styles.legal}>
-          Devam ederek PlantOra&apos;nın{' '}
-          <Text style={styles.legalLink}>Gizlilik Politikası</Text> ve{' '}
-          <Text style={styles.legalLink}>Kullanım Şartları</Text>&apos;nı kabul etmiş olursunuz.
+          {t('welcome.legalPre')}
+          <Text style={styles.legalLink}>{t('welcome.privacy')}</Text>
+          {t('welcome.legalMid')}
+          <Text style={styles.legalLink}>{t('welcome.terms')}</Text>
+          {t('welcome.legalPost')}
         </Text>
       </View>
     </View>

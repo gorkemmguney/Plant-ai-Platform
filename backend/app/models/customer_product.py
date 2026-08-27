@@ -10,7 +10,8 @@ class CustProd(Base):
     __tablename__ = "cust_prod"
 
     cust_prod_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    cust_id: Mapped[int] = mapped_column(ForeignKey("cust.cust_id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("app_user.user_id", ondelete="CASCADE"), nullable=False)
+
     prod_spec_id: Mapped[int] = mapped_column(ForeignKey("prod_spec.prod_spec_id"), nullable=False)
     
     name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -35,7 +36,8 @@ class CustProd(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # Relationships
-    customer: Mapped["Cust"] = relationship(foreign_keys=[cust_id])
+    user: Mapped["AppUser"] = relationship(foreign_keys=[user_id])
+
     specification: Mapped["ProdSpec"] = relationship(foreign_keys=[prod_spec_id])
     care_logs: Mapped[list["CustProdCareLog"]] = relationship(
         back_populates="product", cascade="all, delete-orphan"

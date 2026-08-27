@@ -9,8 +9,10 @@ import {
   View,
 } from 'react-native';
 import { useCart } from '../../context/CartContext';
+import { useI18n } from '../../i18n';
 import { apiClient } from '../../services/apiClient';
 import { colors, fonts, radius, shadow, spacing } from '../../theme/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface Coupon {
   coupon_id: number;
@@ -31,6 +33,8 @@ interface Suggestion {
 }
 
 export default function CartScreen({ navigation }: any) {
+  const insets = useSafeAreaInsets();
+  const { t } = useI18n();
   const { items, total, addToCart, changeQty } = useCart();
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [selectedCouponId, setSelectedCouponId] = useState<number | null>(null);
@@ -125,13 +129,13 @@ export default function CartScreen({ navigation }: any) {
       <View style={styles.screen}>
         <View style={styles.center}>
           <Text style={styles.emptyEmoji}>🛒</Text>
-          <Text style={styles.emptyText}>Sepetin boş.</Text>
+          <Text style={styles.emptyText}>{t('cart.empty')}</Text>
           <TouchableOpacity
             style={styles.shopButton}
             onPress={() => navigation.navigate('Tabs', { screen: 'Marketplace' })}
             activeOpacity={0.85}
           >
-            <Text style={styles.shopButtonText}>Alışverişe başla</Text>
+            <Text style={styles.shopButtonText}>{t('cart.startShopping')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -148,7 +152,7 @@ export default function CartScreen({ navigation }: any) {
         ListFooterComponent={
           suggestions.length > 0 ? (
             <View style={styles.suggestBox}>
-              <Text style={styles.suggestTitle}>Birlikte alınabilir</Text>
+              <Text style={styles.suggestTitle}>{t('cart.suggested')}</Text>
               <View style={styles.suggestRow}>
                 {suggestions.map((s) => (
                   <View key={s.prod_id} style={styles.suggestCard}>
@@ -180,7 +184,7 @@ export default function CartScreen({ navigation }: any) {
                       }
                       activeOpacity={0.85}
                     >
-                      <Text style={styles.suggestAddText}>+ Ekle</Text>
+                      <Text style={styles.suggestAddText}>{t('cart.add')}</Text>
                     </TouchableOpacity>
                   </View>
                 ))}
@@ -190,10 +194,10 @@ export default function CartScreen({ navigation }: any) {
         }
       />
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: spacing.xl + insets.bottom }]}>
         {coupons.length > 0 && (
           <View style={styles.couponSection}>
-            <Text style={styles.couponTitle}>Kampanyalarım</Text>
+            <Text style={styles.couponTitle}>{t('cart.myCoupons')}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.couponRow}>
               {coupons.map((c) => {
                 const active = c.coupon_id === selectedCouponId;
@@ -207,10 +211,10 @@ export default function CartScreen({ navigation }: any) {
                     activeOpacity={0.8}
                   >
                     <Text style={[styles.couponChipText, active && styles.couponChipTextActive]}>
-                      ₺{Number(c.discount_amount).toFixed(0)} indirim
+                      ₺{Number(c.discount_amount).toFixed(0)} {t('cart.discountWord')}
                     </Text>
                     <Text style={[styles.couponChipStore, active && styles.couponChipTextActive]} numberOfLines={1}>
-                      {c.seller_name ?? 'Mağaza'}
+                      {c.seller_name ?? t('common.store')}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -222,17 +226,17 @@ export default function CartScreen({ navigation }: any) {
         {discount > 0 && (
           <>
             <View style={styles.totalRow}>
-              <Text style={styles.subLabel}>Ara toplam</Text>
+              <Text style={styles.subLabel}>{t('cart.subtotal')}</Text>
               <Text style={styles.subValue}>₺{total.toFixed(2)}</Text>
             </View>
             <View style={styles.totalRow}>
-              <Text style={styles.discountLabel}>İndirim</Text>
+              <Text style={styles.discountLabel}>{t('cart.discountLabel')}</Text>
               <Text style={styles.discountValue}>−₺{discount.toFixed(2)}</Text>
             </View>
           </>
         )}
         <View style={styles.totalRow}>
-          <Text style={styles.totalLabel}>Toplam</Text>
+          <Text style={styles.totalLabel}>{t('cart.total')}</Text>
           <Text style={styles.totalValue}>₺{finalTotal.toFixed(2)}</Text>
         </View>
         <TouchableOpacity
@@ -240,7 +244,7 @@ export default function CartScreen({ navigation }: any) {
           onPress={handleCheckout}
           activeOpacity={0.85}
         >
-          <Text style={styles.checkoutText}>Sipariş Ver</Text>
+          <Text style={styles.checkoutText}>{t('cart.checkout')}</Text>
         </TouchableOpacity>
       </View>
     </View>

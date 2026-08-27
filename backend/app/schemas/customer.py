@@ -33,8 +33,9 @@ class CustomerCreateIn(BaseModel):
 
 class CustomerOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    cust_id: int
+    cust_id: int = 0
     user_id: int
     customer_type: str
-    is_active: bool
-    created_at: datetime
+    is_active: bool = True
+    created_at: datetime | None = None
+

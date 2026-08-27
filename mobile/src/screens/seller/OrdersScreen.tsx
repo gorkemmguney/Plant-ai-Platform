@@ -9,6 +9,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useI18n } from '../../i18n';
 import { apiClient } from '../../services/apiClient';
 import { badgeColors, colors, fonts, radius, shadow, spacing } from '../../theme/theme';
 
@@ -28,18 +30,13 @@ interface Order {
   items: OrderItem[];
 }
 
-// Sipariş durumları (order_service.py ile aynı id'ler)
-const STATUSES: { id: number; label: string }[] = [
-  { id: 5, label: 'Alındı' },
-  { id: 6, label: 'Hazırlanıyor' },
-  { id: 7, label: 'Kargoda' },
-  { id: 8, label: 'Teslim' },
-  { id: 9, label: 'İptal' },
-];
+// Sipariş durumları (order_service.py ile aynı id'ler); etiketler i18n'den gelir.
+const STATUS_IDS = [5, 6, 7, 8, 9];
 
-const statusLabel = (id: number) => STATUSES.find((s) => s.id === id)?.label ?? `#${id}`;
-
-export default function OrdersScreen() {
+export default function OrdersScreen({ navigation }: any) {
+  const { t } = useI18n();
+  const statusLabel = (id: number) =>
+    STATUS_IDS.includes(id) ? t(`sellerOrders.status${id}`) : `#${id}`;
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -52,7 +49,7 @@ export default function OrdersScreen() {
       const { data } = await apiClient.get<Order[]>('/orders/all');
       setOrders(data);
     } catch (err: any) {
-      setError(err?.response?.data?.detail ?? 'Siparişler yüklenemedi.');
+      setError(err?.response?.data?.detail ?? t('orders.loadFailed'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -72,7 +69,7 @@ export default function OrdersScreen() {
         prev.map((o) => (o.cust_ord_id === order.cust_ord_id ? { ...o, gnl_st_id: statusId } : o))
       );
     } catch (err: any) {
-      Alert.alert('Güncellenemedi', err?.response?.data?.detail ?? 'Sipariş durumu güncellenemedi.');
+      Alert.alert(t('sellerOrders.updateFailed'), err?.response?.data?.detail ?? t('sellerOrders.updateFailedMsg'));
     } finally {
       setBusyId(null);
     }
@@ -86,11 +83,11 @@ export default function OrdersScreen() {
       <View style={styles.card}>
         <View style={styles.cardTop}>
           <View>
-            <Text style={styles.orderId}>Sipariş #{item.cust_ord_id}</Text>
+            <Text style={styles.orderId}>{t('orders.orderPrefix')}#{item.cust_ord_id}</Text>
             <Text style={styles.meta}>
               {dateText}
               {dateText ? ' · ' : ''}
-              {itemCount} ürün · Müşteri #{item.cust_id}
+              {itemCount} {t('common.items')} · {t('sellerOrders.customer')} #{item.cust_id}
             </Text>
           </View>
           <Text style={styles.total}>₺{Number(item.total_price).toFixed(2)}</Text>
@@ -98,19 +95,19 @@ export default function OrdersScreen() {
 
         <View style={[styles.currentBadge, { backgroundColor: badgeColors.secondary.bg }]}>
           <Text style={[styles.currentBadgeText, { color: badgeColors.secondary.text }]}>
-            Durum: {statusLabel(item.gnl_st_id)}
+            {t('sellerOrders.status')}: {statusLabel(item.gnl_st_id)}
           </Text>
         </View>
 
-        <Text style={styles.updateLabel}>Durumu güncelle</Text>
+        <Text style={styles.updateLabel}>{t('sellerOrders.updateStatus')}</Text>
         <View style={styles.statusRow}>
-          {STATUSES.map((s) => {
-            const active = item.gnl_st_id === s.id;
+          {STATUS_IDS.map((id) => {
+            const active = item.gnl_st_id === id;
             return (
               <TouchableOpacity
-                key={s.id}
+                key={id}
                 style={[styles.statusChip, active ? styles.statusChipActive : styles.statusChipInactive]}
-                onPress={() => changeStatus(item, s.id)}
+                onPress={() => changeStatus(item, id)}
                 disabled={busyId === item.cust_ord_id}
                 activeOpacity={0.75}
               >
@@ -120,7 +117,7 @@ export default function OrdersScreen() {
                     active ? styles.statusChipTextActive : styles.statusChipTextInactive,
                   ]}
                 >
-                  {s.label}
+                  {statusLabel(id)}
                 </Text>
               </TouchableOpacity>
             );
@@ -129,6 +126,32 @@ export default function OrdersScreen() {
         {busyId === item.cust_ord_id && (
           <ActivityIndicator size="small" color={colors.muted} style={{ marginTop: spacing.sm }} />
         )}
+
+        <TouchableOpacity
+          style={styles.chatCustomerBtn}
+          onPress={async () => {
+            try {
+              const { fetchInteractions } = require('../../services/communicationService');
+              const interactions = await fetchInteractions();
+              const found = interactions.find((i: any) => i.related_ord_id === item.cust_ord_id || i.customer_id === item.cust_id);
+              if (found) {
+                navigation.navigate('SellerChatDetail', {
+                  interactionId: found.comm_interaction_id,
+                  partnerName: found.partner_name,
+                  ordId: item.cust_ord_id,
+                });
+              } else {
+                navigation.navigate('SellerChatList');
+              }
+            } catch (err: any) {
+              navigation.navigate('SellerChatList');
+            }
+          }}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="chatbubbles-outline" size={15} color={colors.primaryDeep} style={{ marginRight: 6 }} />
+          <Text style={styles.chatCustomerText}>Müşteri ile Mesajlaş</Text>
+        </TouchableOpacity>
       </View>
     );
   };
@@ -136,8 +159,8 @@ export default function OrdersScreen() {
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Siparişler</Text>
-        <Text style={styles.headerSub}>Gelen siparişleri yönet</Text>
+        <Text style={styles.headerTitle}>{t('sellerOrders.title')}</Text>
+        <Text style={styles.headerSub}>{t('sellerOrders.sub')}</Text>
       </View>
 
       {loading ? (
@@ -148,7 +171,7 @@ export default function OrdersScreen() {
         <View style={styles.center}>
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={loadOrders} activeOpacity={0.85}>
-            <Text style={styles.retryText}>Tekrar dene</Text>
+            <Text style={styles.retryText}>{t('common.retry')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -166,7 +189,7 @@ export default function OrdersScreen() {
               }}
             />
           }
-          ListEmptyComponent={<Text style={styles.emptyText}>Henüz sipariş yok.</Text>}
+          ListEmptyComponent={<Text style={styles.emptyText}>{t('sellerOrders.empty')}</Text>}
         />
       )}
     </View>
@@ -216,6 +239,16 @@ const styles = StyleSheet.create({
   statusChipText: { fontFamily: fonts.sansBold, fontSize: 11.5 },
   statusChipTextActive: { color: colors.white },
   statusChipTextInactive: { color: colors.muted },
+  chatCustomerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.sm,
+    paddingVertical: 9,
+    marginTop: spacing.md,
+  },
+  chatCustomerText: { fontFamily: fonts.sansBold, fontSize: 12.5, color: colors.primaryDeep },
   errorText: { fontFamily: fonts.sans, fontSize: 13.5, color: colors.muted, textAlign: 'center', lineHeight: 20 },
   retryButton: {
     borderWidth: 1,

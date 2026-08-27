@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import get_current_user, get_user_roles, require_role
 from app.db.session import get_db
 from app.models.catalog import Prod
-from app.models.customer import Cust
+from app.models.customer import Ind
 from app.models.order import CustOrd, CustOrdItem
 from app.models.review import Review
 from app.models.user import AppUser
@@ -14,7 +14,6 @@ from app.schemas.review import RatingSummaryOut, ReviewCreateIn, ReviewOut, Revi
 
 router = APIRouter(prefix="/reviews", tags=["reviews"])
 
-# order_service.py ile aynı durum kodları — sadece TESLİM EDİLMİŞ siparişler puanlanabilir
 DELIVERED_STATUS_ID = 8
 
 
@@ -38,13 +37,6 @@ async def create_review(
     db: AsyncSession = Depends(get_db),
     user: AppUser = Depends(require_role(RoleName.CUSTOMER, RoleName.ADMIN)),
 ):
-    # Müşteri profili
-    cust = (await db.execute(select(Cust).where(Cust.user_id == user.user_id))).scalar_one_or_none()
-    if cust is None:
-        raise HTTPException(status_code=400, detail="Müşteri profili bulunamadı")
-
-    # Bu sipariş kalemi gerçekten bu müşteriye mi ait, TESLİM EDİLMİŞ bir
-    # siparişte mi, ve gerçekten bu ürüne mi ait — doğrula
     item_check = (
         await db.execute(
             select(CustOrdItem.cust_ord_item_id)
@@ -52,20 +44,19 @@ async def create_review(
             .where(
                 CustOrdItem.cust_ord_item_id == payload.cust_ord_item_id,
                 CustOrdItem.prod_id == payload.prod_id,
-                CustOrd.cust_id == cust.cust_id,
+                CustOrd.user_id == user.user_id,
                 CustOrd.gnl_st_id == DELIVERED_STATUS_ID,
             )
             .limit(1)
         )
     ).first()
+
     if item_check is None:
         raise HTTPException(
             status_code=400,
             detail="Bu ürünü değerlendirebilmek için siparişinin teslim edilmiş olması gerekiyor",
         )
 
-    # Bu SİPARİŞ KALEMİ zaten değerlendirilmiş mi? (aynı ürün farklı bir
-    # siparişte tekrar teslim alınırsa yeniden değerlendirilebilir)
     existing = (
         await db.execute(
             select(Review).where(
@@ -85,10 +76,13 @@ async def create_review(
         comment=payload.comment,
     )
     db.add(review)
-
     await db.commit()
     await db.refresh(review)
-    return _review_out(review, user.first_name, user.last_name)
+
+    ind = (await db.execute(select(Ind).where(Ind.user_id == user.user_id))).scalar_one_or_none()
+    first = ind.first_name if ind else None
+    last = ind.last_name if ind else None
+    return _review_out(review, first, last)
 
 
 @router.get("/mine", response_model=list[ReviewOut])
@@ -104,22 +98,22 @@ async def my_reviews(
     )
     out: list[ReviewOut] = []
     for review, prod_name in result.all():
-        item = _review_out(review, user.first_name, user.last_name)
+        item = _review_out(review, None, None)
         item.prod_name = prod_name
         out.append(item)
     return out
 
 
+@router.get("/my-received", response_model=list[ReviewOut])
 @router.get("/seller", response_model=list[ReviewOut])
-async def seller_reviews(
+async def my_received_reviews(
     db: AsyncSession = Depends(get_db),
     user: AppUser = Depends(require_role(RoleName.SELLER, RoleName.ADMIN)),
 ):
-    """Satıcının kendi ürünlerine gelen tüm yorumlar (cevaplamak için)."""
     result = await db.execute(
-        select(Review, Prod.name, AppUser.first_name, AppUser.last_name)
+        select(Review, Prod.name, Ind.first_name, Ind.last_name)
         .join(Prod, Prod.prod_id == Review.prod_id)
-        .join(AppUser, AppUser.user_id == Review.user_id)
+        .outerjoin(Ind, Ind.user_id == Review.user_id)
         .where(Prod.seller_id == user.user_id)
         .order_by(Review.created_at.desc())
     )
@@ -134,8 +128,8 @@ async def seller_reviews(
 @router.get("/product/{prod_id}", response_model=ReviewSummaryOut)
 async def product_reviews(prod_id: int, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
-        select(Review, AppUser.first_name, AppUser.last_name)
-        .join(AppUser, AppUser.user_id == Review.user_id)
+        select(Review, Ind.first_name, Ind.last_name)
+        .outerjoin(Ind, Ind.user_id == Review.user_id)
         .where(Review.prod_id == prod_id)
         .order_by(Review.created_at.desc())
     )
@@ -148,7 +142,6 @@ async def product_reviews(prod_id: int, db: AsyncSession = Depends(get_db)):
 
 @router.get("/store/{seller_id}", response_model=RatingSummaryOut)
 async def store_rating(seller_id: int, db: AsyncSession = Depends(get_db)):
-    # Mağaza puanı = o satıcının tüm ürünlerine gelen yorumların ortalaması
     result = await db.execute(
         select(func.avg(Review.rating), func.count(Review.review_id))
         .join(Prod, Prod.prod_id == Review.prod_id)
@@ -169,7 +162,6 @@ async def reply_to_review(
     if review is None:
         raise HTTPException(status_code=404, detail="Yorum bulunamadı")
 
-    # Satıcı yalnızca kendi ürününe gelen yoruma cevap verebilir (admin her yoruma)
     prod = (await db.execute(select(Prod).where(Prod.prod_id == review.prod_id))).scalar_one_or_none()
     user_roles = await get_user_roles(user, db)
     is_admin = RoleName.ADMIN.value in user_roles
@@ -181,7 +173,7 @@ async def reply_to_review(
     await db.refresh(review)
 
     reviewer = (
-        await db.execute(select(AppUser.first_name, AppUser.last_name).where(AppUser.user_id == review.user_id))
+        await db.execute(select(Ind.first_name, Ind.last_name).where(Ind.user_id == review.user_id))
     ).first()
     first, last = (reviewer[0], reviewer[1]) if reviewer else (None, None)
     return _review_out(review, first, last)

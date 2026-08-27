@@ -10,9 +10,11 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useI18n } from '../../i18n';
 import { badgeColors, colors, fonts, radius, shadow, spacing } from '../../theme/theme';
 
 export default function AnalysisResultScreen({ route, navigation }: any) {
+  const { t } = useI18n();
   const { analysisId, imageUrl, result, confidence, createdAt, recommendedProducts } = route.params || {};
   const [feedbackSent, setFeedbackSent] = useState<boolean | null>(null);
 
@@ -32,9 +34,9 @@ export default function AnalysisResultScreen({ route, navigation }: any) {
   };
 
   const analysis = parseAnalysisResult(result);
-  const species = analysis?.species || 'Tespit Edilemeyen Tür';
+  const species = analysis?.species || t('analysis.unknownSpecies');
   const healthStatus = analysis?.health_status || 'unknown';
-  const careRecommendation = analysis?.care_recommendation || 'Bakım önerisi bulunmuyor.';
+  const careRecommendation = analysis?.care_recommendation || t('analysis.noCareRec');
   const issuesDetected = analysis?.issues_detected || [];
 
   const confidencePct = confidence ? Math.round(Number(confidence) * 100) : 0;
@@ -44,34 +46,34 @@ export default function AnalysisResultScreen({ route, navigation }: any) {
       case 'healthy':
         return {
           bg: badgeColors.green.bg,
-          text: 'Sağlıklı',
+          text: t('analysis.healthy'),
           color: badgeColors.green.text,
           icon: 'checkmark-circle',
-          desc: 'Bitkiniz oldukça sağlıklı görünüyor. Mevcut bakım düzenine devam edebilirsiniz.',
+          desc: t('analysis.healthyDesc'),
         };
       case 'diseased':
         return {
           bg: badgeColors.red.bg,
-          text: 'Hasta / Hastalıklı',
+          text: t('analysis.diseased'),
           color: badgeColors.red.text,
           icon: 'alert-circle',
-          desc: 'Bitkide hastalık belirtileri gözlemlendi. Aşağıdaki önerileri dikkatle uygulayın.',
+          desc: t('analysis.diseasedDesc'),
         };
       case 'pest_damage':
         return {
           bg: badgeColors.amber.bg,
-          text: 'Zararlı Tehdidi',
+          text: t('analysis.pest'),
           color: badgeColors.amber.text,
           icon: 'bug',
-          desc: 'Bitkide böcek veya zararlı hasarı tespit edildi. Bitkiyi diğerlerinden ayırmanız önerilir.',
+          desc: t('analysis.pestDesc'),
         };
       default:
         return {
           bg: colors.bgAlt,
-          text: 'Belirlenemedi',
+          text: t('analysis.unknown'),
           color: colors.muted,
           icon: 'help-circle',
-          desc: 'Görüntü kalitesi veya bitki yapısından ötürü net bir analiz yapılamadı.',
+          desc: t('analysis.unknownDesc'),
         };
     }
   };
@@ -84,7 +86,7 @@ export default function AnalysisResultScreen({ route, navigation }: any) {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={colors.ink} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Analiz Sonucu</Text>
+        <Text style={styles.headerTitle}>{t('analysis.title')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -110,7 +112,7 @@ export default function AnalysisResultScreen({ route, navigation }: any) {
           {confidencePct > 0 && (
             <View style={styles.confidenceSection}>
               <View style={styles.confidenceHeader}>
-                <Text style={styles.confidenceLabel}>Yapay Zeka Doğruluk Payı</Text>
+                <Text style={styles.confidenceLabel}>{t('analysis.confidence')}</Text>
                 <Text style={styles.confidenceValue}>%{confidencePct}</Text>
               </View>
               <View style={styles.progressBarBg}>
@@ -122,7 +124,7 @@ export default function AnalysisResultScreen({ route, navigation }: any) {
 
         {issuesDetected.length > 0 && (
           <View style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>⚠️ Tespit Edilen Sorunlar</Text>
+            <Text style={styles.sectionTitle}>{t('analysis.issuesTitle')}</Text>
             <View style={styles.issuesList}>
               {issuesDetected.map((issue: string, idx: number) => (
                 <View key={idx} style={styles.issueRow}>
@@ -135,13 +137,13 @@ export default function AnalysisResultScreen({ route, navigation }: any) {
         )}
 
         <View style={[styles.sectionCard, styles.recommendationCard]}>
-          <Text style={styles.sectionTitle}>🌿 Bakım & Çözüm Önerisi</Text>
+          <Text style={styles.sectionTitle}>{t('analysis.careTitle')}</Text>
           <Text style={styles.recommendationText}>{careRecommendation}</Text>
         </View>
 
         {recommendedProducts && recommendedProducts.length > 0 && (
           <View style={styles.productsSection}>
-            <Text style={styles.productsSectionTitle}>🌿 Bitkiniz İçin Önerilen Ürünler</Text>
+            <Text style={styles.productsSectionTitle}>{t('analysis.recommendedProducts')}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.productsList}>
               {recommendedProducts.map((product: string, idx: number) => {
                 let emoji = '🌿';
@@ -163,12 +165,12 @@ export default function AnalysisResultScreen({ route, navigation }: any) {
                     activeOpacity={0.85}
                     onPress={() =>
                       Alert.alert(
-                        'Ürünü Ara',
-                        `"${product}" ürününü internette aratmak ister misiniz?`,
+                        t('analysis.searchProductTitle'),
+                        `"${product}"${t('analysis.searchProductQ')}`,
                         [
-                          { text: 'Vazgeç', style: 'cancel' },
+                          { text: t('common.cancel'), style: 'cancel' },
                           {
-                            text: 'Google\'da Ara',
+                            text: t('analysis.searchGoogle'),
                             onPress: () => {
                               const url = `https://www.google.com/search?q=${encodeURIComponent(product)}`;
                               Linking.openURL(url).catch((err) =>
@@ -186,7 +188,7 @@ export default function AnalysisResultScreen({ route, navigation }: any) {
                     <Text style={styles.productName} numberOfLines={2}>
                       {product}
                     </Text>
-                    <Text style={styles.searchLink}>İnternette Ara 🔍</Text>
+                    <Text style={styles.searchLink}>{t('analysis.searchWeb')}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -195,7 +197,7 @@ export default function AnalysisResultScreen({ route, navigation }: any) {
         )}
 
         <View style={styles.feedbackContainer}>
-          <Text style={styles.feedbackTitle}>Bu analiz yardımcı oldu mu?</Text>
+          <Text style={styles.feedbackTitle}>{t('analysis.feedbackTitle')}</Text>
           {feedbackSent === null ? (
             <View style={styles.feedbackButtons}>
               <TouchableOpacity
@@ -203,7 +205,7 @@ export default function AnalysisResultScreen({ route, navigation }: any) {
                 onPress={() => setFeedbackSent(true)}
               >
                 <Ionicons name="thumbs-up" size={18} color={badgeColors.green.text} style={{ marginRight: 6 }} />
-                <Text style={[styles.feedbackBtnText, { color: badgeColors.green.text }]}>Evet</Text>
+                <Text style={[styles.feedbackBtnText, { color: badgeColors.green.text }]}>{t('analysis.yes')}</Text>
               </TouchableOpacity>
               
               <TouchableOpacity
@@ -211,12 +213,12 @@ export default function AnalysisResultScreen({ route, navigation }: any) {
                 onPress={() => setFeedbackSent(false)}
               >
                 <Ionicons name="thumbs-down" size={18} color={colors.red} style={{ marginRight: 6 }} />
-                <Text style={[styles.feedbackBtnText, { color: colors.red }]}>Hayır</Text>
+                <Text style={[styles.feedbackBtnText, { color: colors.red }]}>{t('analysis.no')}</Text>
               </TouchableOpacity>
             </View>
           ) : (
             <Text style={styles.feedbackSuccessText}>
-              {feedbackSent ? 'Geri bildiriminiz için teşekkürler! 👍' : 'Geri bildiriminiz kaydedildi. Asistanımızı geliştirmeye devam edeceğiz.'}
+              {feedbackSent ? t('analysis.feedbackThanks') : t('analysis.feedbackSaved')}
             </Text>
           )}
         </View>
@@ -236,7 +238,7 @@ export default function AnalysisResultScreen({ route, navigation }: any) {
             activeOpacity={0.85}
           >
             <Ionicons name="leaf-outline" size={20} color={colors.white} style={{ marginRight: 8 }} />
-            <Text style={styles.addToGardenBtnText}>Bu Bitkiyi Bahçeme Ekle</Text>
+            <Text style={styles.addToGardenBtnText}>{t('analysis.addToGarden')}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

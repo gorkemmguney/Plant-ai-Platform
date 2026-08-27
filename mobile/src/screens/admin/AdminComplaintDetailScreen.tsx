@@ -14,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useI18n } from '../../i18n';
 import { apiClient } from '../../services/apiClient';
 import { colors, fonts, radius, shadow, spacing } from '../../theme/theme';
 
@@ -43,22 +44,24 @@ interface Complaint {
 }
 
 const statusOptions = [
-  { key: 'pending', label: 'Beklemede', bg: '#fef3c7', text: '#d97706', activeBorder: '#d97706' },
-  { key: 'in_progress', label: 'İnceleniyor', bg: '#eff6ff', text: '#2563eb', activeBorder: '#2563eb' },
-  { key: 'resolved', label: 'Çözüldü', bg: '#ecfdf5', text: '#059669', activeBorder: '#059669' },
-  { key: 'rejected', label: 'Reddedildi', bg: '#fef2f2', text: '#dc2626', activeBorder: '#dc2626' },
+  { key: 'pending', labelKey: 'support.statusPending', bg: '#fef3c7', text: '#d97706', activeBorder: '#d97706' },
+  { key: 'in_progress', labelKey: 'support.statusInProgress', bg: '#eff6ff', text: '#2563eb', activeBorder: '#2563eb' },
+  { key: 'resolved', labelKey: 'support.statusResolved', bg: '#ecfdf5', text: '#059669', activeBorder: '#059669' },
+  { key: 'rejected', labelKey: 'support.statusRejected', bg: '#fef2f2', text: '#dc2626', activeBorder: '#dc2626' },
 ];
 
-const typeMapping: Record<string, { label: string; icon: string }> = {
-  general: { label: 'Genel Destek', icon: 'help-circle-outline' },
-  order: { label: 'Sipariş Şikayeti', icon: 'receipt-outline' },
-  product: { label: 'Ürün Şikayeti', icon: 'leaf-outline' },
-  seller: { label: 'Satıcı Şikayeti', icon: 'business-outline' },
+const typeMapping: Record<string, { labelKey: string; icon: string }> = {
+  general: { labelKey: 'adminComplaints.typeGeneral', icon: 'help-circle-outline' },
+  order: { labelKey: 'adminComplaints.typeOrder', icon: 'receipt-outline' },
+  product: { labelKey: 'adminComplaints.typeProduct', icon: 'leaf-outline' },
+  seller: { labelKey: 'adminComplaints.typeSeller', icon: 'business-outline' },
+  suggestion: { labelKey: 'adminComplaints.typeSuggestion', icon: 'bulb-outline' },
 };
 
 export default function AdminComplaintDetailScreen() {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
+  const { t } = useI18n();
   const { complaintId } = route.params;
 
   const [complaint, setComplaint] = useState<Complaint | null>(null);
@@ -78,10 +81,10 @@ export default function AdminComplaintDetailScreen() {
       if (data && data.suggested_note) {
         setAdminNote(data.suggested_note);
       } else {
-        Alert.alert('Hata', 'Yapay zekadan yanıt alınamadı.');
+        Alert.alert(t('common.error'), t('cDetail.aiNoResponse'));
       }
     } catch (err: any) {
-      Alert.alert('Hata', err?.response?.data?.detail ?? 'Yapay zeka taslağı oluşturulamadı.');
+      Alert.alert(t('common.error'), err?.response?.data?.detail ?? t('cDetail.aiDraftFailed'));
     } finally {
       setDrafting(false);
     }
@@ -112,7 +115,7 @@ export default function AdminComplaintDetailScreen() {
         fetchRiskAdvice(complaintId);
       }
     } catch (err: any) {
-      setError(err?.response?.data?.detail ?? 'Detaylar yüklenirken hata oluştu.');
+      setError(err?.response?.data?.detail ?? t('cDetail.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -129,11 +132,11 @@ export default function AdminComplaintDetailScreen() {
         status,
         admin_note: adminNote.trim() || null,
       });
-      Alert.alert('Başarılı', 'Şikayet durumu başarıyla güncellendi.', [
-        { text: 'Tamam', onPress: () => navigation.goBack() }
+      Alert.alert(t('createPost.success'), t('cDetail.updated'), [
+        { text: t('common.ok'), onPress: () => navigation.goBack() }
       ]);
     } catch (err: any) {
-      Alert.alert('Hata', err?.response?.data?.detail ?? 'Güncelleme yapılırken bir hata oluştu.');
+      Alert.alert(t('common.error'), err?.response?.data?.detail ?? t('cDetail.updateFailed'));
     } finally {
       setSaving(false);
     }
@@ -158,7 +161,7 @@ export default function AdminComplaintDetailScreen() {
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color={colors.buttonPrimary} />
-        <Text style={styles.loadingText}>Detaylar yükleniyor...</Text>
+        <Text style={styles.loadingText}>{t('cDetail.loading')}</Text>
       </View>
     );
   }
@@ -166,15 +169,17 @@ export default function AdminComplaintDetailScreen() {
   if (error || !complaint) {
     return (
       <View style={styles.centerContainer}>
-        <Text style={styles.errorText}>{error ?? 'Şikayet bulunamadı.'}</Text>
+        <Text style={styles.errorText}>{error ?? t('cDetail.notFound')}</Text>
         <TouchableOpacity style={styles.retryButton} onPress={fetchDetail}>
-          <Text style={styles.retryText}>Geri Dön</Text>
+          <Text style={styles.retryText}>{t('cDetail.goBack')}</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
-  const typeInfo = typeMapping[complaint.complaint_type] || { label: 'Bilinmeyen', icon: 'help-outline' };
+  const typeInfo = typeMapping[complaint.complaint_type];
+  const typeLabel = typeInfo ? t(typeInfo.labelKey) : t('adminComplaints.unknown');
+  const typeIcon = (typeInfo?.icon ?? 'help-outline') as any;
 
   return (
     <KeyboardAvoidingView
@@ -187,8 +192,8 @@ export default function AdminComplaintDetailScreen() {
         <View style={styles.card}>
           <View style={styles.headerRow}>
             <View style={styles.typeTag}>
-              <Ionicons name={typeInfo.icon as any} size={16} color={colors.primaryDeep} style={{ marginRight: 5 }} />
-              <Text style={styles.typeTagText}>{typeInfo.label}</Text>
+              <Ionicons name={typeIcon} size={16} color={colors.primaryDeep} style={{ marginRight: 5 }} />
+              <Text style={styles.typeTagText}>{typeLabel}</Text>
             </View>
             <Text style={styles.dateText}>{formatDate(complaint.created_at)}</Text>
           </View>
@@ -202,7 +207,7 @@ export default function AdminComplaintDetailScreen() {
           <View style={styles.aiSummaryCard}>
             <View style={styles.aiSummaryHeader}>
               <Ionicons name="sparkles" size={16} color="#7c4dff" style={{ marginRight: 6 }} />
-              <Text style={styles.aiSummaryTitle}>AI Yönetici Özeti</Text>
+              <Text style={styles.aiSummaryTitle}>{t('cDetail.aiSummary')}</Text>
             </View>
             <Text style={styles.aiSummaryText}>{complaint.ai_summary}</Text>
           </View>
@@ -210,11 +215,11 @@ export default function AdminComplaintDetailScreen() {
 
         {/* User Card */}
         <View style={styles.card}>
-          <Text style={styles.cardSectionTitle}>Şikayetçi Bilgileri</Text>
+          <Text style={styles.cardSectionTitle}>{t('cDetail.complainantInfo')}</Text>
           <View style={styles.infoRow}>
             <Ionicons name="person-circle-outline" size={36} color={colors.muted} style={{ marginRight: spacing.sm }} />
             <View>
-              <Text style={styles.infoValue}>{complaint.user_name || 'İsim Belirtilmemiş'}</Text>
+              <Text style={styles.infoValue}>{complaint.user_name || t('cDetail.noName')}</Text>
               <Text style={styles.infoLabel}>{complaint.user_email}</Text>
             </View>
           </View>
@@ -223,15 +228,15 @@ export default function AdminComplaintDetailScreen() {
         {/* Reference Context Card */}
         {(complaint.cust_ord_id || complaint.prod_id || complaint.reported_seller_id) && (
           <View style={styles.card}>
-            <Text style={styles.cardSectionTitle}>İlişkili Kayıt</Text>
+            <Text style={styles.cardSectionTitle}>{t('cDetail.relatedRecord')}</Text>
             
             {complaint.complaint_type === 'order' && complaint.cust_ord_id && (
               <View style={styles.refRow}>
                 <Ionicons name="receipt-outline" size={24} color={colors.primaryDeep} style={{ marginRight: spacing.sm }} />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.refTitle}>Sipariş No: #{complaint.cust_ord_id}</Text>
+                  <Text style={styles.refTitle}>{t('cDetail.orderNo')}#{complaint.cust_ord_id}</Text>
                   <Text style={styles.refSubtitle}>
-                    Tutar: {complaint.order_price ? `${complaint.order_price} TL` : '—'} | Tarih: {complaint.order_date ? formatDate(complaint.order_date) : '—'}
+                    {t('cDetail.amount')}: {complaint.order_price ? `${complaint.order_price} TL` : '—'} | {t('cDetail.date')}: {complaint.order_date ? formatDate(complaint.order_date) : '—'}
                   </Text>
                 </View>
               </View>
@@ -241,8 +246,8 @@ export default function AdminComplaintDetailScreen() {
               <View style={styles.refRow}>
                 <Ionicons name="leaf-outline" size={24} color={colors.primaryDeep} style={{ marginRight: spacing.sm }} />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.refTitle}>Ürün Adı: {complaint.product_name || 'Yüklenemedi'}</Text>
-                  <Text style={styles.refSubtitle}>Ürün ID: #{complaint.prod_id}</Text>
+                  <Text style={styles.refTitle}>{t('cDetail.productName')}{complaint.product_name || t('cDetail.notLoaded')}</Text>
+                  <Text style={styles.refSubtitle}>{t('cDetail.productId')}#{complaint.prod_id}</Text>
                 </View>
               </View>
             )}
@@ -251,8 +256,8 @@ export default function AdminComplaintDetailScreen() {
               <View style={styles.refRow}>
                 <Ionicons name="business-outline" size={24} color={colors.primaryDeep} style={{ marginRight: spacing.sm }} />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.refTitle}>Satıcı Mağazası: {complaint.reported_seller_name || 'Yüklenemedi'}</Text>
-                  <Text style={styles.refSubtitle}>Satıcı ID: #{complaint.reported_seller_id}</Text>
+                  <Text style={styles.refTitle}>{t('cDetail.sellerStore')}{complaint.reported_seller_name || t('cDetail.notLoaded')}</Text>
+                  <Text style={styles.refSubtitle}>{t('cDetail.sellerId')}#{complaint.reported_seller_id}</Text>
                 </View>
               </View>
             )}
@@ -263,13 +268,13 @@ export default function AdminComplaintDetailScreen() {
         {loadingRisk ? (
           <View style={styles.card}>
             <ActivityIndicator size="small" color={colors.primaryDeep} />
-            <Text style={styles.loadingRiskText}>Satıcı risk analizi yapılıyor...</Text>
+            <Text style={styles.loadingRiskText}>{t('cDetail.riskAnalyzing')}</Text>
           </View>
         ) : riskAdvice ? (
           <View style={styles.card}>
-            <Text style={styles.cardSectionTitle}>AI Satıcı Risk Değerlendirmesi</Text>
+            <Text style={styles.cardSectionTitle}>{t('cDetail.riskAssessment')}</Text>
             <View style={styles.riskHeaderRow}>
-              <Text style={styles.riskLabelText}>Risk Seviyesi:</Text>
+              <Text style={styles.riskLabelText}>{t('cDetail.riskLevel')}</Text>
               <View style={[styles.riskBadge, { backgroundColor: riskAdvice.risk_level === 'high' ? '#fde8e8' : riskAdvice.risk_level === 'medium' ? '#fef3c7' : '#edfcf2' }]}>
                 <Text style={[styles.riskBadgeText, { color: riskAdvice.risk_level === 'high' ? '#e02424' : riskAdvice.risk_level === 'medium' ? '#d97706' : '#0e7043' }]}>
                   {riskAdvice.risk_label}
@@ -280,7 +285,7 @@ export default function AdminComplaintDetailScreen() {
             <View style={styles.recommendationBox}>
               <Ionicons name="shield-checkmark" size={16} color={colors.primaryDeep} style={{ marginRight: 6 }} />
               <Text style={styles.recommendationText}>
-                <Text style={{ fontWeight: 'bold' }}>Öneri: </Text>
+                <Text style={{ fontWeight: 'bold' }}>{t('cDetail.recommendation')}</Text>
                 {riskAdvice.recommendation}
               </Text>
             </View>
@@ -289,9 +294,9 @@ export default function AdminComplaintDetailScreen() {
 
         {/* Resolution Action Card */}
         <View style={[styles.card, { marginBottom: spacing.xl }]}>
-          <Text style={styles.cardSectionTitle}>Çözüm ve Durum Yönetimi</Text>
-          
-          <Text style={styles.inputLabel}>Şikayet Durumu</Text>
+          <Text style={styles.cardSectionTitle}>{t('cDetail.resolutionMgmt')}</Text>
+
+          <Text style={styles.inputLabel}>{t('cDetail.complaintStatus')}</Text>
           <View style={styles.statusOptionsRow}>
             {statusOptions.map((opt) => {
               const isActive = status === opt.key;
@@ -306,7 +311,7 @@ export default function AdminComplaintDetailScreen() {
                   onPress={() => setStatus(opt.key)}
                 >
                   <Text style={[styles.statusOptionText, { color: opt.text, fontWeight: isActive ? '700' : '500' }]}>
-                    {opt.label}
+                    {t(opt.labelKey)}
                   </Text>
                 </TouchableOpacity>
               );
@@ -315,7 +320,7 @@ export default function AdminComplaintDetailScreen() {
 
           <View style={styles.noteHeaderRow}>
             <View style={{ flex: 1, marginRight: spacing.sm }}>
-              <Text style={styles.noteLabel}>Yönetici Yanıt Notu (Kullanıcıya Gönderilecek)</Text>
+              <Text style={styles.noteLabel}>{t('cDetail.adminNote')}</Text>
             </View>
             <TouchableOpacity
               onPress={handleAiDraft}
@@ -333,7 +338,7 @@ export default function AdminComplaintDetailScreen() {
                 ) : (
                   <>
                     <Ionicons name="sparkles" size={12} color={colors.white} style={{ marginRight: 5 }} />
-                    <Text style={styles.aiDraftText}>AI TASLAK YAZ</Text>
+                    <Text style={styles.aiDraftText}>{t('cDetail.aiDraftBtn')}</Text>
                   </>
                 )}
               </LinearGradient>
@@ -345,7 +350,7 @@ export default function AdminComplaintDetailScreen() {
             numberOfLines={4}
             value={adminNote}
             onChangeText={setAdminNote}
-            placeholder="Kullanıcıya iletilecek çözüm veya bilgilendirme notunu yazınız..."
+            placeholder={t('cDetail.notePlaceholder')}
             placeholderTextColor={colors.muted2}
           />
 
@@ -360,7 +365,7 @@ export default function AdminComplaintDetailScreen() {
             ) : (
               <>
                 <Ionicons name="save-outline" size={18} color={colors.buttonPrimaryText} style={{ marginRight: 6 }} />
-                <Text style={styles.saveButtonText}>Güncellemeyi Kaydet</Text>
+                <Text style={styles.saveButtonText}>{t('cDetail.saveUpdate')}</Text>
               </>
             )}
           </TouchableOpacity>

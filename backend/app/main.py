@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
-from app.routers import seller_reports, admin, ai, auth, bundles, campaigns, catalog, complaints, coupons, customers, interactions, notifications, orders, reviews, locations, addresses, community, customer_products
+from app.routers import seller_reports, admin, ai, auth, bundles, campaigns, catalog, communication, complaints, coupons, customers, interactions, notifications, orders, reviews, locations, addresses, community, customer_products, profile, verification
 settings = get_settings()
 
 app = FastAPI(
@@ -39,6 +39,19 @@ app.include_router(addresses.router)
 app.include_router(community.router)
 app.include_router(customer_products.router)
 app.include_router(interactions.router)
+app.include_router(communication.router)
+app.include_router(profile.router)
+app.include_router(verification.router)
+
+
+@app.on_event("startup")
+async def startup_event():
+    import app.models  # noqa: F401
+    from app.db.base import Base
+    from app.db.session import engine
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
 
 @app.get("/health")

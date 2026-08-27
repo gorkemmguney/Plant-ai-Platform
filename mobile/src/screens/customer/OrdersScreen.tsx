@@ -15,6 +15,7 @@ import {
   View,
 } from 'react-native';
 import { useCart } from '../../context/CartContext';
+import { useI18n } from '../../i18n';
 import { apiClient } from '../../services/apiClient';
 import { trackInteraction } from '../../services/interactionService';
 import { badgeColors, colors, fonts, radius, shadow, spacing } from '../../theme/theme';
@@ -31,7 +32,7 @@ interface CatalogProduct {
 
 const HIDE_BTN_W = 92;
 
-function SwipeToHide({ children, onHide }: { children: React.ReactNode; onHide: () => void }) {
+function SwipeToHide({ children, onHide, hideLabel }: { children: React.ReactNode; onHide: () => void; hideLabel: string }) {
   const translateX = useRef(new Animated.Value(0)).current;
   const offset = useRef(0);
 
@@ -54,7 +55,7 @@ function SwipeToHide({ children, onHide }: { children: React.ReactNode; onHide: 
   return (
     <View style={styles.swipeWrap}>
       <TouchableOpacity style={styles.hideAction} onPress={onHide} activeOpacity={0.85}>
-        <Text style={styles.hideActionText}>Gizle</Text>
+        <Text style={styles.hideActionText}>{hideLabel}</Text>
       </TouchableOpacity>
       <Animated.View style={{ transform: [{ translateX }] }} {...pan.panHandlers}>
         {children}
@@ -86,17 +87,18 @@ interface Order {
   items: OrderItem[];
 }
 
-const statusLabels: Record<number, string> = {
-  5: 'Alındı',
-  6: 'Hazırlanıyor',
-  7: 'Kargoda',
-  8: 'Teslim edildi',
-  9: 'İptal edildi',
+const statusKeys: Record<number, string> = {
+  5: 'orderStatus.5',
+  6: 'orderStatus.6',
+  7: 'orderStatus.7',
+  8: 'orderStatus.8',
+  9: 'orderStatus.9',
 };
 
 const CANCELLABLE = [5, 6];
 
 export default function OrdersScreen({ navigation }: any) {
+  const { t } = useI18n();
   const { addToCart } = useCart();
   const [orders, setOrders] = useState<Order[]>([]);
   const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -132,7 +134,7 @@ export default function OrdersScreen({ navigation }: any) {
 
   const submitReview = async () => {
     if (!reviewItem || stars < 1) {
-      Alert.alert('Puan gerekli', 'Lütfen 1-5 arası yıldız ver.');
+      Alert.alert(t('orders.ratingRequired'), t('orders.ratingRequiredMsg'));
       return;
     }
     setSavingReview(true);
@@ -146,9 +148,9 @@ export default function OrdersScreen({ navigation }: any) {
       trackInteraction('REVIEW_SUBMIT');
       setReviewedItemIds((prev) => new Set(prev).add(reviewItem.cust_ord_item_id));
       setReviewItem(null);
-      Alert.alert('Teşekkürler 🌿', 'Değerlendirmen kaydedildi.');
+      Alert.alert(t('orders.thanks'), t('orders.reviewSaved'));
     } catch (err: any) {
-      Alert.alert('Kaydedilemedi', err?.response?.data?.detail ?? 'Değerlendirme kaydedilemedi.');
+      Alert.alert(t('common.saveFailed'), err?.response?.data?.detail ?? t('orders.reviewSaveFailed'));
     } finally {
       setSavingReview(false);
     }
@@ -157,10 +159,10 @@ export default function OrdersScreen({ navigation }: any) {
   const load = useCallback(async () => {
     try {
       setError(null);
-      const { data } = await apiClient.get<Order[]>('/orders');
+      const { data } = await apiClient.get<Order[]>('/orders/my');
       setOrders(data);
     } catch (err: any) {
-      setError(err?.response?.data?.detail ?? 'Siparişler yüklenemedi.');
+      setError(err?.response?.data?.detail ?? t('orders.loadFailed'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -182,7 +184,7 @@ export default function OrdersScreen({ navigation }: any) {
       await apiClient.patch(`/orders/${id}/visibility`, { is_hidden: hidden });
     } catch (err: any) {
       setOrders(prevOrders);
-      Alert.alert('İşlem başarısız', err?.response?.data?.detail ?? 'İşlem yapılamadı.');
+      Alert.alert(t('orders.actionFailed'), err?.response?.data?.detail ?? t('orders.actionFailedMsg'));
     } finally {
       setHidingId(null);
     }
@@ -221,29 +223,31 @@ export default function OrdersScreen({ navigation }: any) {
         added += 1;
       }
       if (added === 0) {
-        Alert.alert('Eklenemedi', 'Bu siparişteki ürünler artık satışta değil.');
+        Alert.alert(t('orders.reorderEmpty'), t('orders.reorderEmptyMsg'));
       } else {
         Alert.alert(
-          'Sepete eklendi 🛒',
-          skipped > 0 ? `${added} ürün eklendi, ${skipped} ürün artık mevcut değil.` : `${added} ürün sepete eklendi.`,
+          t('orders.addedToCart'),
+          skipped > 0
+            ? `${added} ${t('orders.itemsAdded')}, ${skipped} ${t('orders.itemsUnavailable')}`
+            : `${added} ${t('orders.itemsAddedToCart')}`,
           [
-            { text: 'Sepete git', onPress: () => navigation.navigate('Cart') },
-            { text: 'Tamam' },
+            { text: t('orders.goToCart'), onPress: () => navigation.navigate('Cart') },
+            { text: t('common.ok') },
           ]
         );
       }
     } catch (err: any) {
-      Alert.alert('Hata', err?.response?.data?.detail ?? 'Ürünler yüklenemedi.');
+      Alert.alert(t('common.error'), err?.response?.data?.detail ?? t('common.productsLoadFailed'));
     } finally {
       setReorderingId(null);
     }
   };
 
   const handleCancel = (order: Order) => {
-    Alert.alert('Siparişi iptal et', `Sipariş #${order.cust_ord_id} iptal edilsin mi?`, [
-      { text: 'Vazgeç', style: 'cancel' },
+    Alert.alert(t('orders.cancelTitle'), `${t('orders.cancelQPre')}#${order.cust_ord_id}${t('orders.cancelQPost')}`, [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'İptal Et',
+        text: t('orders.confirmCancel'),
         style: 'destructive',
         onPress: async () => {
           setCancellingId(order.cust_ord_id);
@@ -251,7 +255,7 @@ export default function OrdersScreen({ navigation }: any) {
             await apiClient.post(`/orders/${order.cust_ord_id}/cancel`);
             await load();
           } catch (err: any) {
-            Alert.alert('İptal edilemedi', err?.response?.data?.detail ?? 'Sipariş iptal edilemedi.');
+            Alert.alert(t('orders.cancelFailed'), err?.response?.data?.detail ?? t('orders.cancelFailedMsg'));
           } finally {
             setCancellingId(null);
           }
@@ -272,13 +276,13 @@ export default function OrdersScreen({ navigation }: any) {
         onPress={() => setExpandedId(expanded ? null : item.cust_ord_id)}
       >
         <View style={styles.cardTop}>
-          <Text style={styles.orderId}>Sipariş #{item.cust_ord_id}</Text>
+          <Text style={styles.orderId}>{t('orders.orderPrefix')}#{item.cust_ord_id}</Text>
           <Text style={styles.total}>₺{Number(item.total_price).toFixed(2)}</Text>
         </View>
         <Text style={styles.meta}>
           {dateText}
           {dateText ? ' · ' : ''}
-          {itemCount} ürün
+          {itemCount} {t('common.items')}
         </Text>
         <View style={styles.badgeRow}>
           {(() => {
@@ -288,12 +292,12 @@ export default function OrdersScreen({ navigation }: any) {
               <View style={[styles.badge, styles.badgeWithIcon, { backgroundColor: sb.bg }]}>
                 {delivered && <Ionicons name="checkmark-circle" size={13} color={sb.text} />}
                 <Text style={[styles.badgeText, { color: sb.text }]}>
-                  {statusLabels[item.gnl_st_id] ?? 'Durum bilinmiyor'}
+                  {statusKeys[item.gnl_st_id] ? t(statusKeys[item.gnl_st_id]) : t('orders.statusUnknown')}
                 </Text>
               </View>
             );
           })()}
-          <Text style={styles.detailHint}>{expanded ? 'Gizle ▲' : 'Detay ▼'}</Text>
+          <Text style={styles.detailHint}>{expanded ? t('orders.collapse') : t('orders.detail')}</Text>
         </View>
 
         {item.gnl_st_id === 8 && (
@@ -307,7 +311,7 @@ export default function OrdersScreen({ navigation }: any) {
                   onPress={() => openReview(it.prod_id as number, it.prod_name, it.cust_ord_item_id)}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.rateRowText} numberOfLines={1}>⭐ Değerlendir — {it.prod_name}</Text>
+                  <Text style={styles.rateRowText} numberOfLines={1}>⭐ {t('orders.rate')} — {it.prod_name}</Text>
                 </TouchableOpacity>
               ))}
           </View>
@@ -343,8 +347,37 @@ export default function OrdersScreen({ navigation }: any) {
               {reorderingId === item.cust_ord_id ? (
                 <ActivityIndicator size="small" color={colors.buttonPrimaryText} />
               ) : (
-                <Text style={styles.reorderText}>🔁 Tekrar Sipariş Ver</Text>
+                <Text style={styles.reorderText}>{t('orders.reorder')}</Text>
               )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.chatSellerOrderBtn}
+              onPress={async () => {
+                const firstSeller = (item.items.find((i: any) => i.seller_id) as any)?.seller_id || 1;
+                try {
+                  const { startCommunication } = require('../../services/communicationService');
+                  const interaction = await startCommunication({
+                    seller_id: firstSeller,
+                    related_ord_id: item.cust_ord_id,
+                    subject: `Sipariş #${item.cust_ord_id} Hakkında`,
+                    initial_message: `Merhaba, Sipariş #${item.cust_ord_id} hakkında bilgi almak istiyorum.`,
+                  });
+                  navigation.navigate('SellerChatDetail', {
+                    interactionId: interaction.comm_interaction_id,
+                    partnerName: interaction.partner_name || 'Satıcı',
+                    ordId: item.cust_ord_id,
+                    prodName: interaction.related_prod_name,
+                    prodImage: interaction.related_prod_image,
+                  });
+                } catch (err: any) {
+                  Alert.alert(t('common.error'), err?.response?.data?.detail ?? t('sellerChat.startError'));
+                }
+              }}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="chatbubbles-outline" size={15} color={colors.primaryDeep} style={{ marginRight: 6 }} />
+              <Text style={styles.chatSellerOrderText}>Satıcıya Sipariş Hakkında Soru Sor</Text>
             </TouchableOpacity>
 
             {CANCELLABLE.includes(item.gnl_st_id) && (
@@ -357,7 +390,7 @@ export default function OrdersScreen({ navigation }: any) {
                 {cancellingId === item.cust_ord_id ? (
                   <ActivityIndicator size="small" color={colors.red} />
                 ) : (
-                  <Text style={styles.cancelOrderText}>Siparişi İptal Et</Text>
+                  <Text style={styles.cancelOrderText}>{t('orders.cancelOrder')}</Text>
                 )}
               </TouchableOpacity>
             )}
@@ -380,7 +413,7 @@ export default function OrdersScreen({ navigation }: any) {
             {hidingId === item.cust_ord_id ? (
               <ActivityIndicator size="small" color={colors.primaryDeep} />
             ) : (
-              <Text style={styles.unhideText}>↩︎ Geri Getir</Text>
+              <Text style={styles.unhideText}>{t('orders.restore')}</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -390,7 +423,7 @@ export default function OrdersScreen({ navigation }: any) {
     // İptal edilmiş ve gizlenmemiş → sola kaydırıp gizlenebilir
     if (item.gnl_st_id === 9) {
       return (
-        <SwipeToHide onHide={() => hideOrder(item.cust_ord_id)}>
+        <SwipeToHide onHide={() => hideOrder(item.cust_ord_id)} hideLabel={t('orders.hide')}>
           {hidingId === item.cust_ord_id ? (
             <View style={styles.hidingOverlay}>
               <ActivityIndicator size="small" color={colors.muted} />
@@ -407,14 +440,14 @@ export default function OrdersScreen({ navigation }: any) {
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Siparişlerim</Text>
-        <Text style={styles.headerSub}>Verdiğin siparişleri takip et</Text>
+        <Text style={styles.headerTitle}>{t('orders.title')}</Text>
+        <Text style={styles.headerSub}>{t('orders.sub')}</Text>
 
         <View style={styles.filterRow}>
           {([
-            { key: 'active', label: 'Aktif' },
-            { key: 'hidden', label: 'Gizlenenler' },
-            { key: 'all', label: 'Tümü' },
+            { key: 'active', label: t('orders.filterActive') },
+            { key: 'hidden', label: t('orders.filterHidden') },
+            { key: 'all', label: t('orders.filterAll') },
           ] as { key: 'active' | 'hidden' | 'all'; label: string }[]).map((f) => {
             const active = filter === f.key;
             return (
@@ -439,7 +472,7 @@ export default function OrdersScreen({ navigation }: any) {
         <View style={styles.center}>
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={load} activeOpacity={0.85}>
-            <Text style={styles.retryText}>Tekrar dene</Text>
+            <Text style={styles.retryText}>{t('common.retry')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -464,10 +497,10 @@ export default function OrdersScreen({ navigation }: any) {
           ListEmptyComponent={
             <Text style={styles.emptyText}>
               {filter === 'hidden'
-                ? 'Gizlenmiş siparişin yok.'
+                ? t('orders.emptyHidden')
                 : filter === 'active'
-                ? 'Aktif siparişin yok.'
-                : "Henüz siparişin yok. Mağaza'dan alışverişe başla!"}
+                ? t('orders.emptyActive')
+                : t('orders.emptyAll')}
             </Text>
           }
         />
@@ -477,7 +510,7 @@ export default function OrdersScreen({ navigation }: any) {
         <View style={styles.modalWrap}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle} numberOfLines={2}>{reviewItem?.prod_name}</Text>
-            <Text style={styles.modalSub}>Bu ürünü değerlendir — bu işlem sonradan değiştirilemez</Text>
+            <Text style={styles.modalSub}>{t('orders.reviewSub')}</Text>
 
             <View style={styles.starsRow}>
               {[1, 2, 3, 4, 5].map((n) => (
@@ -491,20 +524,20 @@ export default function OrdersScreen({ navigation }: any) {
               style={styles.commentInput}
               value={comment}
               onChangeText={setComment}
-              placeholder="Yorumun (isteğe bağlı)"
+              placeholder={t('orders.commentPlaceholder')}
               placeholderTextColor={colors.muted2}
               multiline
             />
 
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.modalCancel} onPress={() => setReviewItem(null)} disabled={savingReview}>
-                <Text style={styles.modalCancelText}>Vazgeç</Text>
+                <Text style={styles.modalCancelText}>{t('common.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.modalSave} onPress={submitReview} disabled={savingReview}>
                 {savingReview ? (
                   <ActivityIndicator size="small" color={colors.white} />
                 ) : (
-                  <Text style={styles.modalSaveText}>Gönder</Text>
+                  <Text style={styles.modalSaveText}>{t('common.submit')}</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -624,6 +657,16 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   reorderText: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.buttonPrimaryText },
+  chatSellerOrderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.sm,
+    paddingVertical: 11,
+    marginTop: spacing.xs,
+  },
+  chatSellerOrderText: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.primaryDeep },
   errorText: { fontFamily: fonts.sans, fontSize: 13.5, color: colors.muted, textAlign: 'center', lineHeight: 20 },
   retryButton: {
     borderWidth: 1,

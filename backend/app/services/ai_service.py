@@ -54,95 +54,107 @@ async def build_user_ai_context(db, user) -> str:
     """Builds a structured markdown text summary of the user's database records for Gemini AI context."""
     from sqlalchemy import select
     from sqlalchemy.orm import selectinload
-    from app.models.customer import Cust
+    from app.models.customer import Ind, Org
     from app.models.customer_product import CustProd
     from app.models.order import CustOrd
     from app.models.campaign import UserCoupon
     from app.models.address import CustomerAddress
 
-    full_name = f"{user.first_name or ''} {user.last_name or ''}".strip() or "Değerli Kullanıcı"
+    ind_res = await db.execute(select(Ind).where(Ind.user_id == user.user_id))
+    ind = ind_res.scalar_one_or_none()
+
+    org_res = await db.execute(select(Org).where(Org.user_id == user.user_id))
+    org = org_res.scalar_one_or_none()
+
+    if ind:
+        full_name = f"{ind.first_name or ''} {ind.last_name or ''}".strip() or ind.username or "Değerli Kullanıcı"
+        email_str = ind.email or "Belirtilmemiş"
+    elif org:
+        full_name = org.store_name or org.company_name
+        email_str = org.email or "Belirtilmemiş"
+    else:
+        full_name = "Değerli Kullanıcı"
+        email_str = "Belirtilmemiş"
+
     context_lines = [
         "=== OTURUM AÇAN KULLANICI KİŞİSEL VERİTABANI BAĞLAMI ===",
         f"- Kullanıcı Adı: {full_name}",
-        f"- E-posta: {user.email}",
+        f"- E-posta: {email_str}",
         f"- Birikmiş Puan Bakiyesi: {user.points} Puan",
     ]
-    if user.store_name:
-        context_lines.append(f"- Mağaza Adı: {user.store_name}")
+    if org and org.store_name:
+        context_lines.append(f"- Mağaza Adı: {org.store_name}")
 
-    # Customer record lookup
-    cust_res = await db.execute(select(Cust).where(Cust.user_id == user.user_id))
-    cust = cust_res.scalar_one_or_none()
+    # Addresses
+    addr_res = await db.execute(
+        select(CustomerAddress).where(CustomerAddress.user_id == user.user_id)
+    )
+    addresses = addr_res.scalars().all()
+    if addresses:
+        addr_str = "; ".join([f"{a.title}: {a.address_line}" for a in addresses])
+        context_lines.append(f"- Kayıtlı Adresler: {addr_str}")
 
-    if cust:
-        # Addresses
-        addr_res = await db.execute(
-            select(CustomerAddress).where(CustomerAddress.cust_id == cust.cust_id)
-        )
-        addresses = addr_res.scalars().all()
-        if addresses:
-            addr_str = "; ".join([f"{a.title}: {a.address_line}" for a in addresses])
-            context_lines.append(f"- Kayıtlı Adresler: {addr_str}")
+    # Bahçemdeki Bitkiler
+    plants_res = await db.execute(
+        select(CustProd)
+        .options(selectinload(CustProd.specification))
+        .where(CustProd.user_id == user.user_id)
+        .order_by(CustProd.created_at.desc())
+    )
+    plants = plants_res.scalars().all()
+    if plants:
+        context_lines.append("\n[KULLANICININ BAHÇESİNDEKİ BİTKİLER (BAHÇEM)]")
+        for p in plants:
+            spec_name = p.specification.name if p.specification else "Genel Tür"
+            loc = f" (Konum: {p.location})" if p.location else ""
+            health_map = {
+                "healthy": "Sağlıklı 🌿",
+                "diseased": "Hasta 🩺",
+                "pest_damage": "Zararlı Tehdidi Var 🐛"
+            }
+            h_text = health_map.get(p.health_status, p.health_status)
+            
+            last_w = p.last_watered_at.strftime("%d.%m.%Y") if p.last_watered_at else "Henüz sulanmadı"
+            last_f = p.last_fertilized_at.strftime("%d.%m.%Y") if p.last_fertilized_at else "Gübrelenmedi"
+            
+            context_lines.append(
+                f"• '{p.name}' [Tür: {spec_name}]{loc} | Sağlık: {h_text} | Sulama: Periyot {p.watering_interval_days} gün (Son Sulama: {last_w}) | Son Gübreleme: {last_f}"
+            )
+    else:
+        context_lines.append("\n[KULLANICININ BAHÇESİNDEKİ BİTKİLER]")
+        context_lines.append("Kullanıcının bahçesinde henüz kayıtlı bitkisi yok.")
 
-        # Bahçemdeki Bitkiler
-        plants_res = await db.execute(
-            select(CustProd)
-            .options(selectinload(CustProd.specification))
-            .where(CustProd.cust_id == cust.cust_id)
-            .order_by(CustProd.created_at.desc())
-        )
-        plants = plants_res.scalars().all()
-        if plants:
-            context_lines.append("\n[KULLANICININ BAHÇESİNDEKİ BİTKİLER (BAHÇEM)]")
-            for p in plants:
-                spec_name = p.specification.name if p.specification else "Genel Tür"
-                loc = f" (Konum: {p.location})" if p.location else ""
-                health_map = {
-                    "healthy": "Sağlıklı 🌿",
-                    "diseased": "Hasta 🩺",
-                    "pest_damage": "Zararlı Tehdidi Var 🐛"
-                }
-                h_text = health_map.get(p.health_status, p.health_status)
-                
-                last_w = p.last_watered_at.strftime("%d.%m.%Y") if p.last_watered_at else "Henüz sulanmadı"
-                last_f = p.last_fertilized_at.strftime("%d.%m.%Y") if p.last_fertilized_at else "Gübrelenmedi"
-                
-                context_lines.append(
-                    f"• '{p.name}' [Tür: {spec_name}]{loc} | Sağlık: {h_text} | Sulama: Periyot {p.watering_interval_days} gün (Son Sulama: {last_w}) | Son Gübreleme: {last_f}"
-                )
-        else:
-            context_lines.append("\n[KULLANICININ BAHÇESİNDEKİ BİTKİLER]")
-            context_lines.append("Kullanıcının bahçesinde henüz kayıtlı bitkisi yok.")
+    # Son Siparişler
+    orders_res = await db.execute(
+        select(CustOrd)
+        .options(selectinload(CustOrd.items))
+        .where(CustOrd.user_id == user.user_id)
+        .order_by(CustOrd.order_date.desc())
+        .limit(10)
+    )
+    orders = orders_res.scalars().all()
 
-        # Son Siparişler
-        orders_res = await db.execute(
-            select(CustOrd)
-            .options(selectinload(CustOrd.items))
-            .where(CustOrd.cust_id == cust.cust_id)
-            .order_by(CustOrd.order_date.desc())
-            .limit(10)
-        )
-        orders = orders_res.scalars().all()
-        
-        STATUS_MAP = {
-            5: "Sipariş Alındı 📦",
-            6: "Hazırlanıyor ⏳",
-            7: "Kargoda 🚚",
-            8: "Teslim Edildi ✅",
-            9: "İptal Edildi ❌",
-        }
-        
-        if orders:
-            context_lines.append("\n[KULLANICININ SON SİPARİŞLERİ]")
-            for ord_obj in orders:
-                st_text = STATUS_MAP.get(ord_obj.gnl_st_id, f"Durum Kodu: {ord_obj.gnl_st_id}")
-                date_str = ord_obj.order_date.strftime("%d.%m.%Y %H:%M")
-                items_list = [f"{item.prod_name} ({item.quantity} adet)" for item in ord_obj.items]
-                items_str = ", ".join(items_list) if items_list else "Ürün detayı yok"
-                context_lines.append(
-                    f"• Sipariş #{ord_obj.cust_ord_id} | Tarih: {date_str} | Tutar: ₺{ord_obj.total_price} | Durum: {st_text} | Ürünler: {items_str}"
-                )
-        else:
+    STATUS_MAP = {
+        5: "Sipariş Alındı 📦",
+        6: "Hazırlanıyor ⏳",
+        7: "Kargoda 🚚",
+        8: "Teslim Edildi ✅",
+        9: "İptal Edildi ❌",
+    }
+
+    if orders:
+        context_lines.append("\n[KULLANICININ SON SİPARİŞLERİ]")
+        for ord_obj in orders:
+            st_text = STATUS_MAP.get(ord_obj.gnl_st_id, f"Durum Kodu: {ord_obj.gnl_st_id}")
+            date_str = ord_obj.order_date.strftime("%d.%m.%Y %H:%M")
+
+            items_list = [f"{item.prod_name} ({item.quantity} adet)" for item in ord_obj.items]
+            items_str = ", ".join(items_list) if items_list else "Ürün detayı yok"
+            context_lines.append(
+                f"• Sipariş #{ord_obj.cust_ord_id} | Tarih: {date_str} | Tutar: ₺{ord_obj.total_price} | Durum: {st_text} | Ürünler: {items_str}"
+            )
+    else:
+
             context_lines.append("\n[KULLANICININ SON SİPARİŞLERİ]")
             context_lines.append("Kullanıcının henüz verilmiş bir siparişi bulunmuyor.")
 
@@ -224,17 +236,13 @@ async def process_user_action_intent(db, user, message: str) -> dict | None:
     if not action_type:
         return None
 
-    cust_res = await db.execute(select(Cust).where(Cust.user_id == user.user_id))
-    cust = cust_res.scalar_one_or_none()
-    if not cust:
-        return None
-
     plants_res = await db.execute(
-        select(CustProd).where(CustProd.cust_id == cust.cust_id).order_by(CustProd.created_at.desc())
+        select(CustProd).where(CustProd.user_id == user.user_id).order_by(CustProd.created_at.desc())
     )
     plants = plants_res.scalars().all()
     if not plants:
         return None
+
 
     # Try matching plant name in the message
     target_plant = None

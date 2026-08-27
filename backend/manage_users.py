@@ -60,17 +60,18 @@ async def create_user(email: str, password: str, role: str, first_name: str, las
 
         # 3) app_user'da var mı, yoksa oluştur
         user_row = await conn.fetchrow(
-            "SELECT user_id FROM app_user WHERE firebase_uid = $1", fb_user.uid
+            "SELECT user_id FROM app_user WHERE supabase_uid = $1", fb_user.uid
         )
         if user_row is None:
             user_row = await conn.fetchrow(
                 """
-                INSERT INTO app_user (firebase_uid, email, first_name, last_name, is_active)
+                INSERT INTO app_user (supabase_uid, email, first_name, last_name, is_active)
                 VALUES ($1, $2, $3, $4, true)
                 RETURNING user_id
                 """,
                 fb_user.uid, email, first_name, last_name,
             )
+
             print(f"✅ app_user kaydı oluşturuldu: user_id={user_row['user_id']}")
         else:
             print(f"ℹ️  app_user kaydı zaten vardı: user_id={user_row['user_id']}")
@@ -111,7 +112,7 @@ async def delete_user(email: str, hard_delete: bool = False):
         # user_id'yi bul (firebase_uid varsa onunla, yoksa email ile)
         if fb_user:
             user_row = await conn.fetchrow(
-                "SELECT user_id FROM app_user WHERE firebase_uid = $1", fb_user.uid
+                "SELECT user_id FROM app_user WHERE supabase_uid = $1", fb_user.uid
             )
         else:
             user_row = await conn.fetchrow(
@@ -169,15 +170,16 @@ async def list_users():
     try:
         rows = await conn.fetch(
             """
-            SELECT u.user_id, u.email, u.firebase_uid, u.is_active,
+            SELECT u.user_id, u.email, u.supabase_uid, u.is_active,
                    COALESCE(string_agg(r.role_name, ', '), '(rolsüz)') AS roles
             FROM app_user u
             LEFT JOIN user_role ur ON ur.user_id = u.user_id
             LEFT JOIN role r ON r.role_id = ur.role_id
-            GROUP BY u.user_id, u.email, u.firebase_uid, u.is_active
+            GROUP BY u.user_id, u.email, u.supabase_uid, u.is_active
             ORDER BY u.user_id
             """
         )
+
         for r in rows:
             status = "aktif" if r["is_active"] else "pasif"
             print(f"[{r['user_id']}] {r['email']:<30} roller: {r['roles']:<20} ({status})")

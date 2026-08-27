@@ -14,16 +14,19 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
+import { useI18n } from '../../i18n';
 import { apiClient } from '../../services/apiClient';
 import { badgeColors, colors, fonts, radius, shadow, spacing } from '../../theme/theme';
+import appjson from '../../../app.json';
 
-const roleLabels: Record<string, string> = {
-  admin: 'Admin',
-  seller: 'Satıcı',
-  customer: 'Müşteri',
+const roleLabelKeys: Record<string, string> = {
+  admin: 'role.admin',
+  seller: 'role.seller',
+  customer: 'role.customer',
 };
 
 export default function AdminSettingsScreen() {
+  const { t } = useI18n();
   const navigation = useNavigation<any>();
   const { firebaseUser, roles, firstName, lastName, refreshProfile, chooseRole } = useAuth();
 
@@ -40,7 +43,7 @@ export default function AdminSettingsScreen() {
 
   const handleSave = async () => {
     if (!formFirst.trim()) {
-      Alert.alert('Eksik bilgi', 'Ad boş olamaz.');
+      Alert.alert(t('settings.missingInfo'), t('settings.firstNameRequired'));
       return;
     }
     setSaving(true);
@@ -52,7 +55,7 @@ export default function AdminSettingsScreen() {
       await refreshProfile();
       setEditing(false);
     } catch (err: any) {
-      Alert.alert('Kaydedilemedi', err?.response?.data?.detail ?? 'Profil güncellenemedi.');
+      Alert.alert(t('settings.saveFailed'), err?.response?.data?.detail ?? t('settings.profileUpdateFailed'));
     } finally {
       setSaving(false);
     }
@@ -63,54 +66,62 @@ export default function AdminSettingsScreen() {
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Ayarlar</Text>
+        <Text style={styles.headerTitle}>{t('settings.title')}</Text>
       </View>
 
       <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: spacing.xl }}>
         <View style={styles.card}>
-          <Text style={styles.cardLabel}>Hesap Bilgileri</Text>
+          <Text style={styles.cardLabel}>{t('settings.accountInfo')}</Text>
 
           <View style={styles.row}>
-            <Text style={styles.rowLabel}>Ad Soyad</Text>
+            <Text style={styles.rowLabel}>{t('settings.fullName')}</Text>
             <View style={styles.nameRight}>
               <Text style={styles.rowValue}>{fullName || '—'}</Text>
               <TouchableOpacity onPress={openEdit} activeOpacity={0.7}>
-                <Text style={styles.editLink}>Düzenle</Text>
+                <Text style={styles.editLink}>{t('settings.edit')}</Text>
               </TouchableOpacity>
             </View>
           </View>
 
           <View style={styles.row}>
-            <Text style={styles.rowLabel}>Email</Text>
+            <Text style={styles.rowLabel}>{t('settings.email')}</Text>
             <Text style={styles.rowValue}>{firebaseUser?.email}</Text>
           </View>
 
           <View style={styles.rowLast}>
-            <Text style={styles.rowLabel}>Roller</Text>
+            <Text style={styles.rowLabel}>{t('settings.roles')}</Text>
             <View style={styles.badgeRow}>
               {roles.length > 0 ? (
                 roles.map((role) => (
                   <View key={role} style={[styles.badge, { backgroundColor: badgeColors.primary.bg }]}>
                     <Text style={[styles.badgeText, { color: badgeColors.primary.text }]}>
-                      {roleLabels[role] ?? role}
+                      {roleLabelKeys[role] ? t(roleLabelKeys[role]) : role}
                     </Text>
                   </View>
                 ))
               ) : (
-                <Text style={styles.rowValue}>yükleniyor...</Text>
+                <Text style={styles.rowValue}>{t('settings.loading')}</Text>
               )}
             </View>
           </View>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardLabel}>Yönetim Paneli</Text>
+          <Text style={styles.cardLabel}>{t('adminSettings.managementPanel')}</Text>
           <TouchableOpacity
             style={styles.menuRow}
             onPress={() => navigation.navigate('AdminComplaints')}
             activeOpacity={0.7}
           >
-            <Text style={styles.menuText}>Şikayet & Destek Yönetimi</Text>
+            <Text style={styles.menuText}>{t('adminSettings.complaintMgmt')}</Text>
+            <Ionicons name="chevron-forward" size={18} color={colors.muted2} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.menuRow}
+            onPress={() => navigation.navigate('AppSettings')}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.menuText}>{t('settings.appSettings')}</Text>
             <Ionicons name="chevron-forward" size={18} color={colors.muted2} />
           </TouchableOpacity>
         </View>
@@ -118,47 +129,49 @@ export default function AdminSettingsScreen() {
         {roles.length > 1 && (
           <TouchableOpacity style={styles.switchButton} onPress={() => chooseRole(null)} activeOpacity={0.85}>
             <Ionicons name="swap-horizontal" size={16} color={colors.ink} />
-            <Text style={styles.switchButtonText}>Panel Değiştir</Text>
+            <Text style={styles.switchButtonText}>{t('settings.switchPanel')}</Text>
           </TouchableOpacity>
         )}
 
         <TouchableOpacity style={styles.logoutButton} onPress={() => supabase.auth.signOut()} activeOpacity={0.85}>
-          <Text style={styles.logoutButtonText}>Çıkış Yap</Text>
+          <Text style={styles.logoutButtonText}>{t('settings.logout')}</Text>
         </TouchableOpacity>
+
+        <Text style={styles.versionText}> {appjson.plantai?.version ?? '—'}</Text>
       </ScrollView>
 
       <Modal visible={editing} transparent animationType="fade" onRequestClose={() => setEditing(false)}>
         <View style={styles.modalWrap}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Ad Soyad Düzenle</Text>
+            <Text style={styles.modalTitle}>{t('settings.editName')}</Text>
 
-            <Text style={styles.label}>Ad</Text>
+            <Text style={styles.label}>{t('settings.firstName')}</Text>
             <TextInput
               style={styles.input}
               value={formFirst}
               onChangeText={setFormFirst}
-              placeholder="Adın"
+              placeholder={t('settings.firstNamePlaceholder')}
               placeholderTextColor={colors.muted2}
             />
 
-            <Text style={styles.label}>Soyad</Text>
+            <Text style={styles.label}>{t('settings.lastName')}</Text>
             <TextInput
               style={styles.input}
               value={formLast}
               onChangeText={setFormLast}
-              placeholder="Soyadın"
+              placeholder={t('settings.lastNamePlaceholder')}
               placeholderTextColor={colors.muted2}
             />
 
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.cancelButton} onPress={() => setEditing(false)} disabled={saving}>
-                <Text style={styles.cancelText}>Vazgeç</Text>
+                <Text style={styles.cancelText}>{t('common.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={saving}>
                 {saving ? (
                   <ActivityIndicator size="small" color={colors.white} />
                 ) : (
-                  <Text style={styles.saveText}>Kaydet</Text>
+                  <Text style={styles.saveText}>{t('settings.save')}</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -228,6 +241,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logoutButtonText: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.red },
+  versionText: {
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    color: colors.muted2,
+    textAlign: 'center',
+    marginTop: spacing.lg,
+  },
   modalWrap: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.4)',

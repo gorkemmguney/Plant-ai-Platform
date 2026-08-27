@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useI18n } from '../../i18n';
 import { apiClient } from '../../services/apiClient';
 import { colors, fonts, radius, shadow, spacing, gradients } from '../../theme/theme';
 
@@ -36,9 +37,9 @@ type AiProfileState = AiSellerProfile | 'loading' | 'error';
 const getTrustScore = (risk: number) => 100 - risk;
 
 const getScoreStyle = (trust: number) => {
-  if (trust >= 72) return { color: '#2ecc71', bg: '#e3f9ed', label: 'Güvenilir', gradient: ['#27ae60', '#2ecc71'] as [string, string] };
-  if (trust >= 45) return { color: '#e67e22', bg: '#fdf3e3', label: 'İnceleme Önerilir', gradient: ['#d35400', '#e67e22'] as [string, string] };
-  return { color: '#e74c3c', bg: '#fdecea', label: 'Şüpheli', gradient: ['#c0392b', '#e74c3c'] as [string, string] };
+  if (trust >= 72) return { color: '#2ecc71', bg: '#e3f9ed', labelKey: 'approvals.trusted', gradient: ['#27ae60', '#2ecc71'] as [string, string] };
+  if (trust >= 45) return { color: '#e67e22', bg: '#fdf3e3', labelKey: 'approvals.reviewSuggested', gradient: ['#d35400', '#e67e22'] as [string, string] };
+  return { color: '#e74c3c', bg: '#fdecea', labelKey: 'approvals.suspicious', gradient: ['#c0392b', '#e74c3c'] as [string, string] };
 };
 
 const getInitials = (first: string, last: string) => {
@@ -87,6 +88,7 @@ function ScoreRing({ trust, loading }: { trust: number; loading: boolean }) {
 }
 
 export default function SellerApprovalsScreen() {
+  const { t } = useI18n();
   const [sellers, setSellers] = useState<PendingSeller[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -114,7 +116,7 @@ export default function SellerApprovalsScreen() {
       // Fire all AI analyses simultaneously (non-blocking)
       data.forEach(seller => fetchAiProfile(seller));
     } catch (err: any) {
-      setError(err?.response?.data?.detail ?? 'Başvurular yüklenemedi.');
+      setError(err?.response?.data?.detail ?? t('approvals.loadFailed'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -137,14 +139,14 @@ export default function SellerApprovalsScreen() {
         return next;
       });
     } catch (err: any) {
-      Alert.alert('İşlem başarısız', err?.response?.data?.detail ?? 'Başvuru güncellenemedi.');
+      Alert.alert(t('orders.actionFailed'), err?.response?.data?.detail ?? t('approvals.updateFailedMsg'));
     } finally {
       setBusyId(null);
     }
   };
 
   const renderItem = ({ item }: { item: PendingSeller }) => {
-    const fullName = `${item.first_name} ${item.last_name}`.trim() || 'İsimsiz Kullanıcı';
+    const fullName = `${item.first_name} ${item.last_name}`.trim() || t('approvals.unnamedUser');
     const initials = getInitials(item.first_name, item.last_name);
     const busy = busyId === item.user_id;
     const profileState = aiProfiles[item.user_id];
@@ -174,7 +176,7 @@ export default function SellerApprovalsScreen() {
                   color={scoreStyle.color}
                 />
                 <Text style={[styles.verdictBadgeText, { color: scoreStyle.color }]}>
-                  {scoreStyle.label}
+                  {t(scoreStyle.labelKey)}
                 </Text>
               </View>
             )}
@@ -188,18 +190,18 @@ export default function SellerApprovalsScreen() {
         {isProfileLoading ? (
           <View style={styles.aiLoadingRow}>
             <Ionicons name="sparkles" size={13} color="#7c4dff" />
-            <Text style={styles.aiLoadingText}>Gemini başvuruyu analiz ediyor...</Text>
+            <Text style={styles.aiLoadingText}>{t('approvals.analyzing')}</Text>
           </View>
         ) : profileState === 'error' ? (
           <TouchableOpacity style={styles.retryAiRow} onPress={() => fetchAiProfile(item)} activeOpacity={0.7}>
             <Ionicons name="refresh" size={13} color={colors.muted} />
-            <Text style={styles.retryAiText}>AI analizi başarısız — tekrar dene</Text>
+            <Text style={styles.retryAiText}>{t('approvals.aiFailed')}</Text>
           </TouchableOpacity>
         ) : profile && scoreStyle ? (
           <View style={[styles.aiSummaryBox, { backgroundColor: scoreStyle.bg, borderColor: scoreStyle.color + '30' }]}>
             <View style={styles.aiSummaryHeader}>
               <Ionicons name="sparkles" size={13} color="#7c4dff" />
-              <Text style={styles.aiSummaryLabel}>Gemini Değerlendirmesi</Text>
+              <Text style={styles.aiSummaryLabel}>{t('approvals.geminiEval')}</Text>
             </View>
             <Text style={[styles.aiSummaryText, { color: scoreStyle.color }]}>{profile.summary}</Text>
           </View>
@@ -215,7 +217,7 @@ export default function SellerApprovalsScreen() {
             activeOpacity={0.85}
           >
             <Ionicons name="close-circle-outline" size={16} color={colors.red} style={{ marginRight: 6 }} />
-            <Text style={styles.rejectText}>Reddet</Text>
+            <Text style={styles.rejectText}>{t('approvals.reject')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -225,11 +227,11 @@ export default function SellerApprovalsScreen() {
             onPress={() => {
               if (profile && trust < 45) {
                 Alert.alert(
-                  '⚠️ Düşük Güvenilirlik Skoru',
-                  `Gemini bu başvuru için ${trust}/100 güvenilirlik puanı verdi. Onaylamak istediğinize emin misiniz?`,
+                  t('approvals.lowScoreTitle'),
+                  `${t('approvals.lowScoreMsgPre')}${trust}${t('approvals.lowScoreMsgPost')}`,
                   [
-                    { text: 'İptal', style: 'cancel' },
-                    { text: 'Yine de Onayla', style: 'destructive', onPress: () => decide(item, true) },
+                    { text: t('common.cancel'), style: 'cancel' },
+                    { text: t('approvals.approveAnyway'), style: 'destructive', onPress: () => decide(item, true) },
                   ]
                 );
               } else {
@@ -245,7 +247,7 @@ export default function SellerApprovalsScreen() {
               <>
                 <Ionicons name="checkmark-circle-outline" size={16} color={colors.white} style={{ marginRight: 6 }} />
                 <Text style={styles.approveText}>
-                  {profile && trust < 45 ? 'Yine de Onayla' : 'Onayla'}
+                  {profile && trust < 45 ? t('approvals.approveAnyway') : t('approvals.approve')}
                 </Text>
               </>
             )}
@@ -260,12 +262,12 @@ export default function SellerApprovalsScreen() {
       <LinearGradient colors={gradients.header} style={styles.header}>
         <View style={styles.headerRow}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.headerTitle}>Satıcı Onayları</Text>
-            <Text style={styles.headerSub}>AI güvenilirlik puanlarını inceleyin ve karar verin</Text>
+            <Text style={styles.headerTitle}>{t('approvals.title')}</Text>
+            <Text style={styles.headerSub}>{t('approvals.sub')}</Text>
           </View>
           {sellers.length > 0 && (
             <View style={styles.countBadge}>
-              <Text style={styles.countText}>{sellers.length} Başvuru</Text>
+              <Text style={styles.countText}>{sellers.length} {t('approvals.applications')}</Text>
             </View>
           )}
         </View>
@@ -279,7 +281,7 @@ export default function SellerApprovalsScreen() {
         <View style={styles.center}>
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={load} activeOpacity={0.85}>
-            <Text style={styles.retryText}>Tekrar Dene</Text>
+            <Text style={styles.retryText}>{t('common.retry')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -294,8 +296,8 @@ export default function SellerApprovalsScreen() {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyEmoji}>🎉</Text>
-              <Text style={styles.emptyTitle}>Tümü Tamamlandı!</Text>
-              <Text style={styles.emptyText}>Bekleyen satıcı başvurusu bulunmuyor.</Text>
+              <Text style={styles.emptyTitle}>{t('approvals.allDone')}</Text>
+              <Text style={styles.emptyText}>{t('approvals.empty')}</Text>
             </View>
           }
         />

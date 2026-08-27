@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
+import { useI18n } from '../../i18n';
 import { apiClient } from '../../services/apiClient';
 import { colors, fonts, radius, shadow, spacing } from '../../theme/theme';
 
@@ -25,6 +26,7 @@ interface Campaign {
 }
 
 export default function CampaignsScreen() {
+  const { t } = useI18n();
   const { points, refreshProfile } = useAuth();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,7 +40,7 @@ export default function CampaignsScreen() {
       const { data } = await apiClient.get<Campaign[]>('/campaigns');
       setCampaigns(data);
     } catch (err: any) {
-      setError(err?.response?.data?.detail ?? 'Kampanyalar yüklenemedi.');
+      setError(err?.response?.data?.detail ?? t('campaigns.loadFailed'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -50,21 +52,24 @@ export default function CampaignsScreen() {
   }, [load]);
 
   const redeem = (c: Campaign) => {
-    Alert.alert('Kampanyayı kullan', `"${c.title}" için ${c.required_points} puan harcanacak. Onaylıyor musun?`, [
-      { text: 'Vazgeç', style: 'cancel' },
+    Alert.alert(
+      t('campaigns.useTitle'),
+      `"${c.title}"${t('campaigns.confirmA')}${c.required_points}${t('campaigns.confirmB')}`,
+      [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Kullan',
+        text: t('campaigns.use'),
         onPress: async () => {
           setRedeemingId(c.campaign_id);
           try {
             const { data } = await apiClient.post(`/campaigns/${c.campaign_id}/redeem`);
             await refreshProfile();
             Alert.alert(
-              'Kupon oluşturuldu 🎉',
-              `Kupon kodun: ${data.coupon_code}\nSepette "Kampanyalarım"dan seçip kullanabilirsin.\nKalan puan: ${data.remaining_points}`
+              t('campaigns.couponCreated'),
+              `${t('campaigns.couponCodeLabel')}${data.coupon_code}\n${t('campaigns.couponHint')}\n${t('campaigns.remainingPoints')}${data.remaining_points}`
             );
           } catch (err: any) {
-            Alert.alert('Kullanılamadı', err?.response?.data?.detail ?? 'Kampanya kullanılamadı.');
+            Alert.alert(t('campaigns.useFailed'), err?.response?.data?.detail ?? t('campaigns.useFailedMsg'));
           } finally {
             setRedeemingId(null);
           }
@@ -85,7 +90,7 @@ export default function CampaignsScreen() {
           {!!item.seller_name && <Text style={styles.store}>🏪 {item.seller_name}</Text>}
           <Text style={styles.title}>{item.title}</Text>
           {!!item.description && <Text style={styles.desc}>{item.description}</Text>}
-          <Text style={styles.points}>{item.required_points} puan</Text>
+          <Text style={styles.points}>{item.required_points} {t('common.points')}</Text>
         </View>
         <TouchableOpacity
           style={[styles.useBtn, (!enough || busy) && styles.useBtnDisabled]}
@@ -96,7 +101,7 @@ export default function CampaignsScreen() {
           {busy ? (
             <ActivityIndicator size="small" color={colors.buttonPrimaryText} />
           ) : (
-            <Text style={styles.useBtnText}>{enough ? 'Kullan' : 'Yetersiz'}</Text>
+            <Text style={styles.useBtnText}>{enough ? t('campaigns.use') : t('campaigns.insufficient')}</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -106,10 +111,10 @@ export default function CampaignsScreen() {
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Kampanyalar</Text>
+        <Text style={styles.headerTitle}>{t('campaigns.title')}</Text>
         <View style={styles.pointsPill}>
           <Ionicons name="sparkles" size={13} color={colors.primaryDeep} />
-          <Text style={styles.pointsText}>{points} puan</Text>
+          <Text style={styles.pointsText}>{points} {t('common.points')}</Text>
         </View>
       </View>
 
@@ -121,7 +126,7 @@ export default function CampaignsScreen() {
         <View style={styles.center}>
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={load} activeOpacity={0.85}>
-            <Text style={styles.retryText}>Tekrar dene</Text>
+            <Text style={styles.retryText}>{t('common.retry')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -139,7 +144,7 @@ export default function CampaignsScreen() {
               }}
             />
           }
-          ListEmptyComponent={<Text style={styles.emptyText}>Şu an aktif kampanya yok.</Text>}
+          ListEmptyComponent={<Text style={styles.emptyText}>{t('campaigns.empty')}</Text>}
         />
       )}
     </View>

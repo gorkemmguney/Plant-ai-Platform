@@ -16,6 +16,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useI18n } from '../../i18n';
+import { specTypeLabel } from '../../i18n/specType';
 import { apiClient } from '../../services/apiClient';
 import { badgeColors, colors, fonts, radius, shadow, spacing } from '../../theme/theme';
 
@@ -64,6 +66,7 @@ const EMPTY_FORM: FormState = {
 };
 
 export default function ProductsScreen() {
+  const { t, lang } = useI18n();
   const [products, setProducts] = useState<Product[]>([]);
   const [specs, setSpecs] = useState<ProductSpec[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,7 +88,7 @@ export default function ProductsScreen() {
       const { data } = await apiClient.get<Product[]>('/catalog/products/my-products');
       setProducts(data);
     } catch (err: any) {
-      setError(err?.response?.data?.detail ?? 'Ürünler yüklenemedi.');
+      setError(err?.response?.data?.detail ?? t('common.productsLoadFailed'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -133,7 +136,7 @@ export default function ProductsScreen() {
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('İzin Gerekli', 'Fotoğraf seçebilmek için galeri izni vermeniz gerekiyor.');
+      Alert.alert(t('imageAnalysis.permissionRequired'), t('sellerProducts.libraryPerm'));
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -160,22 +163,22 @@ export default function ProductsScreen() {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
     } catch (err: any) {
-      Alert.alert('Görsel yüklenemedi', err?.response?.data?.detail ?? 'Ürün kaydedildi ama görsel yüklenemedi.');
+      Alert.alert(t('sellerProducts.imageFailed'), err?.response?.data?.detail ?? t('sellerProducts.imageFailedMsg'));
     }
   };
 
   const handleSave = async () => {
     if (!form.name.trim()) {
-      Alert.alert('Eksik bilgi', 'Ürün adı gerekli.');
+      Alert.alert(t('settings.missingInfo'), t('sellerProducts.nameReq'));
       return;
     }
     const price = Number(form.price);
     if (Number.isNaN(price) || price < 0) {
-      Alert.alert('Geçersiz fiyat', 'Fiyat geçerli bir sayı olmalı.');
+      Alert.alert(t('sellerProducts.invalidPrice'), t('sellerProducts.invalidPriceMsg'));
       return;
     }
     if (form.prod_spec_id == null) {
-      Alert.alert('Eksik bilgi', 'Ürün kategorisi seçilmeli.');
+      Alert.alert(t('settings.missingInfo'), t('sellerProducts.categoryReq'));
       return;
     }
     setSaving(true);
@@ -203,17 +206,17 @@ export default function ProductsScreen() {
       setModalOpen(false);
       await loadProducts();
     } catch (err: any) {
-      Alert.alert('Kaydedilemedi', err?.response?.data?.detail ?? 'Ürün kaydedilemedi.');
+      Alert.alert(t('settings.saveFailed'), err?.response?.data?.detail ?? t('sellerProducts.saveFailed'));
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = (product: Product) => {
-    Alert.alert('Ürünü sil', `"${product.name}" silinsin mi?`, [
-      { text: 'Vazgeç', style: 'cancel' },
+    Alert.alert(t('sellerProducts.deleteTitle'), `"${product.name}"${t('sellerProducts.deleteQ')}`, [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Sil',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
           try {
@@ -222,7 +225,7 @@ export default function ProductsScreen() {
             });
             setProducts((prev) => prev.filter((p) => p.prod_id !== product.prod_id));
           } catch (err: any) {
-            Alert.alert('Silinemedi', err?.response?.data?.detail ?? 'Ürün silinemedi.');
+            Alert.alert(t('address.deleteFailed'), err?.response?.data?.detail ?? t('sellerProducts.deleteFailedMsg'));
           }
         },
       },
@@ -251,14 +254,14 @@ export default function ProductsScreen() {
       </View>
       <View style={styles.cardBottom}>
         <Text style={[styles.stock, Number(item.stock) < LOW_STOCK_THRESHOLD && styles.stockLow]}>
-          Stok: {item.stock}
+          {t('common.stock')}: {item.stock}
         </Text>
         <View style={styles.actions}>
           <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(item)} activeOpacity={0.8}>
-            <Text style={styles.editText}>Düzenle</Text>
+            <Text style={styles.editText}>{t('settings.edit')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(item)} activeOpacity={0.8}>
-            <Text style={styles.deleteText}>Sil</Text>
+            <Text style={styles.deleteText}>{t('common.delete')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -269,11 +272,11 @@ export default function ProductsScreen() {
     <View style={styles.screen}>
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.headerTitle}>Ürünlerim</Text>
-          <Text style={styles.headerSub}>Sattığın ürünleri yönet</Text>
+          <Text style={styles.headerTitle}>{t('sellerProducts.title')}</Text>
+          <Text style={styles.headerSub}>{t('sellerProducts.sub')}</Text>
         </View>
         <TouchableOpacity style={styles.addButton} onPress={openCreate} activeOpacity={0.85}>
-          <Text style={styles.addButtonText}>+ Ekle</Text>
+          <Text style={styles.addButtonText}>{t('address.add')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -283,9 +286,9 @@ export default function ProductsScreen() {
             <Text style={styles.lowStockIcon}>⚠️</Text>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.lowStockTitle}>Stok kritik seviyede</Text>
+            <Text style={styles.lowStockTitle}>{t('sellerProducts.lowStockTitle')}</Text>
             <Text style={styles.lowStockSubtitle}>
-              {lowStockProducts.length} üründe stok 5 adedin altına düştü
+              {lowStockProducts.length} {t('sellerProducts.lowStockSub')}
             </Text>
           </View>
           <View style={styles.lowStockCountBadge}>
@@ -302,7 +305,7 @@ export default function ProductsScreen() {
         <View style={styles.center}>
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={loadProducts} activeOpacity={0.85}>
-            <Text style={styles.retryText}>Tekrar dene</Text>
+            <Text style={styles.retryText}>{t('common.retry')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -320,7 +323,7 @@ export default function ProductsScreen() {
               }}
             />
           }
-          ListEmptyComponent={<Text style={styles.emptyText}>Henüz ürün yok. "+ Ekle" ile başla.</Text>}
+          ListEmptyComponent={<Text style={styles.emptyText}>{t('sellerProducts.empty')}</Text>}
         />
       )}
 
@@ -328,25 +331,25 @@ export default function ProductsScreen() {
         <KeyboardAvoidingView style={styles.modalWrap} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={styles.modalCard}>
             <ScrollView keyboardShouldPersistTaps="handled">
-              <Text style={styles.modalTitle}>{editingId == null ? 'Yeni Ürün' : 'Ürünü Düzenle'}</Text>
+              <Text style={styles.modalTitle}>{editingId == null ? t('sellerProducts.newProduct') : t('sellerProducts.editProduct')}</Text>
 
-              <Text style={styles.label}>Ürün Fotoğrafı</Text>
+              <Text style={styles.label}>{t('sellerProducts.photo')}</Text>
               <TouchableOpacity style={styles.imagePicker} onPress={pickImage} activeOpacity={0.85}>
                 {pendingImageUri || existingImageUrl ? (
                   <Image source={{ uri: pendingImageUri ?? existingImageUrl ?? '' }} style={styles.imagePreview} />
                 ) : (
                   <View style={styles.imagePlaceholder}>
-                    <Text style={styles.imagePlaceholderText}>📷 Fotoğraf Ekle</Text>
+                    <Text style={styles.imagePlaceholderText}>{t('sellerProducts.addPhoto')}</Text>
                   </View>
                 )}
               </TouchableOpacity>
 
-              <Text style={styles.label}>Ürün Türü</Text>
+              <Text style={styles.label}>{t('sellerProducts.productType')}</Text>
               <View style={styles.specRow}>
                 {(
                   [
-                    { key: 'plant', label: '🌸 Çiçek / Bitki' },
-                    { key: 'supply', label: '🪴 Malzeme (Saksı, Toprak vb.)' },
+                    { key: 'plant', label: t('sellerProducts.typePlant') },
+                    { key: 'supply', label: t('sellerProducts.typeSupply') },
                   ] as { key: 'plant' | 'supply'; label: string }[]
                 ).map((opt) => {
                   const active = form.category === opt.key;
@@ -365,26 +368,26 @@ export default function ProductsScreen() {
                 })}
               </View>
 
-              <Text style={styles.label}>Ürün adı</Text>
+              <Text style={styles.label}>{t('sellerProducts.nameLabel')}</Text>
               <TextInput
                 style={styles.input}
                 value={form.name}
                 onChangeText={(v) => setForm((f) => ({ ...f, name: v }))}
-                placeholder="Örn. Barış Çiçeği"
+                placeholder={t('sellerProducts.namePlaceholder')}
                 placeholderTextColor={colors.muted2}
               />
 
-              <Text style={styles.label}>Açıklama</Text>
+              <Text style={styles.label}>{t('support.descLabel')}</Text>
               <TextInput
                 style={[styles.input, styles.inputMultiline]}
                 value={form.description}
                 onChangeText={(v) => setForm((f) => ({ ...f, description: v }))}
-                placeholder="Kısa açıklama"
+                placeholder={t('sellerProducts.descPlaceholder')}
                 placeholderTextColor={colors.muted2}
                 multiline
               />
 
-              <Text style={styles.label}>Kategori</Text>
+              <Text style={styles.label}>{t('sellerProducts.category')}</Text>
               <View style={styles.specRow}>
                 {specs.map((s) => {
                   const active = form.prod_spec_id === s.prod_spec_id;
@@ -396,19 +399,19 @@ export default function ProductsScreen() {
                       activeOpacity={0.75}
                     >
                       <Text style={[styles.specChipText, active ? styles.specChipTextActive : styles.specChipTextInactive]}>
-                        {s.name}
+                        {specTypeLabel(s.name, lang)}
                       </Text>
                     </TouchableOpacity>
                   );
                 })}
                 {specs.length === 0 && (
-                  <Text style={styles.specEmptyText}>Kategori listesi yüklenemedi.</Text>
+                  <Text style={styles.specEmptyText}>{t('sellerProducts.categoryLoadFailed')}</Text>
                 )}
               </View>
 
               <View style={styles.inputRow}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>Fiyat (₺)</Text>
+                  <Text style={styles.label}>{t('sellerProducts.priceLabel')}</Text>
                   <TextInput
                     style={styles.input}
                     value={form.price}
@@ -419,7 +422,7 @@ export default function ProductsScreen() {
                   />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>Stok</Text>
+                  <Text style={styles.label}>{t('common.stock')}</Text>
                   <TextInput
                     style={styles.input}
                     value={form.stock}
@@ -438,13 +441,13 @@ export default function ProductsScreen() {
                   activeOpacity={0.85}
                   disabled={saving}
                 >
-                  <Text style={styles.cancelText}>Vazgeç</Text>
+                  <Text style={styles.cancelText}>{t('common.cancel')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.saveButton} onPress={handleSave} activeOpacity={0.85} disabled={saving}>
                   {saving ? (
                     <ActivityIndicator size="small" color={colors.white} />
                   ) : (
-                    <Text style={styles.saveText}>Kaydet</Text>
+                    <Text style={styles.saveText}>{t('settings.save')}</Text>
                   )}
                 </TouchableOpacity>
               </View>

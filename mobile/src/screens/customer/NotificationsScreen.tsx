@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useI18n } from '../../i18n';
 import { apiClient } from '../../services/apiClient';
 import { colors, fonts, radius, shadow, spacing } from '../../theme/theme';
 
@@ -20,6 +21,7 @@ interface Notification {
 }
 
 export default function NotificationsScreen() {
+  const { t } = useI18n();
   const [items, setItems] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -31,7 +33,7 @@ export default function NotificationsScreen() {
       const { data } = await apiClient.get<Notification[]>('/notifications');
       setItems(data);
     } catch (err: any) {
-      setError(err?.response?.data?.detail ?? 'Bildirimler yüklenemedi.');
+      setError(err?.response?.data?.detail ?? t('notif.loadFailed'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -87,7 +89,7 @@ export default function NotificationsScreen() {
         <View style={styles.center}>
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={load} activeOpacity={0.85}>
-            <Text style={styles.retryText}>Tekrar dene</Text>
+            <Text style={styles.retryText}>{t('common.retry')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -105,7 +107,7 @@ export default function NotificationsScreen() {
               }}
             />
           }
-          ListEmptyComponent={<Text style={styles.emptyText}>Henüz bildirimin yok.</Text>}
+          ListEmptyComponent={<Text style={styles.emptyText}>{t('notif.empty')}</Text>}
         />
       )}
     </View>

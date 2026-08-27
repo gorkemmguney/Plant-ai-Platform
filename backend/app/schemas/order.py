@@ -50,8 +50,10 @@ class OrderOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     cust_ord_id: int
-    cust_id: int
+    user_id: int = 0
+    cust_id: int = 0
     address_id: int | None = None
+
     total_price: Decimal
     order_date: datetime
     gnl_st_id: int

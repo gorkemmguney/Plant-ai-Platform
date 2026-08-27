@@ -112,17 +112,18 @@ async def seed():
 
             # 2) app_user
             user_row = await conn.fetchrow(
-                "SELECT user_id FROM app_user WHERE firebase_uid = $1", fb_user.uid
+                "SELECT user_id FROM app_user WHERE supabase_uid = $1", fb_user.uid
             )
             if user_row is None:
                 user_row = await conn.fetchrow(
                     """
-                    INSERT INTO app_user (firebase_uid, email, first_name, last_name, is_active, store_name, seller_status)
+                    INSERT INTO app_user (supabase_uid, email, first_name, last_name, is_active, store_name, seller_status)
                     VALUES ($1, $2, $3, $4, true, $5, 'verified')
                     RETURNING user_id
                     """,
                     fb_user.uid, email, seller["first_name"], seller["last_name"], seller["store_name"],
                 )
+
                 print(f"✅ app_user oluşturuldu: {seller['store_name']} (user_id={user_row['user_id']})")
             else:
                 await conn.execute(

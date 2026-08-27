@@ -15,6 +15,27 @@ class GnlSt(Base):
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
+    # CNTC_MEDIUM doğrulama durumları için 3 parçalı lookup alanları (spec: TM-Forum tarzı).
+    # Mevcut sipariş/ürün statülerinde NULL kalır; sadece doğrulama statülerinde dolar.
+    ent_code_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    ent_name: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    shrt_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    is_actv: Mapped[bool] = mapped_column(Boolean, server_default="true", nullable=False)
+
+
+class GnlTp(Base):
+    __tablename__ = "gnl_tp"
+
+    # Genel TİP lookup'ı (doğrulama tipleri, iletişim veri tipleri vb.).
+    # ent_code_name = kategori, ent_name = alt-grup (EMAIL/GSM), shrt_code = tip kodu.
+    gnl_tp_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    ent_code_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    ent_name: Mapped[str] = mapped_column(String(50), nullable=False)
+    shrt_code: Mapped[str] = mapped_column(String(50), nullable=False)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    description: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    is_actv: Mapped[bool] = mapped_column(Boolean, server_default="true", nullable=False)
+
 
 class Prod(Base):
     __tablename__ = "prod"

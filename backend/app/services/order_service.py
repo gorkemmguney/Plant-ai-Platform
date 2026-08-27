@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from app.models.customer import Cust
+from app.models.customer import Cust, Ind, Org
 from app.services.notification_service import create_notification
 
 from fastapi import HTTPException, status
@@ -10,11 +10,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.catalog import GnlChar, GnlCharVal, Prod, ProdCharVal
 from app.models.address import CustomerAddress
+from app.models.customer_product import CustProd
 from app.models.order import CustOrd, CustOrdCharVal, CustOrdItem, CustOrdItemCharVal
 from app.models.user import AppUser
 from app.schemas.order import OrderCreateIn
 
 DEFAULT_ORDER_STATUS_ID = 5
+DELIVERED_ORDER_STATUS_ID = 8
 
 # "is_hidden" artık cust_ord'da ayrı bir kolon değil; bu code'a sahip gnl_char
 # üzerinden cust_ord_char_val'de tutuluyor (bkz. migration e5f7a8c19d02).
@@ -93,6 +95,29 @@ _STATUS_TITLES = {
 }
 
 
+async def _add_delivered_items_to_garden(db: AsyncSession, order: CustOrd) -> None:
+    """Sipariş teslim edilince siparişteki bitkileri müşterinin bahçesine (cust_prod) ekler.
+    Sadece kategorisi 'plant' olan ürünler eklenir; saksı/gübre gibi malzemeler bahçeye girmez.
+    Alınan adet kadar ayrı bitki kaydı oluşturulur (her bitkinin kendi bakım takibi olur)."""
+    for item in order.items:
+        if item.prod_id is None:
+            continue
+        product = (
+            await db.execute(select(Prod).where(Prod.prod_id == item.prod_id))
+        ).scalar_one_or_none()
+        if product is None or product.category != "plant":
+            continue
+        for _ in range(item.quantity):
+            db.add(
+                CustProd(
+                    user_id=order.user_id,
+                    prod_spec_id=product.prod_spec_id,
+                    name=item.prod_name,
+                    image_url=product.image_url,
+                )
+            )
+
+
 async def update_order_status(db: AsyncSession, cust_ord_id: int, gnl_st_id: int) -> CustOrd:
     result = await db.execute(
         select(CustOrd).options(selectinload(CustOrd.items)).where(CustOrd.cust_ord_id == cust_ord_id)
@@ -101,15 +126,18 @@ async def update_order_status(db: AsyncSession, cust_ord_id: int, gnl_st_id: int
     if order is None:
         raise HTTPException(status_code=404, detail="Sipariş bulunamadı")
 
+    # "Teslim edildi"ye ilk kez geçildiğinde bahçeye ekle; tekrar 8'e geçilirse çift eklemeyi önle
+    became_delivered = gnl_st_id == DELIVERED_ORDER_STATUS_ID and order.gnl_st_id != DELIVERED_ORDER_STATUS_ID
+
     order.gnl_st_id = gnl_st_id
     await db.flush()
 
-    cust_result = await db.execute(select(Cust).where(Cust.cust_id == order.cust_id))
-    cust = cust_result.scalar_one_or_none()
-    if cust is not None:
-        title = _STATUS_TITLES.get(gnl_st_id, "Sipariş Güncellemesi")
-        message = _STATUS_MESSAGES.get(gnl_st_id, "Sipariş durumunuz güncellendi.")
-        await create_notification(db, cust.user_id, title, f"#{order.cust_ord_id} — {message}")
+    if became_delivered:
+        await _add_delivered_items_to_garden(db, order)
+
+    title = _STATUS_TITLES.get(gnl_st_id, "Sipariş Güncellemesi")
+    message = _STATUS_MESSAGES.get(gnl_st_id, "Sipariş durumunuz güncellendi.")
+    await create_notification(db, order.user_id, title, f"#{order.cust_ord_id} — {message}")
 
     await db.commit()
 
@@ -137,7 +165,7 @@ async def _valid_char_values_for_product(db: AsyncSession, prod_id: int) -> dict
     return {val_id: (char_id, value) for (val_id, char_id, value) in result.all()}
 
 
-async def create_order(db: AsyncSession, cust_id: int, payload: OrderCreateIn) -> list[CustOrd]:
+async def create_order(db: AsyncSession, user_id: int, payload: OrderCreateIn) -> list[CustOrd]:
     if not payload.items:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Sepet boş olamaz")
 
@@ -145,16 +173,22 @@ async def create_order(db: AsyncSession, cust_id: int, payload: OrderCreateIn) -
     address = (
         await db.execute(
             select(CustomerAddress).where(
-                CustomerAddress.address_id == payload.address_id, CustomerAddress.cust_id == cust_id
+                CustomerAddress.address_id == payload.address_id, CustomerAddress.user_id == user_id
             )
         )
     ).scalar_one_or_none()
     if address is None:
         raise HTTPException(status_code=400, detail="Geçersiz teslimat adresi")
 
+    # Kullanıcının cust kaydını bul (bahçe güncellemesi için gerekli)
+    cust = (
+        await db.execute(select(Cust).where(Cust.user_id == user_id))
+    ).scalar_one_or_none()
+    cust_id = cust.cust_id if cust else None
+
     items_by_seller: dict[int | None, list[CustOrdItem]] = {}
     totals_by_seller: dict[int | None, Decimal] = {}
-   
+
     pending_char_snapshots: list[tuple[CustOrdItem, list[tuple[int, str]]]] = []
 
     for item in payload.items:
@@ -165,7 +199,6 @@ async def create_order(db: AsyncSession, cust_id: int, payload: OrderCreateIn) -
         if product.stock < item.quantity:
             raise HTTPException(status_code=400, detail=f"Yetersiz stok: {product.name}")
 
-    
         char_snapshots: list[tuple[int, str]] = []
         if item.selected_char_value_ids:
             valid_values = await _valid_char_values_for_product(db, product.prod_id)
@@ -190,11 +223,15 @@ async def create_order(db: AsyncSession, cust_id: int, payload: OrderCreateIn) -
 
         seller_store_name = None
         if product.seller_id is not None:
-            seller = (
-                await db.execute(select(AppUser).where(AppUser.user_id == product.seller_id))
-            ).scalar_one_or_none()
-            if seller is not None:
-                seller_store_name = seller.store_name or f"{seller.first_name} {seller.last_name}"
+            org_res = await db.execute(select(Org).where(Org.user_id == product.seller_id))
+            org = org_res.scalar_one_or_none()
+            if org:
+                seller_store_name = org.store_name or org.company_name or f"{org.first_name or ''} {org.last_name or ''}".strip()
+            else:
+                ind_res = await db.execute(select(Ind).where(Ind.user_id == product.seller_id))
+                ind = ind_res.scalar_one_or_none()
+                if ind:
+                    seller_store_name = f"{ind.first_name or ''} {ind.last_name or ''}".strip() or ind.username
 
         order_item = CustOrdItem(
             prod_id=product.prod_id,
@@ -215,6 +252,7 @@ async def create_order(db: AsyncSession, cust_id: int, payload: OrderCreateIn) -
     new_orders: list[CustOrd] = []
     for seller_key, order_items in items_by_seller.items():
         order = CustOrd(
+            user_id=user_id,
             cust_id=cust_id,
             sale_cnl_id=payload.sale_cnl_id,
             address_id=payload.address_id,
@@ -225,7 +263,6 @@ async def create_order(db: AsyncSession, cust_id: int, payload: OrderCreateIn) -
         db.add(order)
         new_orders.append(order)
 
-    
     await db.flush()
 
     for order_item, char_snapshots in pending_char_snapshots:
@@ -240,13 +277,11 @@ async def create_order(db: AsyncSession, cust_id: int, payload: OrderCreateIn) -
 
     await db.flush()
 
-    # Sipariş oluşturulur oluşturulmaz müşteriye "Sipariş Alındı" bildirimi düşsün
-    cust_row = (await db.execute(select(Cust).where(Cust.cust_id == cust_id))).scalar_one_or_none()
-    if cust_row is not None:
-        for order in new_orders:
-            await create_notification(
-                db,
-                cust_row.user_id,
+    for order in new_orders:
+        await create_notification(
+            db,
+            user_id,
+
                 _STATUS_TITLES[DEFAULT_ORDER_STATUS_ID],
                 f"#{order.cust_ord_id} — {_STATUS_MESSAGES[DEFAULT_ORDER_STATUS_ID]}",
             )

@@ -93,19 +93,20 @@ async def main():
         for s in SELLERS:
             uid = get_or_create_auth_uid(s["email"], DEFAULT_PASSWORD)
 
-            existing = await conn.fetchrow("SELECT user_id FROM app_user WHERE firebase_uid = $1", uid)
+            existing = await conn.fetchrow("SELECT user_id FROM app_user WHERE supabase_uid = $1", uid)
             if existing:
                 user_id = existing["user_id"]
                 print(f"ℹ️  app_user zaten vardı: user_id={user_id}")
             else:
                 row = await conn.fetchrow(
                     """
-                    INSERT INTO app_user (firebase_uid, email, first_name, last_name, is_active, seller_status, store_name)
+                    INSERT INTO app_user (supabase_uid, email, first_name, last_name, is_active, seller_status, store_name)
                     VALUES ($1, $2, $3, $4, true, 'verified', $5)
                     RETURNING user_id
                     """,
                     uid, s["email"], s["first_name"], s["last_name"], s["store_name"],
                 )
+
                 user_id = row["user_id"]
                 print(f"✅ app_user oluşturuldu: user_id={user_id}")
 

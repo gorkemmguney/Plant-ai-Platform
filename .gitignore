@@ -2,13 +2,40 @@
 venv/
 __pycache__/
 *.pyc
+*.pyo
 
 # Environment & secrets
 .env
-firebase-service-account.json
+.env.local
+.env.production
+
+# Service Account & Keys
+*firebase-adminsdk*.json
+*firebase*key*.json
+*service-account*.json
+*serviceAccountKey*.json
+
+# Dokümantasyon & Taslak Dosyalar
+INSTALLATION.md
+TODO.md
+PLANT_AI_DOKUMANTASYON.*
+write_html.py
+*.html
+*.pdf
+# Resmi PDF kılavuzuna izin ver:
+!PLANT_AI_KURULUM_REHBERI.pdf
+
+# Scratch & Geçici dosyalar
+scratch/
+*.log
 
 # OS
 .DS_Store
+Thumbs.db
 
-# Local batch runners
-*.bat
+# node_modules
+node_modules/
+
+# Expo
+.expo/
+dist/

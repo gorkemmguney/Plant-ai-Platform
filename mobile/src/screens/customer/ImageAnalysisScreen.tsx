@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useI18n } from '../../i18n';
 import { apiClient } from '../../services/apiClient';
 import { trackInteraction } from '../../services/interactionService';
 import { badgeColors, colors, fonts, radius, shadow, spacing } from '../../theme/theme';
@@ -26,6 +27,7 @@ interface AnalysisHistoryItem {
 }
 
 export default function ImageAnalysisScreen({ navigation }: any) {
+  const { t } = useI18n();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
@@ -55,13 +57,13 @@ export default function ImageAnalysisScreen({ navigation }: any) {
     if (type === 'camera') {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('İzin Gerekli', 'Kamera ile fotoğraf çekebilmek için kamera izni vermeniz gerekmektedir.');
+        Alert.alert(t('imageAnalysis.permissionRequired'), t('imageAnalysis.cameraPermMsg'));
         return false;
       }
     } else {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('İzin Gerekli', 'Galeriden fotoğraf seçebilmek için fotoğraf galerisi izni vermeniz gerekmektedir.');
+        Alert.alert(t('imageAnalysis.permissionRequired'), t('imageAnalysis.libraryPermMsg'));
         return false;
       }
     }
@@ -88,7 +90,7 @@ export default function ImageAnalysisScreen({ navigation }: any) {
       }
     } catch (err) {
       console.error('Resim seçilirken hata oluştu:', err);
-      Alert.alert('Hata', 'Fotoğraf seçilirken bir sorun oluştu.');
+      Alert.alert(t('common.error'), t('imageAnalysis.pickError'));
     }
   };
 
@@ -96,7 +98,7 @@ export default function ImageAnalysisScreen({ navigation }: any) {
     if (!selectedImage) return;
 
     setLoading(true);
-    setLoadingMessage('Fotoğraf yükleniyor...');
+    setLoadingMessage(t('imageAnalysis.uploading'));
 
     try {
       const formData = new FormData();
@@ -111,7 +113,7 @@ export default function ImageAnalysisScreen({ navigation }: any) {
         type: fileType,
       } as any);
 
-      setLoadingMessage('Yapay zeka bitkiyi analiz ediyor...');
+      setLoadingMessage(t('imageAnalysis.analyzing'));
       
       const response = await apiClient.post('/ai/analyze-image', formData, {
         headers: {
@@ -136,8 +138,8 @@ export default function ImageAnalysisScreen({ navigation }: any) {
 
     } catch (err: any) {
       console.error('Analiz hatası:', err);
-      const detail = err?.response?.data?.detail ?? 'Sunucu bağlantısı kurulamadı. Lütfen internetinizi ve backend adresini kontrol edin.';
-      Alert.alert('Analiz Başarısız', detail);
+      const detail = err?.response?.data?.detail ?? t('imageAnalysis.connError');
+      Alert.alert(t('imageAnalysis.analyzeFailed'), detail);
     } finally {
       setLoading(false);
       setLoadingMessage('');
@@ -170,19 +172,19 @@ export default function ImageAnalysisScreen({ navigation }: any) {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'healthy':
-        return { bg: badgeColors.green.bg, text: 'Sağlıklı', color: badgeColors.green.text };
+        return { bg: badgeColors.green.bg, text: t('analysis.healthy'), color: badgeColors.green.text };
       case 'diseased':
-        return { bg: badgeColors.red.bg, text: 'Hasta', color: badgeColors.red.text };
+        return { bg: badgeColors.red.bg, text: t('imageAnalysis.sick'), color: badgeColors.red.text };
       case 'pest_damage':
-        return { bg: badgeColors.amber.bg, text: 'Zararlı Hasarı', color: badgeColors.amber.text };
+        return { bg: badgeColors.amber.bg, text: t('imageAnalysis.pestDamage'), color: badgeColors.amber.text };
       default:
-        return { bg: colors.bgAlt, text: 'Bilinmiyor', color: colors.muted };
+        return { bg: colors.bgAlt, text: t('imageAnalysis.unknownStatus'), color: colors.muted };
     }
   };
 
   const renderHistoryItem = ({ item }: { item: AnalysisHistoryItem }) => {
     const analysis = parseAnalysisResult(item.result);
-    const speciesName = analysis?.species || 'Bitki Türü Tespit Edilemedi';
+    const speciesName = analysis?.species || t('imageAnalysis.speciesNotDetected');
     const healthStatus = analysis?.health_status || 'unknown';
     const statusBadge = getStatusBadge(healthStatus);
 
@@ -222,7 +224,7 @@ export default function ImageAnalysisScreen({ navigation }: any) {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={colors.ink} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Bitki Sağlığı Analizi</Text>
+        <Text style={styles.headerTitle}>{t('imageAnalysis.title')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -233,9 +235,7 @@ export default function ImageAnalysisScreen({ navigation }: any) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
         ListHeaderComponent={
           <View style={styles.topSection}>
-            <Text style={styles.sectionSubtitle}>
-              Bitkinizin fotoğrafını çekin veya yükleyin; yapay zeka ile türünü, hastalıklarını teşhis edip bakım önerileri sunalım.
-            </Text>
+            <Text style={styles.sectionSubtitle}>{t('imageAnalysis.subtitle')}</Text>
 
             {selectedImage ? (
               <View style={styles.previewContainer}>
@@ -244,7 +244,7 @@ export default function ImageAnalysisScreen({ navigation }: any) {
                   <Ionicons name="close" size={20} color={colors.white} />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.analyzeButton} onPress={handleAnalyze} disabled={loading}>
-                  <Text style={styles.analyzeButtonText}>Analizi Başlat 🚀</Text>
+                  <Text style={styles.analyzeButtonText}>{t('imageAnalysis.startAnalysis')}</Text>
                 </TouchableOpacity>
               </View>
             ) : (
@@ -252,23 +252,23 @@ export default function ImageAnalysisScreen({ navigation }: any) {
                 <TouchableOpacity style={styles.actionCard} onPress={() => pickImage(true)}>
                   <LinearGradientHelper colors={['#3e895c', '#2c694a']}>
                     <Ionicons name="camera" size={32} color={colors.white} />
-                    <Text style={styles.actionCardTitle}>Kamera Kullan</Text>
-                    <Text style={styles.actionCardSub}>Fotoğraf çek</Text>
+                    <Text style={styles.actionCardTitle}>{t('imageAnalysis.useCamera')}</Text>
+                    <Text style={styles.actionCardSub}>{t('imageAnalysis.takePhoto')}</Text>
                   </LinearGradientHelper>
                 </TouchableOpacity>
 
                 <TouchableOpacity style={styles.actionCard} onPress={() => pickImage(false)}>
                   <LinearGradientHelper colors={['#4c4c6a', '#393952']}>
                     <Ionicons name="images" size={32} color={colors.white} />
-                    <Text style={styles.actionCardTitle}>Galeri Aç</Text>
-                    <Text style={styles.actionCardSub}>Fotoğraf yükle</Text>
+                    <Text style={styles.actionCardTitle}>{t('imageAnalysis.openGallery')}</Text>
+                    <Text style={styles.actionCardSub}>{t('imageAnalysis.uploadPhoto')}</Text>
                   </LinearGradientHelper>
                 </TouchableOpacity>
               </View>
             )}
 
             <View style={styles.historyHeader}>
-              <Text style={styles.historyTitleText}>Geçmiş Analizlerim</Text>
+              <Text style={styles.historyTitleText}>{t('imageAnalysis.pastAnalyses')}</Text>
               <TouchableOpacity onPress={onRefresh}>
                 <Ionicons name="refresh" size={18} color={colors.muted} />
               </TouchableOpacity>
@@ -279,7 +279,7 @@ export default function ImageAnalysisScreen({ navigation }: any) {
           !loading ? (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyEmoji}>🍃</Text>
-              <Text style={styles.emptyText}>Henüz hiç analiz yapmadınız.</Text>
+              <Text style={styles.emptyText}>{t('imageAnalysis.empty')}</Text>
             </View>
           ) : null
         }

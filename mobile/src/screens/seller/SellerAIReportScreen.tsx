@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
+import { useI18n } from '../../i18n';
 import { apiClient } from '../../services/apiClient';
 import { colors, fonts, radius, shadow, spacing } from '../../theme/theme';
 
@@ -25,6 +26,7 @@ interface Stats {
 }
 
 export default function SellerAIReportScreen() {
+  const { t } = useI18n();
   const [report, setReport] = useState<string>('');
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -38,7 +40,7 @@ export default function SellerAIReportScreen() {
       setReport(data.report);
       setStats(data.stats);
     } catch (err: any) {
-      setError(err?.response?.data?.detail ?? 'Rapor oluşturulamadı.');
+      setError(err?.response?.data?.detail ?? t('sellerReport.loadFailed'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -79,7 +81,7 @@ export default function SellerAIReportScreen() {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color={colors.buttonPrimary} />
-        <Text style={styles.loadingText}>Mağazan analiz ediliyor...</Text>
+        <Text style={styles.loadingText}>{t('sellerReport.analyzing')}</Text>
       </View>
     );
   }
@@ -92,15 +94,15 @@ export default function SellerAIReportScreen() {
     >
       <LinearGradient colors={[colors.secondary, colors.secondaryDeep]} style={styles.hero}>
         <Ionicons name="sparkles" size={22} color={colors.primary} />
-        <Text style={styles.heroTitle}>AI Mağaza Raporu</Text>
-        <Text style={styles.heroSub}>Satış verilerin yapay zeka ile analiz edildi</Text>
+        <Text style={styles.heroTitle}>{t('sellerReport.title')}</Text>
+        <Text style={styles.heroSub}>{t('sellerReport.sub')}</Text>
       </LinearGradient>
 
       {error ? (
         <View style={styles.card}>
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={load} activeOpacity={0.85}>
-            <Text style={styles.retryText}>Tekrar dene</Text>
+            <Text style={styles.retryText}>{t('common.retry')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -108,34 +110,34 @@ export default function SellerAIReportScreen() {
           {stats && (
             <>
               <View style={styles.metricsRow}>
-                {metric('cube-outline', 'Aktif Ürün', stats.active_products)}
-                {metric('checkmark-circle-outline', 'Teslim', stats.delivered_orders)}
-                {metric('close-circle-outline', 'İptal', stats.cancelled_orders, colors.red)}
+                {metric('cube-outline', t('sellerReport.activeProducts'), stats.active_products)}
+                {metric('checkmark-circle-outline', t('sellerReport.delivered'), stats.delivered_orders)}
+                {metric('close-circle-outline', t('sellerReport.cancelled'), stats.cancelled_orders, colors.red)}
               </View>
               <View style={styles.metricsRow}>
-                {metric('cash-outline', 'Ciro', `₺${Number(stats.total_revenue).toFixed(0)}`)}
-                {metric('star-outline', 'Puan', stats.avg_rating ?? '—')}
-                {metric('alert-circle-outline', 'Stok Yok', stats.out_of_stock, colors.amber)}
+                {metric('cash-outline', t('sellerReport.revenue'), `₺${Number(stats.total_revenue).toFixed(0)}`)}
+                {metric('star-outline', t('sellerReport.rating'), stats.avg_rating ?? '—')}
+                {metric('alert-circle-outline', t('sellerReport.outOfStock'), stats.out_of_stock, colors.amber)}
               </View>
 
-              {listBlock('En Çok Tercih Edilenler', 'flame-outline',
-                stats.top_products.map((p) => ({ name: p.name, value: `${p.qty} adet` })),
-                'Henüz satış verisi yok.')}
+              {listBlock(t('sellerReport.topProducts'), 'flame-outline',
+                stats.top_products.map((p) => ({ name: p.name, value: `${p.qty} ${t('sellerReport.units')}` })),
+                t('sellerReport.noSales'))}
 
-              {listBlock('En Çok İptal Edilenler', 'trending-down-outline',
-                stats.cancelled_products.map((p) => ({ name: p.name, value: `${p.qty} adet` })),
-                'İptal edilen ürün yok — harika!')}
+              {listBlock(t('sellerReport.mostCancelled'), 'trending-down-outline',
+                stats.cancelled_products.map((p) => ({ name: p.name, value: `${p.qty} ${t('sellerReport.units')}` })),
+                t('sellerReport.noCancelled'))}
 
-              {listBlock('Düşük Puanlı Ürünler', 'warning-outline',
+              {listBlock(t('sellerReport.lowRated'), 'warning-outline',
                 stats.low_rated.map((p) => ({ name: p.name, value: `${p.rating} ★` })),
-                'Düşük puanlı ürünün yok.')}
+                t('sellerReport.noLowRated'))}
             </>
           )}
 
           <View style={styles.card}>
             <View style={styles.cardHead}>
               <Ionicons name="bulb-outline" size={16} color={colors.primaryDeep} />
-              <Text style={styles.cardTitle}>Yapay Zeka Yorumu</Text>
+              <Text style={styles.cardTitle}>{t('sellerReport.aiComment')}</Text>
             </View>
             <Text style={styles.reportText}>{report}</Text>
           </View>

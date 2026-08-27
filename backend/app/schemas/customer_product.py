@@ -58,8 +58,10 @@ class CustProdOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     cust_prod_id: int
-    cust_id: int
+    user_id: int = 0
+    cust_id: int = 0
     prod_spec_id: int
+
     name: str
     description: str | None = None
     image_url: str | None = None

@@ -19,7 +19,11 @@ class CustOrd(Base):
     __tablename__ = "cust_ord"
 
     cust_ord_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    cust_id: Mapped[int] = mapped_column(ForeignKey("cust.cust_id"), nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("app_user.user_id"), nullable=False)
+    cust_id: Mapped[int | None] = mapped_column(
+        ForeignKey("cust.cust_id", ondelete="SET NULL"), nullable=True
+    )
+
     sale_cnl_id: Mapped[int] = mapped_column(ForeignKey("sale_cnl.sale_cnl_id"), nullable=False)
     address_id: Mapped[int | None] = mapped_column(
         ForeignKey("customer_address.address_id", ondelete="SET NULL"), nullable=True

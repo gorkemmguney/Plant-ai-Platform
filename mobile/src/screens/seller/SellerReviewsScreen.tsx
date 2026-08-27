@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useI18n } from '../../i18n';
 import { apiClient } from '../../services/apiClient';
 import { colors, fonts, radius, shadow, spacing } from '../../theme/theme';
 
@@ -25,6 +26,7 @@ interface Review {
 }
 
 export default function SellerReviewsScreen() {
+  const { t } = useI18n();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -40,7 +42,7 @@ export default function SellerReviewsScreen() {
       const { data } = await apiClient.get<Review[]>('/reviews/seller');
       setReviews(data);
     } catch (err: any) {
-      setError(err?.response?.data?.detail ?? 'Yorumlar yüklenemedi.');
+      setError(err?.response?.data?.detail ?? t('sellerReviews.loadFailed'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -54,7 +56,7 @@ export default function SellerReviewsScreen() {
   const sendReply = async (review: Review) => {
     const text = (drafts[review.review_id] ?? '').trim();
     if (!text) {
-      Alert.alert('Boş cevap', 'Lütfen bir cevap yaz.');
+      Alert.alert(t('sellerReviews.emptyReply'), t('sellerReviews.emptyReplyMsg'));
       return;
     }
     setSavingId(review.review_id);
@@ -65,7 +67,7 @@ export default function SellerReviewsScreen() {
       );
       setEditingId(null);
     } catch (err: any) {
-      Alert.alert('Gönderilemedi', err?.response?.data?.detail ?? 'Cevap kaydedilemedi.');
+      Alert.alert(t('support.sendFailed'), err?.response?.data?.detail ?? t('sellerReviews.replySaveFailed'));
     } finally {
       setSavingId(null);
     }
@@ -83,22 +85,22 @@ export default function SellerReviewsScreen() {
     return (
       <View style={styles.card}>
         <View style={styles.topRow}>
-          <Text style={styles.prodName} numberOfLines={1}>{item.prod_name ?? 'Ürün'}</Text>
+          <Text style={styles.prodName} numberOfLines={1}>{item.prod_name ?? t('common.product')}</Text>
           {!!dateText && <Text style={styles.date}>{dateText}</Text>}
         </View>
         <Text style={styles.stars}>
           {'★'.repeat(item.rating)}{'☆'.repeat(5 - item.rating)}
         </Text>
-        <Text style={styles.reviewer}>{item.reviewer_name ?? 'Müşteri'}</Text>
+        <Text style={styles.reviewer}>{item.reviewer_name ?? t('role.customer')}</Text>
         {!!item.comment && <Text style={styles.comment}>{item.comment}</Text>}
 
         {/* Satıcı cevabı */}
         {item.seller_reply && !isEditing ? (
           <View style={styles.replyBox}>
-            <Text style={styles.replyLabel}>Senin cevabın</Text>
+            <Text style={styles.replyLabel}>{t('sellerReviews.yourReply')}</Text>
             <Text style={styles.replyText}>{item.seller_reply}</Text>
             <TouchableOpacity onPress={() => startEditing(item)} activeOpacity={0.7}>
-              <Text style={styles.editLink}>Düzenle</Text>
+              <Text style={styles.editLink}>{t('settings.edit')}</Text>
             </TouchableOpacity>
           </View>
         ) : isEditing ? (
@@ -106,14 +108,14 @@ export default function SellerReviewsScreen() {
             <TextInput
               style={styles.input}
               value={drafts[item.review_id] ?? ''}
-              onChangeText={(t) => setDrafts((prev) => ({ ...prev, [item.review_id]: t }))}
-              placeholder="Cevabını yaz…"
+              onChangeText={(val) => setDrafts((prev) => ({ ...prev, [item.review_id]: val }))}
+              placeholder={t('sellerReviews.replyPlaceholder')}
               placeholderTextColor={colors.muted2}
               multiline
             />
             <View style={styles.editorActions}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditingId(null)} activeOpacity={0.8}>
-                <Text style={styles.cancelText}>Vazgeç</Text>
+                <Text style={styles.cancelText}>{t('common.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.sendBtn}
@@ -124,14 +126,14 @@ export default function SellerReviewsScreen() {
                 {savingId === item.review_id ? (
                   <ActivityIndicator size="small" color={colors.buttonPrimaryText} />
                 ) : (
-                  <Text style={styles.sendText}>Gönder</Text>
+                  <Text style={styles.sendText}>{t('common.submit')}</Text>
                 )}
               </TouchableOpacity>
             </View>
           </View>
         ) : (
           <TouchableOpacity style={styles.replyBtn} onPress={() => startEditing(item)} activeOpacity={0.85}>
-            <Text style={styles.replyBtnText}>💬 Cevapla</Text>
+            <Text style={styles.replyBtnText}>{t('sellerReviews.reply')}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -141,8 +143,8 @@ export default function SellerReviewsScreen() {
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Yorumlar</Text>
-        <Text style={styles.headerSub}>Ürünlerine gelen değerlendirmeler</Text>
+        <Text style={styles.headerTitle}>{t('sellerReviews.title')}</Text>
+        <Text style={styles.headerSub}>{t('sellerReviews.sub')}</Text>
       </View>
 
       {loading ? (
@@ -153,7 +155,7 @@ export default function SellerReviewsScreen() {
         <View style={styles.center}>
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={load} activeOpacity={0.85}>
-            <Text style={styles.retryText}>Tekrar dene</Text>
+            <Text style={styles.retryText}>{t('common.retry')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -171,7 +173,7 @@ export default function SellerReviewsScreen() {
               }}
             />
           }
-          ListEmptyComponent={<Text style={styles.emptyText}>Henüz ürünlerine yorum gelmemiş.</Text>}
+          ListEmptyComponent={<Text style={styles.emptyText}>{t('sellerReviews.empty')}</Text>}
         />
       )}
     </View>

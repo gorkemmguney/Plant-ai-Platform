@@ -15,6 +15,8 @@ import {
   View,
 } from 'react-native';
 import { useCart } from '../../context/CartContext';
+import { useI18n } from '../../i18n';
+import { specTypeLabel } from '../../i18n/specType';
 import { apiClient } from '../../services/apiClient';
 import { isPetToxic } from '../../utils/petToxic';
 import { colors, fonts, gradients, radius, shadow, spacing, badgeColors } from '../../theme/theme';
@@ -45,17 +47,19 @@ interface CustProd {
   species_name: string;
 }
 
+// key değerleri backend'deki location ile eşleşir, değiştirme; sadece etiket çevrilir.
 const LOCATIONS = [
-  { key: 'all', label: '📍 Tüm Bahçe' },
-  { key: 'Salon', label: '🛋️ Salon' },
-  { key: 'Mutfak', label: '🍳 Mutfak' },
-  { key: 'Yatak Odası', label: '🛏️ Yatak Odası' },
-  { key: 'Balkon', label: '🌸 Balkon' },
-  { key: 'Ofis', label: '💼 Ofis' },
-  { key: 'Bahçe', label: '🌳 Dış Bahçe' },
+  { key: 'all', labelKey: 'garden.locAll' },
+  { key: 'Salon', labelKey: 'garden.locSalon' },
+  { key: 'Mutfak', labelKey: 'garden.locKitchen' },
+  { key: 'Yatak Odası', labelKey: 'garden.locBedroom' },
+  { key: 'Balkon', labelKey: 'garden.locBalcony' },
+  { key: 'Ofis', labelKey: 'garden.locOffice' },
+  { key: 'Bahçe', labelKey: 'garden.locOutdoor' },
 ];
 
 export default function MyGardenScreen({ navigation }: any) {
+  const { t, lang } = useI18n();
   const { addToCart } = useCart();
   const [plants, setPlants] = useState<CustProd[]>([]);
   const [recs, setRecs] = useState<RecProduct[]>([]);
@@ -70,8 +74,8 @@ export default function MyGardenScreen({ navigation }: any) {
       const { data } = await apiClient.get<CustProd[]>('/customer-products');
       setPlants(data);
     } catch (err: any) {
-      const detail = err?.response?.data?.detail ?? 'Bitkiler yüklenirken bir sorun oluştu.';
-      Alert.alert('Hata', detail);
+      const detail = err?.response?.data?.detail ?? t('garden.loadFailed');
+      Alert.alert(t('common.error'), detail);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -89,7 +93,7 @@ export default function MyGardenScreen({ navigation }: any) {
       1,
       []
     );
-    Alert.alert('Sepete eklendi 🛒', `${p.name} sepete eklendi.`);
+    Alert.alert(t('orders.addedToCart'), `${p.name}${t('garden.addedMsg')}`);
   };
 
   useFocusEffect(
@@ -108,9 +112,9 @@ export default function MyGardenScreen({ navigation }: any) {
     try {
       const { data } = await apiClient.post<CustProd>(`/customer-products/${id}/water`);
       setPlants((prev) => prev.map((p) => (p.cust_prod_id === id ? data : p)));
-      Alert.alert('Harika!', `${data.name} sulandı! 💧`);
+      Alert.alert(t('garden.great'), `${data.name}${t('garden.wateredMsg')}`);
     } catch (err: any) {
-      Alert.alert('Hata', 'Sulama işlemi kaydedilemedi.');
+      Alert.alert(t('common.error'), t('garden.waterFailed'));
     } finally {
       setWateringId(null);
     }
@@ -131,24 +135,24 @@ export default function MyGardenScreen({ navigation }: any) {
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
     if (diffDays <= 0) {
-      return { label: 'Sulanmalı ⚠️', color: colors.red, bg: '#fbe4e8' };
+      return { label: t('garden.needsWater'), color: colors.red, bg: '#fbe4e8' };
     } else if (diffDays === 1) {
-      return { label: 'Yarın', color: colors.amber, bg: '#fdf0dc' };
+      return { label: t('garden.tomorrow'), color: colors.amber, bg: '#fdf0dc' };
     } else {
-      return { label: `${diffDays} gün`, color: colors.primaryDeep, bg: colors.primarySoft };
+      return { label: `${diffDays} ${t('garden.days')}`, color: colors.primaryDeep, bg: colors.primarySoft };
     }
   };
 
   const getHealthBadge = (status: string) => {
     switch (status) {
       case 'healthy':
-        return { label: 'Sağlıklı', ...badgeColors.green };
+        return { label: t('analysis.healthy'), ...badgeColors.green };
       case 'diseased':
-        return { label: 'Hasta', ...badgeColors.red };
+        return { label: t('imageAnalysis.sick'), ...badgeColors.red };
       case 'pest_damage':
-        return { label: 'Zararlı', ...badgeColors.amber };
+        return { label: t('garden.pest'), ...badgeColors.amber };
       default:
-        return { label: 'Bilinmiyor', bg: colors.bgAlt, text: colors.muted };
+        return { label: t('imageAnalysis.unknownStatus'), bg: colors.bgAlt, text: colors.muted };
     }
   };
 
@@ -162,7 +166,7 @@ export default function MyGardenScreen({ navigation }: any) {
   const sections = useMemo(() => {
     const map = new Map<string, CustProd[]>();
     filteredPlants.forEach((p) => {
-      const key = p.species_name || 'Diğer';
+      const key = p.species_name || t('garden.other');
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(p);
     });
@@ -183,7 +187,7 @@ export default function MyGardenScreen({ navigation }: any) {
       );
       const updated = results.filter((r): r is CustProd => r !== null);
       setPlants((prev) => prev.map((p) => updated.find((u) => u.cust_prod_id === p.cust_prod_id) ?? p));
-      Alert.alert('Sulandı 💧', `${title} grubundaki ${updated.length} bitki sulandı.`);
+      Alert.alert(t('garden.watered'), `${title} — ${updated.length} ${t('garden.plantsWatered')}`);
     } finally {
       setBulkGroup(null);
     }
@@ -202,11 +206,11 @@ export default function MyGardenScreen({ navigation }: any) {
     }
     const pct = calculateWateringPercentage(p.last_watered_at, p.watering_interval_days);
     Alert.alert(
-      'Fazla sulama olabilir 💧',
-      `${p.name} kısa süre önce sulandı (toprak nemi %${pct}). Fazla su kökleri çürütebilir. Yine de sulansın mı?`,
+      t('garden.overWaterTitle'),
+      `${p.name}${t('garden.overWaterMsgA')}${pct}${t('garden.overWaterMsgB')}`,
       [
-        { text: 'Vazgeç', style: 'cancel' },
-        { text: 'Yine de sula', style: 'destructive', onPress: () => handleWaterPlant(p.cust_prod_id) },
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('garden.waterAnyway'), style: 'destructive', onPress: () => handleWaterPlant(p.cust_prod_id) },
       ]
     );
   };
@@ -221,22 +225,22 @@ export default function MyGardenScreen({ navigation }: any) {
     }
     if (needy.length === 0) {
       Alert.alert(
-        'Hepsi yeterince nemli 💧',
-        `${title} grubundaki tüm bitkiler yakında sulandı. Fazla sulama zararlı olabilir. Yine de hepsi sulansın mı?`,
+        t('garden.allMoistTitle'),
+        `${t('garden.allMoistPre')}${title}${t('garden.allMoistPost')}`,
         [
-          { text: 'Vazgeç', style: 'cancel' },
-          { text: 'Yine de hepsini sula', style: 'destructive', onPress: () => handleWaterGroup(title, plants) },
+          { text: t('common.cancel'), style: 'cancel' },
+          { text: t('garden.waterAllAnyway'), style: 'destructive', onPress: () => handleWaterGroup(title, plants) },
         ]
       );
       return;
     }
     Alert.alert(
-      'Bazı bitkiler zaten nemli 💧',
-      `${title} grubundaki ${moist.length} bitki yakında sulandı. Ne yapmak istersin?`,
+      t('garden.someMoistTitle'),
+      `${title}${t('garden.someMoistMid')}${moist.length}${t('garden.someMoistPost')}`,
       [
-        { text: 'Vazgeç', style: 'cancel' },
-        { text: `Sadece gerekenler (${needy.length})`, onPress: () => handleWaterGroup(title, needy) },
-        { text: 'Hepsini sula', style: 'destructive', onPress: () => handleWaterGroup(title, plants) },
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: `${t('garden.onlyNeeded')} (${needy.length})`, onPress: () => handleWaterGroup(title, needy) },
+        { text: t('garden.waterAll'), style: 'destructive', onPress: () => handleWaterGroup(title, plants) },
       ]
     );
   };
@@ -277,18 +281,18 @@ export default function MyGardenScreen({ navigation }: any) {
               </View>
             </View>
             
-            <Text style={styles.speciesName} numberOfLines={1}>{item.species_name}</Text>
+            <Text style={styles.speciesName} numberOfLines={1}>{specTypeLabel(item.species_name, lang)}</Text>
 
             {isPetToxic(item) && (
               <View style={styles.petWarnPill}>
-                <Text style={styles.petWarnText}>⚠️ Evcil hayvana zararlı</Text>
+                <Text style={styles.petWarnText}>{t('garden.petToxic')}</Text>
               </View>
             )}
 
             {/* Moisture Progress Bar */}
             <View style={styles.moistureSection}>
               <View style={styles.moistureHeader}>
-                <Text style={styles.moistureTitle}>Toprak Nemi</Text>
+                <Text style={styles.moistureTitle}>{t('garden.soilMoisture')}</Text>
                 <Text style={[styles.moistureValue, { color: moisturePct < 25 ? colors.red : moisturePct < 50 ? colors.amber : colors.primaryDeep }]}>
                   %{moisturePct}
                 </Text>
@@ -310,7 +314,7 @@ export default function MyGardenScreen({ navigation }: any) {
             <View style={styles.bottomMetaRow}>
               <View style={styles.metaLabelWrap}>
                 <Ionicons name="time-outline" size={14} color={colors.muted} />
-                <Text style={styles.metaLabel}>Sulama: {waterStatus.label}</Text>
+                <Text style={styles.metaLabel}>{t('garden.watering')}: {waterStatus.label}</Text>
               </View>
               
               <TouchableOpacity
@@ -324,7 +328,7 @@ export default function MyGardenScreen({ navigation }: any) {
                 ) : (
                   <>
                     <Ionicons name="water" size={13} color={colors.white} style={{ marginRight: 4 }} />
-                    <Text style={styles.quickWaterBtnText}>Sula</Text>
+                    <Text style={styles.quickWaterBtnText}>{t('garden.water')}</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -343,8 +347,8 @@ export default function MyGardenScreen({ navigation }: any) {
             <Ionicons name="arrow-back" size={24} color={colors.white} />
           </TouchableOpacity>
           <View style={styles.titleWrap}>
-            <Text style={styles.headerTitle}>Bitki Bahçem</Text>
-            <Text style={styles.headerSub}>Bitkilerinizin sağlık ve nem seviyeleri</Text>
+            <Text style={styles.headerTitle}>{t('garden.title')}</Text>
+            <Text style={styles.headerSub}>{t('garden.sub')}</Text>
           </View>
           <TouchableOpacity
             style={styles.addButton}
@@ -370,7 +374,7 @@ export default function MyGardenScreen({ navigation }: any) {
                   activeOpacity={0.8}
                 >
                   <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
-                    {loc.label}
+                    {t(loc.labelKey)}
                   </Text>
                 </TouchableOpacity>
               );
@@ -383,7 +387,7 @@ export default function MyGardenScreen({ navigation }: any) {
         <View style={styles.petBanner}>
           <Text style={styles.petBannerIcon}>🐾</Text>
           <Text style={styles.petBannerText}>
-            Bahçende evcil hayvana zararlı {toxicCount} bitki var. Kedi/köpeğin varsa erişemeyeceği yerde tut.
+            {t('garden.petBannerPre')}{toxicCount}{t('garden.petBannerPost')}
           </Text>
         </View>
       )}
@@ -401,7 +405,7 @@ export default function MyGardenScreen({ navigation }: any) {
           renderSectionHeader={({ section }) => (
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>
-                {section.title} · {section.data.length}
+                {specTypeLabel(section.title, lang)} · {section.data.length}
               </Text>
               <TouchableOpacity
                 style={[styles.groupWaterBtn, bulkGroup === section.title && styles.waterButtonDisabled]}
@@ -412,7 +416,7 @@ export default function MyGardenScreen({ navigation }: any) {
                 {bulkGroup === section.title ? (
                   <ActivityIndicator size="small" color={colors.white} />
                 ) : (
-                  <Text style={styles.groupWaterText}>💧 Hepsini Sula</Text>
+                  <Text style={styles.groupWaterText}>{t('garden.waterAllBtn')}</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -422,8 +426,8 @@ export default function MyGardenScreen({ navigation }: any) {
           ListFooterComponent={
             plants.length > 0 && recs.length > 0 ? (
               <View style={styles.recSection}>
-                <Text style={styles.recTitle}>🌱 Bahçene Göre Öneriler</Text>
-                <Text style={styles.recSub}>Bitkilerine uygun ürünler ve bahçe malzemeleri</Text>
+                <Text style={styles.recTitle}>{t('garden.recTitle')}</Text>
+                <Text style={styles.recSub}>{t('garden.recSub')}</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recRow}>
                   {recs.map((p) => (
                     <View key={p.prod_id} style={styles.recCard}>
@@ -438,7 +442,7 @@ export default function MyGardenScreen({ navigation }: any) {
                       {!!p.seller_name && <Text style={styles.recSeller} numberOfLines={1}>{p.seller_name}</Text>}
                       <Text style={styles.recPrice}>₺{Number(p.price).toFixed(2)}</Text>
                       <TouchableOpacity style={styles.recAddBtn} onPress={() => handleAddRec(p)} activeOpacity={0.85}>
-                        <Text style={styles.recAddText}>+ Sepete Ekle</Text>
+                        <Text style={styles.recAddText}>{t('garden.recAdd')}</Text>
                       </TouchableOpacity>
                     </View>
                   ))}
@@ -451,16 +455,14 @@ export default function MyGardenScreen({ navigation }: any) {
               <View style={styles.emptyIcon}>
                 <Ionicons name="leaf-outline" size={48} color={colors.primaryDeep} />
               </View>
-              <Text style={styles.emptyTitle}>Bahçeniz Henüz Boş</Text>
-              <Text style={styles.emptyText}>
-                Bahçenize henüz bir bitki eklemediniz. Sağ üstteki artı (+) butonuyla yeni bir bitki kaydedebilir veya AI analizinden sonra bitkilerinizi buraya yönlendirebilirsiniz.
-              </Text>
+              <Text style={styles.emptyTitle}>{t('garden.emptyTitle')}</Text>
+              <Text style={styles.emptyText}>{t('garden.emptyText')}</Text>
               <TouchableOpacity
                 style={styles.emptyBtn}
                 onPress={() => navigation.navigate('AddPlant')}
                 activeOpacity={0.8}
               >
-                <Text style={styles.emptyBtnText}>İlk Bitkimi Ekle</Text>
+                <Text style={styles.emptyBtnText}>{t('garden.addFirst')}</Text>
               </TouchableOpacity>
             </View>
           }

@@ -7,7 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import get_current_user
 from app.db.session import get_db
 from app.models.campaign import Campaign, UserCoupon
+from app.models.customer import Ind, Org
 from app.models.user import AppUser
+
 from app.schemas.campaign import CampaignOut, RedeemOut
 
 router = APIRouter(prefix="/campaigns", tags=["campaigns"])
@@ -35,8 +37,9 @@ async def list_campaigns(
     ).scalars().all()
 
     query = (
-        select(Campaign, AppUser.store_name, AppUser.first_name, AppUser.last_name)
-        .outerjoin(AppUser, AppUser.user_id == Campaign.seller_id)
+        select(Campaign, Org.store_name, Org.company_name, Ind.first_name, Ind.last_name)
+        .outerjoin(Org, Org.user_id == Campaign.seller_id)
+        .outerjoin(Ind, Ind.user_id == Campaign.seller_id)
         .where(Campaign.is_active.is_(True))
         .order_by(Campaign.seller_id, Campaign.required_points)
     )
@@ -52,10 +55,11 @@ async def list_campaigns(
             required_points=c.required_points,
             reward_text=c.reward_text,
             seller_id=c.seller_id,
-            seller_name=_store_name(store_name, first, last),
+            seller_name=_store_name(store_name or company_name, first, last),
         )
-        for (c, store_name, first, last) in rows
+        for (c, store_name, company_name, first, last) in rows
     ]
+
 
 
 @router.post("/{campaign_id}/redeem", response_model=RedeemOut)

@@ -15,6 +15,7 @@ import {
 import * as SplashScreen from 'expo-splash-screen';
 import React, { useCallback, useEffect } from 'react';
 import { AuthProvider } from './src/context/AuthContext';
+import { I18nProvider } from './src/i18n';
 import RootNavigator from './src/navigation/RootNavigator';
 
 SplashScreen.preventAutoHideAsync();
@@ -46,8 +47,10 @@ export default function App() {
   }
 
   return (
-    <AuthProvider>
-      <RootNavigator />
-    </AuthProvider>
+    <I18nProvider>
+      <AuthProvider>
+        <RootNavigator />
+      </AuthProvider>
+    </I18nProvider>
   );
 }
